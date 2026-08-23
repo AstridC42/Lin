@@ -860,4 +860,8 @@
   <string name="assistant_no_models" translatable="true" description="Shown when the assistant has no model to load. [CHAR_LIMIT=200]">No assistant model is available yet. Open the capability gallery to download one.</string>
   <!-- Content description of the button that returns to the assistant. [CHAR_LIMIT=40] -->
   <string name="cd_open_assistant" translatable="true" description="Content description of the button that returns to the assistant. [CHAR_LIMIT=40]">Open the assistant</string>
+  <!-- Title shown when the model list could not be loaded. [CHAR_LIMIT=60] -->
+  <string name="assistant_model_list_failed" translatable="true" description="Title shown when the model list could not be loaded. [CHAR_LIMIT=60]">Could not load the model list</string>
+  <!-- Label of the button that retries loading the model list. [CHAR_LIMIT=15] -->
+  <string name="assistant_retry" translatable="true" description="Label of the button that retries loading the model list. [CHAR_LIMIT=15]">Try again</string>
 </resources>
