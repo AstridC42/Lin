@@ -58,9 +58,13 @@ jobs:
 
       - name: Name the APKs after the commit
         id: rename
+        env:
+          # On a pull_request event the checkout is an ephemeral refs/pull/N/merge commit, so
+          # `git rev-parse HEAD` would name something that does not exist in the repository.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          short="$(git rev-parse --short HEAD)"
+          short="${HEAD_SHA:0:7}"
           mkdir -p "$RUNNER_TEMP/apks"
           shopt -s nullglob
           for apk in app/build/outputs/apk/release/*.apk; do
@@ -76,7 +80,7 @@ jobs:
           ls -lh "$RUNNER_TEMP/apks"
           echo "short=$short" >> "$GITHUB_OUTPUT"
 
-      # One artifact per ABI, so you download the ~112 MB you need rather than all ~500 MB.
+      # One artifact per ABI, so you download the ~43 MB you need rather than all ~190 MB.
       - name: Upload arm64-v8a (almost certainly the one you want)
         uses: actions/upload-artifact@v4
         with:
