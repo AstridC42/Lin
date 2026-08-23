@@ -71,16 +71,21 @@ future release is signed with a different key, and no existing install can upgra
 
 ## The download page
 
-`site/index.html` is published to GitHub Pages by the `Deploy static content to Pages` workflow,
-alongside the `skills/` directory at `/skills/`. The page reads the latest release from the GitHub
-API when someone opens it, so a new release shows up on it without the workflow running again — you
-only need to touch the page when the page itself changes.
+There is a ready-made download page at `site/index.html`. It is **not published** — GitHub Pages
+needs either a public repository or a paid plan, and this repository is private, so the Pages
+workflow was removed rather than left failing on every run. The
+[Releases page](https://github.com/AstridC42/Star-Storyteller-/releases) works on a private
+repository and is where the APKs live.
 
-**Pages has to be switched on once.** The workflow passes `enablement: true` to
-`actions/configure-pages`, which creates the Pages site on its first successful run. If that is
-refused — some org policies do not allow it — turn it on by hand under **Settings → Pages →
-Build and deployment → Source: GitHub Actions**, then re-run the workflow. Without either, the run
-fails at *Setup Pages* with `Get Pages site failed … Not Found`.
+To turn the site on later, once the repository is public or the account is on GitHub Pro:
+
+1. Restore the workflow from history:
+   `git show ddc4a8d:.github/workflows/static.yml > .github/workflows/static.yml`
+2. Push it to `main`, then run **Actions → Deploy static content to Pages → Run workflow**.
+
+It publishes `site/` at the root and `skills/` at `/skills/`. The page reads the latest release
+from the GitHub API when someone opens it, so releases appear on it without the workflow running
+again.
 
 ## Building a release locally
 
