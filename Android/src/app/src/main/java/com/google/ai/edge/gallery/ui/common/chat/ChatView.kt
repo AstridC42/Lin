@@ -141,6 +141,8 @@ fun ChatView(
   curSystemPrompt: String = "",
   onSystemPromptChanged: (String) -> Unit = {},
   sendMessageTrigger: SendMessageTrigger? = null,
+  /** Extra controls rendered between the message list and the text input. */
+  aboveInputContent: @Composable () -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
@@ -405,6 +407,7 @@ fun ChatView(
                       showImagePicker = showImagePicker,
                       showAudioPicker = showAudioPicker,
                       emptyStateComposable = emptyStateComposable,
+                      aboveInputContent = aboveInputContent,
                     )
                   // Model download
                   false ->

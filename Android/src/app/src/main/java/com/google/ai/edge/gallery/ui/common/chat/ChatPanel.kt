@@ -106,6 +106,7 @@ import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
+import com.google.ai.edge.gallery.data.usesAgentSkills
 import com.google.ai.edge.gallery.ui.common.AudioAnimation
 import com.google.ai.edge.gallery.ui.common.ErrorDialog
 import com.google.ai.edge.gallery.ui.common.FloatingBanner
@@ -148,6 +149,8 @@ fun ChatPanel(
   showImagePicker: Boolean = false,
   showAudioPicker: Boolean = false,
   emptyStateComposable: @Composable (Model) -> Unit = {},
+  /** Extra controls rendered between the message list and the text input. */
+  aboveInputContent: @Composable () -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
@@ -657,6 +660,8 @@ fun ChatPanel(
       val modelNotSupportAudioMsg = stringResource(R.string.model_not_support_audio_message)
       val imageLimitIgnoredMsg = stringResource(R.string.image_limit_ignored_message)
 
+      aboveInputContent()
+
       MessageInputText(
         task = task,
         modelManagerViewModel = modelManagerViewModel,
@@ -702,8 +707,8 @@ fun ChatPanel(
         onPickedImagesChanged = { pickedImagesCount = it.size },
         onPickedAudioClipsChanged = { pickedAudioClipsCount = it.size },
         showPromptTemplatesInMenu = false,
-        showSkillsPicker = task.id === BuiltInTaskId.LLM_AGENT_CHAT,
-        showMcpPicker = task.id === BuiltInTaskId.LLM_AGENT_CHAT,
+        showSkillsPicker = usesAgentSkills(task.id),
+        showMcpPicker = usesAgentSkills(task.id),
         showImagePicker = showImagePicker,
         showAudioPicker = showAudioPicker,
         showStopButtonWhenInProgress = showStopButtonInInputWhenInProgress,

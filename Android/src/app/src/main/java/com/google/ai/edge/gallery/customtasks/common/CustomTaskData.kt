@@ -46,4 +46,10 @@ data class CustomTaskDataForBuiltinTask(
   val onNavUp: () -> Unit,
   // The initial query to be sent to the model when the screen is first loaded.
   val initialQuery: String? = null,
+  // Content URIs of images to attach to that initial message. Set when the user shares images
+  // into the app, or fires the system assist gesture with a screenshot.
+  val initialImageUris: List<String> = listOf(),
+  // Opens the capability gallery. Only set for the assistant screen, which replaces the gallery
+  // as the app's start destination and therefore has to offer a way back to it.
+  val onOpenGallery: (() -> Unit)? = null,
 )

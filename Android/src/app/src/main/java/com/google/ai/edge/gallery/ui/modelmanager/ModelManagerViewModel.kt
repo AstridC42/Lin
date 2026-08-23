@@ -179,6 +179,8 @@ private val RESET_CONVERSATION_TURN_COUNT_CONFIG =
   )
 private val PREDEFINED_LLM_TASK_ORDER =
   listOf(
+    // The unified assistant leads the gallery: it is what the app opens on.
+    BuiltInTaskId.ASSISTANT,
     BuiltInTaskId.LLM_ASK_IMAGE,
     BuiltInTaskId.LLM_ASK_AUDIO,
     BuiltInTaskId.LLM_CHAT,
@@ -703,6 +705,7 @@ constructor(
 
     val setOfTasks =
       mutableSetOf(
+        BuiltInTaskId.ASSISTANT,
         BuiltInTaskId.LLM_CHAT,
         BuiltInTaskId.LLM_ASK_IMAGE,
         BuiltInTaskId.LLM_ASK_AUDIO,
@@ -1068,6 +1071,13 @@ constructor(
               model.configs = newConfigs
             }
           }
+
+          // The unified assistant is not listed in the remote allowlist, which only knows about
+          // the upstream task ids. Offer it every general-purpose chat model so any of them can
+          // be loaded straight from the assistant screen's model picker.
+          if (isAssistantCompatible(allowedModel.taskTypes)) {
+            curTasks.find { it.id == BuiltInTaskId.ASSISTANT }?.models?.add(model)
+          }
         }
 
         // Find models from allowlist if a task's `modelNames` field is not empty.
@@ -1214,6 +1224,7 @@ constructor(
       val model = createModelFromImportedModelInfo(info = importedModel)
 
       // Add to task.
+      tasks.get(key = BuiltInTaskId.ASSISTANT)?.models?.add(model)
       tasks.get(key = BuiltInTaskId.LLM_CHAT)?.models?.add(model)
       tasks.get(key = BuiltInTaskId.LLM_PROMPT_LAB)?.models?.add(model)
       tasks.get(key = BuiltInTaskId.LLM_AGENT_CHAT)?.models?.add(model)
@@ -1297,6 +1308,7 @@ constructor(
       capabilities.add(ModelCapability.LLM_THINKING)
       capabilityToTaskTypes[ModelCapability.LLM_THINKING] =
         listOf(
+          BuiltInTaskId.ASSISTANT,
           BuiltInTaskId.LLM_CHAT,
           BuiltInTaskId.LLM_ASK_IMAGE,
           BuiltInTaskId.LLM_ASK_AUDIO,
@@ -1306,6 +1318,7 @@ constructor(
       capabilities.add(ModelCapability.SPECULATIVE_DECODING)
       capabilityToTaskTypes[ModelCapability.SPECULATIVE_DECODING] =
         listOf(
+          BuiltInTaskId.ASSISTANT,
           BuiltInTaskId.LLM_CHAT,
           BuiltInTaskId.LLM_ASK_IMAGE,
           BuiltInTaskId.LLM_ASK_AUDIO,
@@ -1569,3 +1582,13 @@ constructor(
 private fun getAllowlistUrl(version: String): String {
   return "$ALLOWLIST_BASE_URL/${version}.json"
 }
+
+/**
+ * Whether a model advertised for [taskTypes] belongs on the unified assistant screen.
+ *
+ * Anything usable as a general chat model qualifies. Purpose-built models - the Tiny Garden and
+ * Mobile Actions demos, the scrapbook segmenter - do not, because they only respond sensibly
+ * inside their own task.
+ */
+private fun isAssistantCompatible(taskTypes: List<String>): Boolean =
+  taskTypes.contains(BuiltInTaskId.LLM_CHAT) || taskTypes.contains(BuiltInTaskId.LLM_AGENT_CHAT)

@@ -165,6 +165,8 @@ fun HomeScreen(
   navigateToTaskScreen: (Task) -> Unit,
   onModelsClicked: () -> Unit,
   onNotificationsClicked: () -> Unit,
+  /** Returns to the assistant, which is the app's start destination. */
+  onAssistantClicked: (() -> Unit)? = null,
   enableAnimation: Boolean,
   modifier: Modifier = Modifier,
   gm4: Boolean = false,
@@ -366,6 +368,10 @@ fun HomeScreen(
                       scope.launch { drawerState.apply { if (isClosed) open() else close() } }
                     },
                   ),
+                rightAction =
+                  onAssistantClicked?.let {
+                    AppBarAction(actionType = AppBarActionType.ASSISTANT, actionFn = it)
+                  },
               )
             }
           },

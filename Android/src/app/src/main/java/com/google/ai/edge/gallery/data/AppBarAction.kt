@@ -23,6 +23,8 @@ enum class AppBarActionType {
   DOWNLOAD_MANAGER,
   NAVIGATE_UP,
   MENU,
+  /** Returns to the assistant, which is the app's start destination. */
+  ASSISTANT,
 }
 
 class AppBarAction(val actionType: AppBarActionType, val actionFn: () -> Unit)

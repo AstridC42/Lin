@@ -75,6 +75,7 @@ import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.ai.edge.gallery.GalleryEvent
 import com.google.ai.edge.gallery.R
@@ -105,6 +106,7 @@ import com.google.ai.edge.gallery.ui.common.chat.LogMessage
 import com.google.ai.edge.gallery.ui.common.chat.LogMessageLevel
 import com.google.ai.edge.gallery.ui.common.chat.SendMessageTrigger
 import com.google.ai.edge.gallery.ui.common.chat.convertToLitertMessage
+import com.google.ai.edge.gallery.ui.common.chat.handleImagesSelected
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatScreen
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatViewModel
 import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
@@ -128,10 +130,28 @@ fun AgentChatScreen(
   modelManagerViewModel: ModelManagerViewModel,
   navigateUp: () -> Unit,
   agentTools: AgentTools,
-  viewModel: AgentChatViewModel = hiltViewModel(),
+  viewModel: LlmChatViewModel = hiltViewModel<AgentChatViewModel>(),
   skillManagerViewModel: SkillManagerViewModel = hiltViewModel(),
   mcpManagerViewModel: McpManagerViewModel = hiltViewModel(),
   initialQuery: String? = null,
+  /**
+   * Images to attach to the first message, as content URIs. Used when another app shares a picture
+   * into Star Storyteller.
+   */
+  initialImageUris: List<String> = listOf(),
+  /**
+   * Turns the stored system prompt into the one actually sent to the model, given whether any MCP
+   * tool is enabled. The unified assistant swaps in its own builder here; the upstream Agent Chat
+   * screen keeps the default.
+   */
+  baseSystemPromptResolver: (currentPrompt: String, hasMcpTools: Boolean) -> String =
+    ::getEffectiveBaseSystemPrompt,
+  /** Extra controls rendered between the message list and the text field. */
+  aboveInputContent: @Composable () -> Unit = {},
+  /** Replaces the headline of the empty state, keeping the "try this" chips below it. */
+  emptyStateHeadline: (@Composable () -> Unit)? = null,
+  /** Called after a full turn - model output plus any tool side effects - has been rendered. */
+  onTurnComplete: (Model) -> Unit = {},
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -184,8 +204,8 @@ fun AgentChatScreen(
       .filter { it.mcpServer.enabled }
       .sumOf { it.mcpServer.toolsList.count { tool -> tool.enabled } }
 
-  LaunchedEffect(uiSystemPrompt, mcpToolsCount) {
-    curSystemPrompt = getEffectiveBaseSystemPrompt(uiSystemPrompt, mcpToolsCount > 0)
+  LaunchedEffect(uiSystemPrompt, mcpToolsCount, baseSystemPromptResolver) {
+    curSystemPrompt = baseSystemPromptResolver(uiSystemPrompt, mcpToolsCount > 0)
   }
 
   val selectedModel = modelManagerUiState.selectedModel
@@ -203,34 +223,53 @@ fun AgentChatScreen(
     }
   }
 
-  var initialQueryConsumed by remember { mutableStateOf(false) }
+  // Re-keyed on the inputs so a *new* query - the system assist gesture firing again while the
+  // screen is already alive - is sent rather than swallowed.
+  var initialQueryConsumed by remember(initialQuery, initialImageUris) { mutableStateOf(false) }
 
   LaunchedEffect(
     llmChatUiState.isResettingSession,
     modelInitStatus?.status,
     selectedModel.name,
     initialQuery,
+    initialImageUris,
   ) {
     // Send the optional initial query to the model if the model is initialized and the initial
     // query is not consumed yet.
+    val hasInitialContent = !initialQuery.isNullOrEmpty() || initialImageUris.isNotEmpty()
     if (
-      !initialQuery.isNullOrEmpty() &&
+      hasInitialContent &&
         !initialQueryConsumed &&
         modelInitStatus?.status == ModelInitializationStatusType.INITIALIZED &&
         !llmChatUiState.isResettingSession
     ) {
       initialQueryConsumed = true
-      sendMessageTrigger =
-        SendMessageTrigger(
-          model = selectedModel,
-          messages = listOf(ChatMessageText(content = initialQuery, side = ChatSide.USER)),
-        )
+      val messages = mutableListOf<ChatMessage>()
+      if (initialImageUris.isNotEmpty()) {
+        buildSharedImageMessage(
+            context = context,
+            uris = initialImageUris,
+            maxSize = (screenWidthDp.value * 0.8).toInt(),
+          )
+          ?.let(messages::add)
+      }
+      // A shared image with no caption still needs a prompt, or the model has nothing to answer.
+      val queryText =
+        initialQuery.orEmpty().ifEmpty {
+          if (messages.isEmpty()) "" else context.getString(R.string.assistant_shared_image_prompt)
+        }
+      if (queryText.isNotEmpty()) {
+        messages.add(ChatMessageText(content = queryText, side = ChatSide.USER))
+      }
+      if (messages.isNotEmpty()) {
+        sendMessageTrigger = SendMessageTrigger(model = selectedModel, messages = messages)
+      }
     }
   }
 
   LlmChatScreen(
     modelManagerViewModel = modelManagerViewModel,
-    taskId = BuiltInTaskId.LLM_AGENT_CHAT,
+    taskId = task.id,
     navigateUp = navigateUp,
     viewModel = viewModel,
     skillCount = skillCount,
@@ -284,6 +323,7 @@ fun AgentChatScreen(
           agentTools.resultWebviewToShow = null
         }
         updateProgressPanel(viewModel = viewModel, model = model, agentTools = agentTools)
+        onTurnComplete(model)
       }
     },
     onResetSessionClickedOverride = { task, _, initialMessages, clearHistory ->
@@ -296,6 +336,7 @@ fun AgentChatScreen(
         agentTools,
         initialMessages = initialMessages,
         clearHistory = clearHistory,
+        baseSystemPromptResolver = baseSystemPromptResolver,
       )
     },
     onSkillClicked = { showSkillManagerBottomSheet = true },
@@ -513,6 +554,9 @@ fun AgentChatScreen(
           exit = fadeOut(animationSpec = tween(200)),
         ) {
           Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (emptyStateHeadline != null) {
+              emptyStateHeadline()
+            } else {
             Column(
               modifier =
                 Modifier.align(Alignment.Center)
@@ -550,6 +594,7 @@ fun AgentChatScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
               )
+            }
             }
           }
         }
@@ -607,6 +652,7 @@ fun AgentChatScreen(
       }
     },
     sendMessageTrigger = sendMessageTrigger,
+    aboveInputContent = aboveInputContent,
   )
 
   if (showAskInfoDialog && currentAskInfoAction != null) {
@@ -672,6 +718,7 @@ fun AgentChatScreen(
             task,
             curSystemPrompt,
             agentTools,
+            baseSystemPromptResolver = baseSystemPromptResolver,
           )
         }
       },
@@ -692,6 +739,7 @@ fun AgentChatScreen(
             task,
             curSystemPrompt,
             agentTools,
+            baseSystemPromptResolver = baseSystemPromptResolver,
           )
         }
       },
@@ -752,7 +800,14 @@ private fun updateProgressPanel(viewModel: LlmChatViewModel, model: Model, agent
   }
 }
 
-private fun resetSessionWithCurrentSkillsAndMcps(
+/**
+ * Rebuilds the LLM session with the skills, MCP tools and system prompt that are active right now.
+ *
+ * Internal rather than private because the assistant screen calls it when the user switches mode:
+ * the mode is part of the system prompt, so the session has to be rebuilt for the change to take
+ * effect, and it is done with `clearHistory = false` so the conversation survives the switch.
+ */
+internal fun resetSessionWithCurrentSkillsAndMcps(
   viewModel: LlmChatViewModel,
   modelManagerViewModel: ModelManagerViewModel,
   skillManagerViewModel: SkillManagerViewModel,
@@ -762,11 +817,13 @@ private fun resetSessionWithCurrentSkillsAndMcps(
   onDone: (Model) -> Unit = {},
   initialMessages: List<ChatMessage> = listOf(),
   clearHistory: Boolean = true,
+  baseSystemPromptResolver: (currentPrompt: String, hasMcpTools: Boolean) -> String =
+    ::getEffectiveBaseSystemPrompt,
 ) {
   val model = modelManagerViewModel.uiState.value.selectedModel
   val litertMessages = initialMessages.mapNotNull { convertToLitertMessage(it) }
   val toolsPrompt = agentTools.mcpManagerViewModel.getToolsPrompt()
-  val actualSystemPrompt = getEffectiveBaseSystemPrompt(curSystemPrompt, toolsPrompt.isNotEmpty())
+  val actualSystemPrompt = baseSystemPromptResolver(curSystemPrompt, toolsPrompt.isNotEmpty())
 
   val selectedSkills =
     runBlocking(Dispatchers.Default) { skillManagerViewModel.skillManager.getAvailableSkills() }
@@ -793,6 +850,32 @@ private fun resetSessionWithCurrentSkillsAndMcps(
     initialMessages = litertMessages,
     clearHistory = clearHistory,
   )
+}
+
+/**
+ * Turns content URIs shared into the app into one attachable chat message.
+ *
+ * Returns null when nothing could be decoded, for instance when the sharing app revoked the URI
+ * permission before the assistant screen composed.
+ */
+private fun buildSharedImageMessage(
+  context: Context,
+  uris: List<String>,
+  maxSize: Int,
+): ChatMessageImage? {
+  var message: ChatMessageImage? = null
+  handleImagesSelected(context = context, uris = uris.map { it.toUri() }) { bitmaps ->
+    if (bitmaps.isNotEmpty()) {
+      message =
+        ChatMessageImage(
+          bitmaps = bitmaps,
+          imageBitMaps = bitmaps.map { it.asImageBitmap() },
+          side = ChatSide.USER,
+          maxSize = maxSize,
+        )
+    }
+  }
+  return message
 }
 
 class ChatWebViewJavascriptInterface {

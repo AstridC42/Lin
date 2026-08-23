@@ -50,6 +50,8 @@ import androidx.core.net.toUri
 import androidx.core.os.bundleOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import com.google.ai.edge.gallery.assistant.AssistantIntents
+import com.google.ai.edge.gallery.assistant.AssistantLaunchRequest
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.theme.GalleryTheme
 import com.google.ai.edge.litertlm.ExperimentalApi
@@ -66,6 +68,15 @@ class MainActivity : ComponentActivity() {
   private var splashScreenAboutToExit: Boolean = false
   private var contentSet: Boolean = false
 
+  /**
+   * What the launching intent asked the assistant to do.
+   *
+   * Kept as Compose state rather than read straight off `getIntent()` so that a second assist
+   * gesture, or a share while the app is already open, reaches the assistant screen through
+   * [onNewIntent] instead of being ignored.
+   */
+  private var assistantRequest by mutableStateOf(AssistantLaunchRequest())
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // We intentionally pass null to discard the saved instance state bundle.
     // This prevents Jetpack Compose from automatically restoring the previous screen
@@ -78,6 +89,8 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "onCreate Extra -> Key: $key, Value: ${extras.get(key)}")
       }
     }
+
+    assistantRequest = AssistantIntents.parse(intent)
 
     // Convert FCM Console data extras to intent data for GalleryNavGraph to pick up
     intent.getStringExtra("deeplink")?.let { link ->
@@ -98,7 +111,11 @@ class MainActivity : ComponentActivity() {
       setContent {
         GalleryTheme {
           Surface(modifier = Modifier.fillMaxSize()) {
-            GalleryApp(modelManagerViewModel = modelManagerViewModel)
+            GalleryApp(
+              modelManagerViewModel = modelManagerViewModel,
+              initialAssistantQuery = assistantRequest.query.ifEmpty { null },
+              initialAssistantImageUris = assistantRequest.imageUris,
+            )
 
             // Fade out a "mask" that has the same color as the background of the splash screen
             // to reveal the actual app content.
@@ -185,6 +202,10 @@ class MainActivity : ComponentActivity() {
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
+
+    if (AssistantIntents.isAssistantIntent(intent)) {
+      assistantRequest = AssistantIntents.parse(intent)
+    }
 
     // Debug: Dump all intent extras to see what FCM unloads
     intent.extras?.let { extras ->

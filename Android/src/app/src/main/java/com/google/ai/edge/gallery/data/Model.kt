@@ -234,14 +234,14 @@ data class Model(
    * manually manage model files instead of downloading them. This dir is relative to the app's
    * "External Files Directory", which is: /storage/emulated/0/Android/data/<app_id>/files/.
    *
-   * The <app_id> depends on how the app was built:
-   * - `com.google.aiedge.gallery` for builds from the GitHub source.
-   * - `com.google.ai.edge.gallery` for other builds (Play store, internal, etc).
+   * The <app_id> for Star Storyteller builds is `com.starstoryteller.assistant`. Upstream Edge
+   * Gallery uses `com.google.aiedge.gallery` for GitHub builds and `com.google.ai.edge.gallery`
+   * for other builds (Play store, internal, etc).
    *
    * For example, if this field is set to "my_model/local_dir/", then the location you should push
    * files to is (assuming non-github builds):
    *
-   * /storage/emulated/0/Android/data/com.google.ai.edge.gallery/files/my_model/local_dir/
+   * /storage/emulated/0/Android/data/com.starstoryteller.assistant/files/my_model/local_dir/
    *
    * You can get the full path to a specific file within your code using `Model.getPath(Context,
    * fileNameToGet)`.

@@ -80,6 +80,8 @@ fun LlmChatScreen(
   skillCount: Int = 0,
   mcpCount: Int = 0,
   mcpToolsCount: Int = 0,
+  /** Extra controls rendered between the message list and the text input. */
+  aboveInputContent: @Composable () -> Unit = {},
 ) {
   ChatViewWrapper(
     viewModel = viewModel,
@@ -104,6 +106,7 @@ fun LlmChatScreen(
     showImagePicker = showImagePicker,
     showAudioPicker = showAudioPicker,
     getActiveSkills = getActiveSkills,
+    aboveInputContent = aboveInputContent,
   )
 }
 
@@ -221,6 +224,8 @@ fun ChatViewWrapper(
   skillCount: Int = 0,
   mcpCount: Int = 0,
   mcpToolsCount: Int = 0,
+  /** Extra controls rendered between the message list and the text input. */
+  aboveInputContent: @Composable () -> Unit = {},
 ) {
   val context = LocalContext.current
   val task = modelManagerViewModel.getTaskById(id = taskId)!!
@@ -345,5 +350,6 @@ fun ChatViewWrapper(
     onSystemPromptChanged = onSystemPromptChanged,
     sendMessageTrigger = sendMessageTrigger,
     showAudioPicker = showAudioPicker,
+    aboveInputContent = aboveInputContent,
   )
 }

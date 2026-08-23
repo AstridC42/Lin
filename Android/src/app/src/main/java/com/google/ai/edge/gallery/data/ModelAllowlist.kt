@@ -215,7 +215,7 @@ data class AllowedModel(
       llmMaxToken = llmMaxToken,
       accelerators = accelerators,
       visionAccelerator = visionAccelerator,
-      bestForTaskIds = bestForTaskTypes ?: listOf(),
+      bestForTaskIds = withAssistantMirroring(bestForTaskTypes ?: listOf()),
       localModelFilePathOverride = localModelFilePathOverride ?: "",
       isLlm = isLlmModel,
       runtimeType = runtimeType ?: RuntimeType.LITERT_LM,
@@ -223,7 +223,10 @@ data class AllowedModel(
       aicorePreference = aicorePreference,
       parentModelName = parentModelName,
       variantLabel = variantLabel,
-      capabilityToTaskTypes = capabilityToTaskTypes ?: emptyMap(),
+      capabilityToTaskTypes =
+        (capabilityToTaskTypes ?: emptyMap()).mapValues { (_, taskTypes) ->
+          withAssistantMirroring(taskTypes)
+        },
       updatableModelFiles = updatableModelFiles ?: listOf(),
       updateInfo = updateInfo ?: "",
       extraDataFiles = extraDataFiles ?: listOf(),
@@ -235,6 +238,21 @@ data class AllowedModel(
     return "$modelId/$modelFile"
   }
 }
+
+/**
+ * Mirrors an `llm_chat` entry onto Star Storyteller's unified assistant task.
+ *
+ * The remote allowlist is written against the upstream task ids and has no way to know about the
+ * assistant, so a capability the model advertises for plain chat - thinking, speculative decoding,
+ * being the recommended model - has to be carried over here, or those options would be hidden on
+ * the assistant screen.
+ */
+private fun withAssistantMirroring(taskTypes: List<String>): List<String> =
+  if (taskTypes.contains(BuiltInTaskId.LLM_CHAT) && !taskTypes.contains(BuiltInTaskId.ASSISTANT)) {
+    taskTypes + BuiltInTaskId.ASSISTANT
+  } else {
+    taskTypes
+  }
 
 /** Specific device requirements grouped by a descriptive name. */
 data class NamedDeviceGroup(

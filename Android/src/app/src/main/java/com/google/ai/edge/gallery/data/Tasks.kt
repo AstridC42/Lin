@@ -134,6 +134,13 @@ data class Task(
 }
 
 object BuiltInTaskId {
+  /**
+   * Star Storyteller's unified assistant: one chat screen that reaches every capability. It is
+   * the app's start destination and the only task that is offered every general-purpose LLM in
+   * the allowlist.
+   */
+  const val ASSISTANT = "assistant"
+
   const val LLM_CHAT = "llm_chat"
   const val LLM_PROMPT_LAB = "llm_prompt_lab"
   const val LLM_ASK_IMAGE = "llm_ask_image"
@@ -146,6 +153,8 @@ object BuiltInTaskId {
 
 private val allLegacyTaskIds: MutableSet<String> =
   mutableSetOf(
+    // The assistant screen brings its own scaffold and app bar, like the other chat screens.
+    BuiltInTaskId.ASSISTANT,
     BuiltInTaskId.LLM_CHAT,
     BuiltInTaskId.LLM_PROMPT_LAB,
     BuiltInTaskId.LLM_ASK_IMAGE,
@@ -155,4 +164,15 @@ private val allLegacyTaskIds: MutableSet<String> =
 
 fun isLegacyTasks(id: String): Boolean {
   return allLegacyTaskIds.contains(id)
+}
+
+/**
+ * Whether a task runs the agent loop with skills and MCP tools.
+ *
+ * Both the upstream Agent Chat screen and Star Storyteller's unified assistant do, so anything
+ * that special-cases the agent - the skills and MCP pickers in the input bar, the agent-specific
+ * top-K handling - has to apply to both.
+ */
+fun usesAgentSkills(id: String): Boolean {
+  return id == BuiltInTaskId.LLM_AGENT_CHAT || id == BuiltInTaskId.ASSISTANT
 }

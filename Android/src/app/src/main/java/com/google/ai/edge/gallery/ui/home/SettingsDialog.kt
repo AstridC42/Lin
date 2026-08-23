@@ -17,10 +17,13 @@
 package com.google.ai.edge.gallery.ui.home
 
 import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
+import android.Manifest
 import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +31,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -54,8 +58,10 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -76,6 +82,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.google.ai.edge.gallery.BuildConfig
 import com.google.ai.edge.gallery.R
+import com.google.ai.edge.gallery.assistant.WebSearchSettingsDialog
+import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.proto.Theme
 import com.google.ai.edge.gallery.ui.common.ClickableLink
 import com.google.ai.edge.gallery.ui.common.tos.AppTosDialog
@@ -111,6 +119,26 @@ fun SettingsDialog(
   val focusRequester = remember { FocusRequester() }
   val interactionSource = remember { MutableInteractionSource() }
   var showTos by remember { mutableStateOf(false) }
+  var showWebSearchSettings by remember { mutableStateOf(false) }
+  var webSearchRevision by remember { mutableIntStateOf(0) }
+  val searxngClient = remember {
+    SearxngClient { modelManagerViewModel.dataStoreRepository.readWebSearchSettings() }
+  }
+  val webSearchConfigured = remember(webSearchRevision) { searxngClient.isConfigured() }
+  var allowDirectCalls by remember {
+    mutableStateOf(modelManagerViewModel.dataStoreRepository.readAssistantSettings().allowDirectCalls)
+  }
+  // Direct dialing is useless without CALL_PHONE, so the switch asks for it as it is turned on.
+  val callPermissionLauncher =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      if (!granted) {
+        allowDirectCalls = false
+        val repository = modelManagerViewModel.dataStoreRepository
+        repository.saveAssistantSettings(
+          repository.readAssistantSettings().toBuilder().setAllowDirectCalls(false).build()
+        )
+      }
+    }
 
   Dialog(onDismissRequest = onDismissed) {
     val focusManager = LocalFocusManager.current
@@ -189,6 +217,66 @@ fun SettingsDialog(
                   label = { Text(stringResource(themeLabelRes(theme))) },
                 )
               }
+            }
+          }
+
+          // Star Storyteller assistant settings: the SearXNG connection and whether the
+          // assistant may dial without the user tapping call.
+          Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Text(
+              stringResource(R.string.assistant_settings_title),
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
+            )
+
+            TextButton(
+              onClick = { showWebSearchSettings = true },
+              contentPadding = PaddingValues(horizontal = 0.dp),
+            ) {
+              Text(
+                stringResource(R.string.web_search_settings_title) +
+                  if (webSearchConfigured) " · on" else " · off"
+              )
+            }
+
+            Row(
+              modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Column(
+                modifier = Modifier.weight(1f).padding(end = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+              ) {
+                Text(
+                  stringResource(R.string.assistant_allow_direct_calls),
+                  style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                  stringResource(R.string.assistant_allow_direct_calls_desc),
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+              Switch(
+                checked = allowDirectCalls,
+                onCheckedChange = { enabled ->
+                  allowDirectCalls = enabled
+                  val repository = modelManagerViewModel.dataStoreRepository
+                  repository.saveAssistantSettings(
+                    repository
+                      .readAssistantSettings()
+                      .toBuilder()
+                      .setAllowDirectCalls(enabled)
+                      .build()
+                  )
+                  if (enabled) {
+                    callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                  }
+                },
+              )
             }
           }
 
@@ -378,6 +466,17 @@ fun SettingsDialog(
 
   if (showTos) {
     AppTosDialog(onTosAccepted = { showTos = false }, viewingMode = true)
+  }
+
+  if (showWebSearchSettings) {
+    WebSearchSettingsDialog(
+      dataStoreRepository = modelManagerViewModel.dataStoreRepository,
+      searxngClient = searxngClient,
+      onDismiss = {
+        showWebSearchSettings = false
+        webSearchRevision++
+      },
+    )
   }
 }
 
