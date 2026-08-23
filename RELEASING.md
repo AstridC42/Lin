@@ -69,6 +69,19 @@ Then add four repository secrets under **Settings → Secrets and variables → 
 **Keep `upload.jks` and its passwords somewhere safe and backed up.** Losing them means every
 future release is signed with a different key, and no existing install can upgrade to it.
 
+## The download page
+
+`site/index.html` is published to GitHub Pages by the `Deploy static content to Pages` workflow,
+alongside the `skills/` directory at `/skills/`. The page reads the latest release from the GitHub
+API when someone opens it, so a new release shows up on it without the workflow running again — you
+only need to touch the page when the page itself changes.
+
+**Pages has to be switched on once.** The workflow passes `enablement: true` to
+`actions/configure-pages`, which creates the Pages site on its first successful run. If that is
+refused — some org policies do not allow it — turn it on by hand under **Settings → Pages →
+Build and deployment → Source: GitHub Actions**, then re-run the workflow. Without either, the run
+fails at *Setup Pages* with `Get Pages site failed … Not Found`.
+
 ## Building a release locally
 
 ```bash
