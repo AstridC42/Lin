@@ -132,6 +132,13 @@ It also accepts:
 Replies can be read out loud with the platform text-to-speech engine; markdown
 is flattened first so it does not read asterisks aloud.
 
+## Download
+
+Every version is published on the
+[Releases page](https://github.com/AstridC42/Star-Storyteller-/releases) with prebuilt APKs
+attached. Take `arm64-v8a` unless you know your phone is something else, or `universal` if you
+would rather not think about it. See [RELEASING.md](RELEASING.md) for how releases are cut.
+
 ## Building
 
 ```bash
