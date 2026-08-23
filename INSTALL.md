@@ -32,7 +32,8 @@ Every push to `main` builds APKs and keeps them for 14 days.
 2. Scroll to **Artifacts** at the bottom.
 3. Download `apk-arm64-v8a-<commit>`.
 
-GitHub always zips artifacts, so you get a `.zip` — unzip it and you have the APK. Easy on a
+GitHub always zips artifacts, so you get a `.zip` — unzip it and you have the APK. The zip is
+about 43 MB for arm64-v8a (APKs compress well), against 112 MB for the APK inside it. Easy on a
 computer, fiddly on a phone. Use a release when the target is a phone.
 
 To build a commit that has not been built yet: **Actions** → **Build Android APK** → **Run
