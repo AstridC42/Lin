@@ -1,12 +1,23 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Publishes the Star Storyteller site to GitHub Pages.
+#
+# The site is two things:
+#   /        the download page, which reads the latest release from the GitHub API at load time,
+#            so a new release appears on it without this workflow running again
+#   /skills/ the agent skill files, as upstream Edge Gallery published them
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
     paths:
+      - 'site/**'
       - 'skills/**'
+      - '.github/workflows/static.yml'
+
+  # Refresh the site after a release is published. The page fetches releases client-side, so this
+  # is only needed when the page itself changed; it is here so a release never leaves a stale site.
+  release:
+    types: [published]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -24,7 +35,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
@@ -33,19 +43,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      # Create the nested directory structure
-      - name: Prepare for nested deployment
+
+      - name: Assemble the site
         run: |
+          set -euo pipefail
           mkdir -p staging/skills
-          # Move all files (except the staging folder itself) into the subdirectory
-          rsync -rr --exclude='staging' ./skills/ staging/skills/
+          cp -R site/. staging/
+          cp -R skills/. staging/skills/
+          # Pages runs the output through Jekyll unless told not to, which drops files and
+          # directories whose names begin with an underscore.
+          touch staging/.nojekyll
+          find staging -maxdepth 2 -type f | sort
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Creates the Pages site on first run. Without this the action calls "get a Pages site",
+          # gets a 404 on a repository where Pages was never switched on, and fails the job.
+          enablement: true
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
           path: 'staging/'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

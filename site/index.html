@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star Storyteller — an assistant that never leaves the phone</title>
+<meta name="description" content="An on-device Android assistant. Ask it anything, show it a photo, tell it to call someone. Download the latest release.">
+<meta property="og:title" content="Star Storyteller">
+<meta property="og:description" content="An on-device Android assistant. The model runs on your phone; web search goes to your own SearXNG instance.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⭐</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap">
+<style>
+  :root {
+    --bg: #131314;
+    --surface: #1B1B1B;
+    --surface-high: #1E1F20;
+    --outline: #333537;
+    --outline-strong: #444746;
+    --on-surface: #E3E3E3;
+    --on-surface-variant: #C4C7C5;
+    --muted: #8E918F;
+    --primary: #A8C7FA;
+    --on-primary: #062E6F;
+    --primary-container: #0842A0;
+    --on-primary-container: #D3E3FD;
+    --accent-bg: #10233F;
+    --accent-border: #3B5C8F;
+    --green: #6DD58C;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: Nunito, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { color: var(--on-primary-container); }
+  code, .mono {
+    font-family: ui-monospace, "SFMono-Regular", "Roboto Mono", monospace;
+    font-size: 0.88em;
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+  /* Nav */
+  nav { display: flex; align-items: center; justify-content: space-between; gap: 16px 26px; flex-wrap: wrap; padding-top: 26px; }
+  .brand { display: flex; align-items: center; gap: 11px; font-size: 17px; font-weight: 800; letter-spacing: -0.2px; color: #fff; }
+  .nav-links { display: flex; gap: 26px; font-size: 14px; font-weight: 600; color: var(--on-surface-variant); }
+  .nav-links a { color: inherit; }
+  .nav-links a:hover { color: #fff; }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 64px; align-items: center; padding: 68px 0 0; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
+    border: 1px solid var(--outline-strong); border-radius: 999px;
+    font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 26px;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--green); }
+  h1 { margin: 0; font-size: clamp(38px, 5.2vw, 60px); line-height: 1.04; font-weight: 900; letter-spacing: -1.6px; color: #fff; text-wrap: balance; }
+  .lede { margin: 24px 0 0; font-size: 19px; line-height: 1.55; color: var(--on-surface-variant); max-width: 540px; text-wrap: pretty; }
+  .cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 36px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px; padding: 15px 26px;
+    border-radius: 999px; font-size: 15px; font-weight: 800; border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--primary); color: var(--on-primary); }
+  .btn-primary:hover { background: var(--on-primary-container); color: var(--on-primary); }
+  .btn-ghost { border-color: var(--outline-strong); color: var(--on-surface); }
+  .btn-ghost:hover { border-color: var(--muted); color: #fff; }
+  .fineprint { margin: 17px 0 0; font-size: 13px; color: var(--muted); }
+
+  /* Phone */
+  .phone { justify-self: center; width: 300px; max-width: 100%; border: 1px solid var(--outline); border-radius: 34px; background: var(--surface-high); padding: 10px; box-shadow: 0 40px 90px rgba(0,0,0,.55); }
+  .screen { background: var(--bg); border-radius: 26px; padding: 20px 16px; display: flex; flex-direction: column; gap: 14px; min-height: 372px; }
+  .screen-head { display: flex; align-items: center; gap: 8px; justify-content: center; padding-bottom: 6px; }
+  .bubble-user { align-self: flex-end; max-width: 82%; background: var(--primary-container); color: var(--on-primary-container); border-radius: 18px 18px 4px 18px; padding: 11px 14px; font-size: 13px; line-height: 1.45; }
+  .bubble-agent { align-self: flex-start; max-width: 88%; background: var(--surface-high); border-radius: 18px 18px 18px 4px; padding: 11px 14px; font-size: 13px; line-height: 1.5; }
+  .thumb { height: 62px; border-radius: 10px; background: linear-gradient(135deg,#2E96FF33,#B1C5FF22); border: 1px solid #ffffff1f; margin-bottom: 9px; display: grid; place-items: center; }
+  .chip-row { margin-top: auto; display: flex; gap: 7px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--outline-strong); border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 700; color: var(--on-surface-variant); }
+  .chip-on { color: var(--primary); }
+
+  /* Sections */
+  section { margin-top: 84px; border-top: 1px solid #282A2C; padding-top: 50px; }
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  h2 { margin: 0; font-size: 27px; font-weight: 800; letter-spacing: -0.5px; color: #fff; }
+  .sec-note { font-size: 13px; color: var(--muted); }
+  .sec-lede { margin: 8px 0 26px; font-size: 15px; color: var(--on-surface-variant); }
+
+  /* Downloads */
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .card {
+    border: 1px solid var(--outline); background: var(--surface); border-radius: 18px;
+    padding: 20px; display: flex; flex-direction: column; transition: border-color .15s ease, transform .15s ease;
+  }
+  a.card:hover { border-color: var(--primary); transform: translateY(-2px); }
+  .card-rec { border-color: var(--accent-border); background: var(--accent-bg); }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .card-abi { font-size: 15px; font-weight: 800; color: #fff; word-break: break-word; }
+  .card-tag { font-size: 12px; font-weight: 700; color: var(--primary); white-space: nowrap; }
+  .card-for { font-size: 13px; line-height: 1.45; color: var(--on-surface-variant); flex-grow: 1; }
+  .card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding-top: 14px; border-top: 1px solid #ffffff14; font-size: 13px; font-weight: 700; color: var(--primary); }
+
+  .notice { display: flex; gap: 10px; align-items: flex-start; margin-top: 20px; border: 1px solid var(--outline); background: var(--surface); border-radius: 14px; padding: 14px 18px; font-size: 13px; line-height: 1.5; color: var(--on-surface-variant); }
+  .notice svg { flex-shrink: 0; margin-top: 1px; }
+
+  /* Steps */
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+  .step { display: flex; flex-direction: column; gap: 11px; }
+  .step-n { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; background: var(--primary-container); color: var(--on-primary-container); font-size: 14px; font-weight: 800; }
+  .step-t { font-size: 16px; font-weight: 800; color: #fff; }
+  .step-b { font-size: 14px; line-height: 1.55; color: var(--on-surface-variant); }
+
+  footer { margin: 68px 0 60px; border-top: 1px solid #282A2C; padding-top: 24px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+
+  .loading { color: var(--muted); font-size: 14px; }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 940px) {
+    .hero { grid-template-columns: 1fr; gap: 44px; padding-top: 48px; }
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .steps { grid-template-columns: 1fr; gap: 26px; }
+  }
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: 1fr; }
+    .nav-links { gap: 18px; }
+    section { margin-top: 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav>
+    <div class="brand">
+      <svg width="26" height="27" viewBox="0 0 66 68" aria-hidden="true">
+        <defs><linearGradient id="star" x1="16.12" y1="50.92" x2="50.31" y2="17.68" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#446EFF"/><stop offset=".37" stop-color="#2E96FF"/><stop offset=".83" stop-color="#B1C5FF"/>
+        </linearGradient></defs>
+        <path fill-rule="evenodd" fill="url(#star)" d="M33.93 16.71c-0.3-1.03-0.52-2.08-0.67-3.16v-3.1c5.9 0.06 11.28 2.43 15.3 6.26H33.92Zm-1.9 0c0.32-1.04 0.55-2.12 0.71-3.21v-3.05c-5.9 0.06-11.28 2.43-15.3 6.26h14.6ZM17.1 17.24h14.77c-0.21 0.66-0.46 1.3-0.73 1.95-1.18 2.84-2.8 5.32-4.84 7.44l-9.2-9.4Zm-0.73-0.53H8.2v0.53h8.01c-3.96 4.2-6.41 9.9-6.48 16.19H0v0.52h9.72c0.07 6.28 2.52 11.98 6.48 16.19H8.2v0.52h8.18v8.36h0.51v-8.18c4.13 4.04 9.71 6.54 15.86 6.61v9.92h0.52v-9.92c6.15-0.07 11.73-2.57 15.86-6.61v8.18h0.5v-8.36h8.2v-0.52H49.8c3.96-4.21 6.41-9.9 6.48-16.2H66v-0.51h-9.72c-0.07-6.29-2.52-11.98-6.48-16.2h8.01v-0.52h-8.18V8.36h-0.51v8.18c-4.13-4.04-9.71-6.55-15.86-6.62V0h-0.52v9.92C26.6 10 21.01 12.5 16.88 16.54V8.36h-0.5v8.35Zm16.89 40.22c5.9-0.07 11.28-2.44 15.3-6.27H33.92c-0.3 1.03-0.52 2.09-0.67 3.16v3.1Zm-0.52-3.05c-0.16-1.1-0.4-2.17-0.7-3.22h-14.6c4.02 3.83 9.4 6.2 15.3 6.27v-3.05Zm-22.5-20.45h3.04c1.05-0.16 2.08-0.4 3.1-0.7V17.81c-3.76 4.1-6.08 9.58-6.15 15.62Zm2.98 0.52h-2.99c0.07 6.03 2.39 11.52 6.14 15.61V34.67c-1.02-0.32-2.07-0.56-3.15-0.72Zm42.55-0.52c-0.07-6.04-2.39-11.52-6.14-15.62v14.92c1 0.3 2.04 0.54 3.1 0.7h3.04Zm-3 0.52c-1.07 0.16-2.12 0.4-3.14 0.72v14.9c3.75-4.1 6.07-9.59 6.14-15.62h-3Zm-3.65 15.97V34.84c-0.65 0.22-1.3 0.47-1.92 0.75-2.78 1.2-5.21 2.85-7.28 4.94l9.2 9.4Zm0-17.35v-15.3l-0.04-0.03H34.1c0.2 0.66 0.45 1.3 0.71 1.95 1.25 2.9 2.91 5.4 5 7.55 2.1 2.14 4.57 3.84 7.4 5.1 0.63 0.28 1.27 0.52 1.92 0.73ZM16.88 50.1V34.84c0.65 0.22 1.3 0.47 1.92 0.75 2.83 1.23 5.3 2.91 7.4 5.05 2.09 2.14 3.73 4.65 4.94 7.54 0.27 0.65 0.52 1.3 0.73 1.96H16.92l-0.04-0.04Zm0-17.53V17.76L25.93 27c-2.04 2.01-4.41 3.63-7.13 4.85-0.63 0.27-1.27 0.51-1.92 0.72ZM34.1 50.14H48.6l-9.04-9.24c-1.98 2.08-3.56 4.51-4.76 7.28-0.26 0.65-0.5 1.3-0.7 1.96ZM27.64 28.2c-2.26 2.31-4.9 4.14-7.92 5.5 3.01 1.33 5.66 3.15 7.92 5.45 2.26 2.3 4.03 5 5.33 8.09 1.34-3.08 3.13-5.78 5.4-8.09 2.25-2.3 4.9-4.12 7.91-5.44-3.01-1.37-5.66-3.2-7.92-5.5-2.26-2.31-4.05-5.01-5.39-8.1-1.3 3.09-3.07 5.79-5.33 8.1Z"/>
+      </svg>
+      Star Storyteller
+    </div>
+    <div class="nav-links">
+      <a href="#downloads">Download</a>
+      <a id="nav-releases" href="#">Releases</a>
+      <a id="nav-source" href="#">Source</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div>
+      <div class="badge"><span class="dot"></span><span id="hero-badge">Loading the latest release…</span></div>
+      <h1>An assistant that<br>never leaves the phone.</h1>
+      <p class="lede">
+        Ask it anything, show it a photo, tell it to call someone — often in the same
+        message. The model runs on your device. Web search goes to your own SearXNG
+        instance, and nowhere else.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#downloads">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>
+          <span id="hero-cta">Download</span>
+        </a>
+        <a class="btn btn-ghost" id="hero-all" href="#">All releases</a>
+      </div>
+      <p class="fineprint">Android 12 and up · Apache-2.0 · a fork of Google AI Edge Gallery</p>
+    </div>
+
+    <div class="phone" aria-hidden="true">
+      <div class="screen">
+        <div class="screen-head">
+          <span style="font-size:12px;font-weight:800;color:var(--primary)">Assistant</span>
+          <span style="font-size:11px;color:var(--muted)">· Gemma-4-E4B-it</span>
+        </div>
+        <div class="bubble-user">
+          <div class="thumb">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B1C5FF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m4 17 5-5 4 4 3-2 4 4"/></svg>
+          </div>
+          What’s the total on this receipt? Text it to Sam.
+        </div>
+        <div class="bubble-agent">£42.60. I’ve opened your messages with a draft to Sam — tap send when it looks right.</div>
+        <div class="chip-row">
+          <span class="chip chip-on">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+            Auto
+          </span>
+          <span class="chip">Web</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="downloads">
+    <div class="sec-head">
+      <h2>Downloads</h2>
+      <span class="sec-note" id="checksums-note"></span>
+    </div>
+    <p class="sec-lede">
+      Take <strong style="color:var(--on-surface)">arm64-v8a</strong> unless you know your phone is
+      something else. Universal works everywhere and is about three times the size.
+    </p>
+
+    <div id="dl-loading" class="loading">Fetching the latest release…</div>
+    <div class="grid" id="dl-grid" hidden></div>
+
+    <div id="dl-empty" class="notice" hidden>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8E918F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+      <span id="dl-empty-text"></span>
+    </div>
+
+    <div class="notice">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8E918F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+      <span>Android will warn that the app comes from an unknown source — allow installs from your browser or file manager to continue.</span>
+    </div>
+  </section>
+
+  <section>
+    <h2 style="margin-bottom:28px">Three steps after install</h2>
+    <div class="steps">
+      <div class="step">
+        <span class="step-n">1</span>
+        <div class="step-t">Make it your assistant</div>
+        <div class="step-b">Settings → Apps → Default apps → Digital assistant app → Star Storyteller. The assist gesture and the power-button hold then open the chat.</div>
+      </div>
+      <div class="step">
+        <span class="step-n">2</span>
+        <div class="step-t">Pick a model</div>
+        <div class="step-b">Tap the model chip at the top of the chat and choose one. It downloads in place; Gemma-4-E2B is a good first choice on most phones.</div>
+      </div>
+      <div class="step">
+        <span class="step-n">3</span>
+        <div class="step-t">Connect your search</div>
+        <div class="step-b">Tap the Web chip and point it at your SearXNG instance. It needs <code>json</code> under <code>search.formats</code> — the Test connection button checks that for you.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Apache-2.0 · a fork of Google AI Edge Gallery · not affiliated with Google</span>
+    <span id="footer-version"></span>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // The repository this page publishes releases for. Kept explicit rather than derived from the
+  // URL so the page still works from a custom domain or a local file.
+  var OWNER = "AstridC42";
+  var REPO = "Star-Storyteller-";
+
+  var RELEASES_URL = "https://github.com/" + OWNER + "/" + REPO + "/releases";
+  var SOURCE_URL = "https://github.com/" + OWNER + "/" + REPO;
+
+  document.getElementById("nav-releases").href = RELEASES_URL;
+  document.getElementById("nav-source").href = SOURCE_URL;
+  document.getElementById("hero-all").href = RELEASES_URL;
+
+  // How each ABI is described, and the order the cards appear in.
+  var ABIS = [
+    { key: "arm64-v8a",   blurb: "Nearly every phone made since 2018.", recommended: true },
+    { key: "universal",   blurb: "Any phone, if you would rather not check." },
+    { key: "armeabi-v7a", blurb: "Older 32-bit phones." },
+    { key: "x86_64",      blurb: "Emulators and x86 tablets." }
+  ];
+
+  function humanSize(bytes) {
+    if (!bytes && bytes !== 0) return "";
+    return (bytes / 1048576).toFixed(0) + " MB";
+  }
+
+  function humanDate(iso) {
+    if (!iso) return "";
+    try {
+      return new Date(iso).toLocaleDateString(undefined, {
+        day: "numeric", month: "short", year: "numeric"
+      });
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function showEmpty(message) {
+    document.getElementById("dl-loading").hidden = true;
+    document.getElementById("dl-grid").hidden = true;
+    document.getElementById("dl-empty-text").textContent = message;
+    document.getElementById("dl-empty").hidden = false;
+
+    // Nothing to download, so the hero must not keep promising a download.
+    document.getElementById("hero-badge").textContent = "No release yet";
+    var cta = document.getElementById("hero-cta");
+    cta.textContent = "See releases";
+    cta.parentNode.setAttribute("href", RELEASES_URL);
+  }
+
+  function render(release) {
+    var version = (release.tag_name || "").replace(/^v/, "");
+    var assets = release.assets || [];
+
+    document.getElementById("hero-badge").textContent =
+      "v" + version + (release.published_at ? " · " + humanDate(release.published_at) : "");
+    document.getElementById("hero-cta").textContent = "Download v" + version;
+    document.getElementById("footer-version").textContent = "v" + version;
+
+    // Match each ABI to the asset whose filename contains it. universal must be matched last-ish;
+    // filenames are star-storyteller-<version>-<abi>.apk, so an exact suffix match is unambiguous.
+    var grid = document.getElementById("dl-grid");
+    var shown = 0;
+
+    ABIS.forEach(function (abi) {
+      var asset = assets.filter(function (a) {
+        return a.name.slice(-4) === ".apk" && a.name.indexOf("-" + abi.key + ".apk") !== -1;
+      })[0];
+      if (!asset) return;
+      shown++;
+
+      var card = el("a", "card" + (abi.recommended ? " card-rec" : ""));
+      card.href = asset.browser_download_url;
+
+      var top = el("div", "card-top");
+      top.appendChild(el("span", "card-abi", abi.key));
+      if (abi.recommended) top.appendChild(el("span", "card-tag", "Recommended"));
+      card.appendChild(top);
+
+      card.appendChild(el("div", "card-for", abi.blurb));
+
+      var foot = el("div", "card-foot");
+      foot.appendChild(el("span", null, humanSize(asset.size)));
+      foot.insertAdjacentHTML("beforeend",
+        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>');
+      card.appendChild(foot);
+
+      grid.appendChild(card);
+    });
+
+    if (!shown) {
+      showEmpty("The latest release has no APKs attached yet. Check the releases page.");
+      return;
+    }
+
+    document.getElementById("dl-loading").hidden = true;
+    grid.hidden = false;
+
+    var sums = assets.filter(function (a) { return a.name === "SHA256SUMS.txt"; })[0];
+    if (sums) {
+      var note = document.getElementById("checksums-note");
+      note.innerHTML = 'Checksums in <a href="' + sums.browser_download_url + '">SHA256SUMS.txt</a>';
+    }
+  }
+
+  fetch("https://api.github.com/repos/" + OWNER + "/" + REPO + "/releases/latest", {
+    headers: { Accept: "application/vnd.github+json" }
+  })
+    .then(function (response) {
+      if (response.status === 404) {
+        showEmpty("No release has been published yet. The first tag pushed to the repository will build one.");
+        return null;
+      }
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    })
+    .then(function (release) { if (release) render(release); })
+    .catch(function () {
+      showEmpty("Could not reach GitHub to list the downloads. Open the releases page directly.");
+    });
+})();
+</script>
+
+</body>
+</html>
