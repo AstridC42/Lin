@@ -2,3 +2,8 @@
 
 # Local Android SDK location.
 local.properties
+
+# Signing material — never commit these.
+keystore.properties
+*.jks
+*.keystore
