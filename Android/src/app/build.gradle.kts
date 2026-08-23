@@ -33,11 +33,13 @@ android {
   compileSdk { this.version = release(37) { minorApiLevel = 0 } }
 
   defaultConfig {
-    applicationId = "com.google.aiedge.gallery"
+    // Star Storyteller ships as its own app rather than a drop-in replacement for Edge Gallery,
+    // so it installs alongside it instead of colliding with its package name.
+    applicationId = "com.starstoryteller.assistant"
     minSdk = 31
     targetSdk = 37
-    versionCode = 41
-    versionName = "1.0.19"
+    versionCode = 1
+    versionName = "0.1.0"
 
     // Needed for HuggingFace auth workflows.
     // Use the scheme of the "Redirect URLs" in HuggingFace app.

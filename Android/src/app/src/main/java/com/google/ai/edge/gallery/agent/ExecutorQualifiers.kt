@@ -23,3 +23,15 @@ import javax.inject.Qualifier
 
 /** Qualifier annotation for Agent Chat runtime executor with skills and MCP tools enabled. */
 @Qualifier @Retention(AnnotationRetention.RUNTIME) annotation class AgentChatExecutor
+
+/**
+ * Qualifier for the Star Storyteller assistant runtime executor.
+ *
+ * Same machinery as [AgentChatExecutor] but bound to its own tool set (skills, MCP, device
+ * actions and SearXNG web search) and its own session, so the unified assistant screen and the
+ * upstream Agent Chat screen never share state.
+ */
+@Qualifier @Retention(AnnotationRetention.RUNTIME) annotation class AssistantExecutor
+
+/** Qualifier for the [com.google.ai.edge.gallery.customtasks.agentchat.AgentTools] instance used by the assistant. */
+@Qualifier @Retention(AnnotationRetention.RUNTIME) annotation class AssistantAgentTools

@@ -71,6 +71,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.google.ai.edge.gallery.GalleryEvent
+import com.google.ai.edge.gallery.assistant.AssistantRoute
 import com.google.ai.edge.gallery.customtasks.common.CustomTaskData
 import com.google.ai.edge.gallery.customtasks.common.CustomTaskDataForBuiltinTask
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
@@ -93,6 +94,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val TAG = "AGGalleryNavGraph"
+private const val SCHEME_UPSTREAM = "com.google.ai.edge.gallery"
+private const val SCHEME_STAR_STORYTELLER = "starstoryteller"
+private const val ROUTE_ASSISTANT = "assistant"
 private const val ROUTE_HOMESCREEN = "homepage"
 private const val ROUTE_MODEL_LIST = "model_list"
 private const val ROUTE_MODEL = "route_model"
@@ -152,6 +156,10 @@ fun GalleryNavHost(
   navController: NavHostController,
   modifier: Modifier = Modifier,
   modelManagerViewModel: ModelManagerViewModel,
+  /** A question to hand straight to the assistant, e.g. from the system assist gesture. */
+  initialAssistantQuery: String? = null,
+  /** Images shared into the app, attached to the assistant's first message. */
+  initialAssistantImageUris: List<String> = listOf(),
 ) {
   val lifecycleOwner = LocalLifecycleOwner.current
   var showModelManager by remember { mutableStateOf(false) }
@@ -185,12 +193,39 @@ fun GalleryNavHost(
 
   NavHost(
     navController = navController,
-    startDestination = ROUTE_HOMESCREEN,
+    // Star Storyteller opens on the assistant rather than the capability gallery: it is meant to
+    // be the phone's default assistant, so the chat has to be the first thing on screen. The
+    // gallery is one tap away from the assistant's mode bar and is otherwise unchanged.
+    startDestination = ROUTE_ASSISTANT,
     enterTransition = { EnterTransition.None },
     exitTransition = { ExitTransition.None },
   ) {
+    // The assistant: one chat screen covering every capability.
+    composable(route = ROUTE_ASSISTANT) {
+      val activity = androidx.activity.compose.LocalActivity.current
+      AssistantRoute(
+        modelManagerViewModel = modelManagerViewModel,
+        onOpenGallery = {
+          enableHomeScreenAnimation = true
+          navController.navigate(ROUTE_HOMESCREEN)
+        },
+        // Nothing sits below the assistant in the back stack, so "up" means leaving the app.
+        onExit = { activity?.moveTaskToBack(true) },
+        initialQuery = initialAssistantQuery,
+        initialImageUris = initialAssistantImageUris,
+      )
+    }
+
     // Home screen.
-    composable(route = ROUTE_HOMESCREEN) {
+    composable(
+      route = ROUTE_HOMESCREEN,
+      enterTransition = {
+        if (initialState.destination.route == ROUTE_ASSISTANT) slideEnter() else EnterTransition.None
+      },
+      exitTransition = {
+        if (targetState.destination.route == ROUTE_ASSISTANT) slideExit() else ExitTransition.None
+      },
+    ) {
       // Create a state to trigger PromoScreen fade in animation.
       val promoId = "gm4"
       Box(modifier = modifier.fillMaxSize()) {
@@ -212,6 +247,7 @@ fun GalleryNavHost(
             },
             onModelsClicked = { navController.navigate(ROUTE_MODEL_MANAGER) },
             onNotificationsClicked = { navController.navigate(ROUTE_NOTIFICATIONS) },
+            onAssistantClicked = { navController.popBackStack(ROUTE_ASSISTANT, false) },
             gm4 = true,
           )
         }
@@ -460,7 +496,11 @@ fun GalleryNavHost(
   // Wait until the model manager has been initialized and the tasks are available.
   if (data != null && modelManagerUiState.tasks.isNotEmpty()) {
     intent.data = null
-    val uriStr = data.toString()
+    // Star Storyteller answers to its own scheme as well as the upstream one, so links keep
+    // working when both apps are installed. Normalize to the upstream form and handle both with
+    // the same code below.
+    val uriStr =
+      data.toString().replaceFirst("$SCHEME_STAR_STORYTELLER://", "$SCHEME_UPSTREAM://")
     Log.d(TAG, "navigation link clicked: $data")
     // 1. Precise model deep links: com.google.ai.edge.gallery://model/<taskId>/<modelName>
     if (uriStr.startsWith("com.google.ai.edge.gallery://model/")) {

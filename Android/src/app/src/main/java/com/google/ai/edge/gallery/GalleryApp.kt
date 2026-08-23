@@ -22,11 +22,25 @@ import androidx.navigation.compose.rememberNavController
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.navigation.GalleryNavHost
 
-/** Top level composable representing the main screen of the application. */
+/**
+ * Top level composable representing the main screen of the application.
+ *
+ * @param initialAssistantQuery a question to hand straight to the assistant, from the system
+ *   assist gesture, a shared piece of text, or a web search handed over by the launcher.
+ * @param initialAssistantImageUris images shared into the app, attached to the assistant's first
+ *   message.
+ */
 @Composable
 fun GalleryApp(
   navController: NavHostController = rememberNavController(),
   modelManagerViewModel: ModelManagerViewModel,
+  initialAssistantQuery: String? = null,
+  initialAssistantImageUris: List<String> = listOf(),
 ) {
-  GalleryNavHost(navController = navController, modelManagerViewModel = modelManagerViewModel)
+  GalleryNavHost(
+    navController = navController,
+    modelManagerViewModel = modelManagerViewModel,
+    initialAssistantQuery = initialAssistantQuery,
+    initialAssistantImageUris = initialAssistantImageUris,
+  )
 }

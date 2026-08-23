@@ -29,7 +29,7 @@
   <string name="aichat_initializing_title" translatable="true" description="Status indicator when initializing model. [CHAR_LIMIT=31]">Initializing model</string>
   <string name="aichat_initializing_content" translatable="true" description="Loading message shown while a chat or translator session is initializing. [CHAR_LIMIT=110]">Sit tight, this can take up to 1 minute</string>
   <string name="app_intro" translatable="true" description="Introduction text shown on the home screen. [CHAR_LIMIT=90]">Explore a world of amazing on-device models from</string>
-  <string name="app_name" translatable="false">Google AI Edge Gallery</string>
+  <string name="app_name" translatable="false">Star Storyteller</string>
   <string name="app_name_first_part" translatable="false">Google AI</string>
   <string name="app_name_second_part" translatable="false">Edge Gallery</string>
   <string name="askimage_emptystate_title" translatable="false">Ask Image</string>
@@ -765,4 +765,99 @@
   <string name="task_desc_tiny_garden" translatable="true" description="Description for the Tiny Garden task. [CHAR_LIMIT=468]">Use natural language to plant, water, and harvest in this fully offline mini-game.\n\nNote: This is powered by the experimental FunctionGemma model optimized for latency. Due to its compact size (270M), it works well on simple instructions but responses may vary to more complex interactions.</string>
   <!-- Short description for the Tiny Garden task. [CHAR_LIMIT=35] -->
   <string name="task_short_desc_tiny_garden" translatable="true" description="Short description for the Tiny Garden task. [CHAR_LIMIT=45]">Use natural language to plant</string>
+
+  <!-- ==================== Star Storyteller assistant ==================== -->
+  <!-- Label of the unified assistant capability. [CHAR_LIMIT=20] -->
+  <string name="task_label_assistant" translatable="true" description="Label of the unified assistant capability. [CHAR_LIMIT=20]">Assistant</string>
+  <!-- Description of the unified assistant capability. [CHAR_LIMIT=300] -->
+  <string name="task_desc_assistant" translatable="true" description="Description of the unified assistant capability. [CHAR_LIMIT=300]">One chat that does everything: ask questions, drop in a photo or a voice clip, search the web through your own SearXNG instance, and have it call, text, navigate or set a reminder for you. Switch the mode to bias it toward a task; every mode still accepts every kind of input.</string>
+  <!-- Short description of the unified assistant capability. [CHAR_LIMIT=45] -->
+  <string name="task_short_desc_assistant" translatable="true" description="Short description of the unified assistant capability. [CHAR_LIMIT=45]">Your everyday on-device assistant</string>
+  <!-- Placeholder in the assistant text field. [CHAR_LIMIT=40] -->
+  <string name="assistant_input_placeholder" translatable="true" description="Placeholder in the assistant text field. [CHAR_LIMIT=40]">Ask, show or tell me to do something</string>
+
+  <!-- Name of the automatic assistant mode. [CHAR_LIMIT=14] -->
+  <string name="assistant_mode_auto" translatable="true" description="Name of the automatic assistant mode. [CHAR_LIMIT=14]">Auto</string>
+  <!-- Explanation of the automatic assistant mode. [CHAR_LIMIT=120] -->
+  <string name="assistant_mode_auto_desc" translatable="true" description="Explanation of the automatic assistant mode. [CHAR_LIMIT=120]">Picks the right capability for each message</string>
+  <!-- Name of the conversation assistant mode. [CHAR_LIMIT=14] -->
+  <string name="assistant_mode_chat" translatable="true" description="Name of the conversation assistant mode. [CHAR_LIMIT=14]">Chat</string>
+  <!-- Explanation of the conversation assistant mode. [CHAR_LIMIT=120] -->
+  <string name="assistant_mode_chat_desc" translatable="true" description="Explanation of the conversation assistant mode. [CHAR_LIMIT=120]">Straight answers, no tools unless you ask</string>
+  <!-- Name of the media assistant mode. [CHAR_LIMIT=14] -->
+  <string name="assistant_mode_media" translatable="true" description="Name of the media assistant mode. [CHAR_LIMIT=14]">Media</string>
+  <!-- Explanation of the media assistant mode. [CHAR_LIMIT=120] -->
+  <string name="assistant_mode_media_desc" translatable="true" description="Explanation of the media assistant mode. [CHAR_LIMIT=120]">Reads photos, screenshots and voice clips closely</string>
+  <!-- Name of the web research assistant mode. [CHAR_LIMIT=14] -->
+  <string name="assistant_mode_research" translatable="true" description="Name of the web research assistant mode. [CHAR_LIMIT=14]">Web</string>
+  <!-- Explanation of the web research assistant mode. [CHAR_LIMIT=120] -->
+  <string name="assistant_mode_research_desc" translatable="true" description="Explanation of the web research assistant mode. [CHAR_LIMIT=120]">Searches your SearXNG instance before answering</string>
+  <!-- Name of the device actions assistant mode. [CHAR_LIMIT=14] -->
+  <string name="assistant_mode_actions" translatable="true" description="Name of the device actions assistant mode. [CHAR_LIMIT=14]">Device</string>
+  <!-- Explanation of the device actions assistant mode. [CHAR_LIMIT=120] -->
+  <string name="assistant_mode_actions_desc" translatable="true" description="Explanation of the device actions assistant mode. [CHAR_LIMIT=120]">Calls, texts, alarms, maps and app launches</string>
+  <!-- Name of the agent assistant mode. [CHAR_LIMIT=14] -->
+  <string name="assistant_mode_agent" translatable="true" description="Name of the agent assistant mode. [CHAR_LIMIT=14]">Agent</string>
+  <!-- Explanation of the agent assistant mode. [CHAR_LIMIT=120] -->
+  <string name="assistant_mode_agent_desc" translatable="true" description="Explanation of the agent assistant mode. [CHAR_LIMIT=120]">Runs multi-step skills and MCP tools</string>
+
+  <!-- Title of the assistant mode picker sheet. [CHAR_LIMIT=30] -->
+  <string name="assistant_mode_picker_title" translatable="true" description="Title of the assistant mode picker sheet. [CHAR_LIMIT=30]">Assistant mode</string>
+  <!-- Footnote in the assistant mode picker sheet. [CHAR_LIMIT=180] -->
+  <string name="assistant_mode_picker_footnote" translatable="true" description="Footnote in the assistant mode picker sheet. [CHAR_LIMIT=180]">Every mode accepts images, audio and files. The mode only changes what the assistant reaches for first.</string>
+  <!-- Content description of the assistant mode button. [CHAR_LIMIT=40] -->
+  <string name="cd_assistant_mode_button" translatable="true" description="Content description of the assistant mode button. [CHAR_LIMIT=40]">Change assistant mode</string>
+  <!-- Chat message shown after the assistant mode changed. [CHAR_LIMIT=80] -->
+  <string name="assistant_mode_switched" translatable="true" description="Chat message shown after the assistant mode changed. [CHAR_LIMIT=80]">Switched to %1$s mode</string>
+  <!-- Label of the button that opens the capability gallery. [CHAR_LIMIT=20] -->
+  <string name="assistant_open_gallery" translatable="true" description="Label of the button that opens the capability gallery. [CHAR_LIMIT=20]">All capabilities</string>
+  <!-- Content description of the button that opens the capability gallery. [CHAR_LIMIT=40] -->
+  <string name="cd_assistant_open_gallery" translatable="true" description="Content description of the button that opens the capability gallery. [CHAR_LIMIT=40]">Open all capabilities</string>
+  <!-- Content description of the spoken replies toggle. [CHAR_LIMIT=40] -->
+  <string name="cd_assistant_speak_replies" translatable="true" description="Content description of the spoken replies toggle. [CHAR_LIMIT=40]">Read replies out loud</string>
+  <!-- Title shown on the empty assistant screen. [CHAR_LIMIT=40] -->
+  <string name="assistant_emptystate_title" translatable="true" description="Title shown on the empty assistant screen. [CHAR_LIMIT=40]">What can I do for you?</string>
+  <!-- Body shown on the empty assistant screen. [CHAR_LIMIT=220] -->
+  <string name="assistant_emptystate_content" translatable="true" description="Body shown on the empty assistant screen. [CHAR_LIMIT=220]">Ask a question, attach a photo to look at, or tell me to call someone, set a timer or search the web. It all runs on this device.</string>
+
+  <!-- Title of the web search settings screen. [CHAR_LIMIT=30] -->
+  <string name="web_search_settings_title" translatable="true" description="Title of the web search settings screen. [CHAR_LIMIT=30]">Web search</string>
+  <!-- Explanation at the top of the web search settings screen. [CHAR_LIMIT=300] -->
+  <string name="web_search_settings_intro" translatable="true" description="Explanation at the top of the web search settings screen. [CHAR_LIMIT=300]">Connect your own SearXNG instance to give the assistant live web access. Nothing is sent to a third-party search API: queries go only to the instance you name here. The instance must list <![CDATA[<code>json</code>]]> under search.formats in its settings.yml.</string>
+  <!-- Label of the SearXNG instance URL field. [CHAR_LIMIT=30] -->
+  <string name="web_search_instance_url" translatable="true" description="Label of the SearXNG instance URL field. [CHAR_LIMIT=30]">Instance URL</string>
+  <!-- Label of the switch that enables web search. [CHAR_LIMIT=30] -->
+  <string name="web_search_enable" translatable="true" description="Label of the switch that enables web search. [CHAR_LIMIT=30]">Enable web search</string>
+  <!-- Label of the switch that lets the assistant read a full page. [CHAR_LIMIT=40] -->
+  <string name="web_search_allow_page_fetch" translatable="true" description="Label of the switch that lets the assistant read a full page. [CHAR_LIMIT=40]">Let the assistant open result pages</string>
+  <!-- Label of the results-per-search field. [CHAR_LIMIT=30] -->
+  <string name="web_search_max_results" translatable="true" description="Label of the results-per-search field. [CHAR_LIMIT=30]">Results per search</string>
+  <!-- Label of the SearXNG categories field. [CHAR_LIMIT=30] -->
+  <string name="web_search_categories" translatable="true" description="Label of the SearXNG categories field. [CHAR_LIMIT=30]">Default categories</string>
+  <!-- Label of the search language field. [CHAR_LIMIT=30] -->
+  <string name="web_search_language" translatable="true" description="Label of the search language field. [CHAR_LIMIT=30]">Language</string>
+  <!-- Label of the safe search field. [CHAR_LIMIT=30] -->
+  <string name="web_search_safe_search" translatable="true" description="Label of the safe search field. [CHAR_LIMIT=30]">Safe search</string>
+  <!-- Label of the request timeout field. [CHAR_LIMIT=30] -->
+  <string name="web_search_timeout" translatable="true" description="Label of the request timeout field. [CHAR_LIMIT=30]">Timeout (seconds)</string>
+  <!-- Label of the optional authorization header field. [CHAR_LIMIT=40] -->
+  <string name="web_search_auth_header" translatable="true" description="Label of the optional authorization header field. [CHAR_LIMIT=40]">Authorization header (optional)</string>
+  <!-- Label of the button that checks the SearXNG connection. [CHAR_LIMIT=25] -->
+  <string name="web_search_test_connection" translatable="true" description="Label of the button that checks the SearXNG connection. [CHAR_LIMIT=25]">Test connection</string>
+  <!-- Status shown while the SearXNG connection is being checked. [CHAR_LIMIT=40] -->
+  <string name="web_search_testing" translatable="true" description="Status shown while the SearXNG connection is being checked. [CHAR_LIMIT=40]">Testing…</string>
+  <!-- Status shown after a successful SearXNG connection check. [CHAR_LIMIT=80] -->
+  <string name="web_search_test_ok" translatable="true" description="Status shown after a successful SearXNG connection check. [CHAR_LIMIT=80]">Connected. %1$d result(s) for the test query.</string>
+  <!-- Label of the switch that allows the assistant to dial directly. [CHAR_LIMIT=40] -->
+  <string name="assistant_allow_direct_calls" translatable="true" description="Label of the switch that allows the assistant to dial directly. [CHAR_LIMIT=40]">Let the assistant place calls directly</string>
+  <!-- Explanation of the direct call switch. [CHAR_LIMIT=200] -->
+  <string name="assistant_allow_direct_calls_desc" translatable="true" description="Explanation of the direct call switch. [CHAR_LIMIT=200]">Off by default: the assistant opens the dialer with the number filled in and you tap to call.</string>
+  <!-- Label of the assistant settings section. [CHAR_LIMIT=30] -->
+  <string name="assistant_settings_title" translatable="true" description="Label of the assistant settings section. [CHAR_LIMIT=30]">Assistant</string>
+  <!-- Prompt used when an image is shared into the app without a caption. [CHAR_LIMIT=80] -->
+  <string name="assistant_shared_image_prompt" translatable="true" description="Prompt used when an image is shared into the app without a caption. [CHAR_LIMIT=80]">What is in this image?</string>
+  <!-- Shown when the assistant has no model to load. [CHAR_LIMIT=200] -->
+  <string name="assistant_no_models" translatable="true" description="Shown when the assistant has no model to load. [CHAR_LIMIT=200]">No assistant model is available yet. Open the capability gallery to download one.</string>
+  <!-- Content description of the button that returns to the assistant. [CHAR_LIMIT=40] -->
+  <string name="cd_open_assistant" translatable="true" description="Content description of the button that returns to the assistant. [CHAR_LIMIT=40]">Open the assistant</string>
 </resources>

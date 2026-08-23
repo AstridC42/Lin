@@ -136,6 +136,18 @@ fun GalleryTopAppBar(
           TextButton(onClick = rightAction.actionFn) { Text("Done") }
         }
 
+        // Click a star to go back to the assistant chat.
+        AppBarActionType.ASSISTANT -> {
+          IconButton(onClick = rightAction.actionFn) {
+            Icon(
+              painterResource(R.drawable.gemini_star),
+              contentDescription = stringResource(R.string.cd_open_assistant),
+              tint = MaterialTheme.colorScheme.onSurface,
+              modifier = Modifier.size(20.dp),
+            )
+          }
+        }
+
         else -> {}
       }
     },

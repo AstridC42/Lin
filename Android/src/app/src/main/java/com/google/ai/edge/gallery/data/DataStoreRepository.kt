@@ -18,6 +18,7 @@ package com.google.ai.edge.gallery.data
 
 import androidx.datastore.core.DataStore
 import com.google.ai.edge.gallery.proto.AccessTokenData
+import com.google.ai.edge.gallery.proto.AssistantSettings
 import com.google.ai.edge.gallery.proto.BenchmarkResult
 import com.google.ai.edge.gallery.proto.BenchmarkResults
 import com.google.ai.edge.gallery.proto.Cutout
@@ -28,6 +29,7 @@ import com.google.ai.edge.gallery.proto.Skill
 import com.google.ai.edge.gallery.proto.Skills
 import com.google.ai.edge.gallery.proto.Theme
 import com.google.ai.edge.gallery.proto.UserData
+import com.google.ai.edge.gallery.proto.WebSearchSettings
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -130,6 +132,18 @@ interface DataStoreRepository {
 
   /** Returns whether a promo with the specified ID has been viewed. */
   fun hasViewedPromo(promoId: String): Boolean
+
+  /** Reads the SearXNG web search connection settings. */
+  fun readWebSearchSettings(): WebSearchSettings
+
+  /** Persists the SearXNG web search connection settings. */
+  fun saveWebSearchSettings(settings: WebSearchSettings)
+
+  /** Reads the preferences of the unified assistant screen. */
+  fun readAssistantSettings(): AssistantSettings
+
+  /** Persists the preferences of the unified assistant screen. */
+  fun saveAssistantSettings(settings: AssistantSettings)
 }
 
 /** Repository for managing data using Proto DataStore. */
@@ -470,6 +484,26 @@ class DefaultDataStoreRepository(
     return runBlocking {
       val settings = dataStore.data.first()
       settings.viewedPromoIdList.contains(promoId)
+    }
+  }
+
+  override fun readWebSearchSettings(): WebSearchSettings {
+    return runBlocking { dataStore.data.first().webSearchSettings }
+  }
+
+  override fun saveWebSearchSettings(settings: WebSearchSettings) {
+    runBlocking {
+      dataStore.updateData { current -> current.toBuilder().setWebSearchSettings(settings).build() }
+    }
+  }
+
+  override fun readAssistantSettings(): AssistantSettings {
+    return runBlocking { dataStore.data.first().assistantSettings }
+  }
+
+  override fun saveAssistantSettings(settings: AssistantSettings) {
+    runBlocking {
+      dataStore.updateData { current -> current.toBuilder().setAssistantSettings(settings).build() }
     }
   }
 }

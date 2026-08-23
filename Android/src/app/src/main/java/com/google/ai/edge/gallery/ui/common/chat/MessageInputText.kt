@@ -1007,7 +1007,13 @@ private fun MediaPanelCloseButton(onClicked: () -> Unit) {
   }
 }
 
-private fun handleImagesSelected(
+/**
+ * Decodes [uris] into correctly-oriented bitmaps and hands them to [onImagesSelected].
+ *
+ * Internal rather than private because the assistant screen reuses it to attach images that were
+ * shared into the app from another app.
+ */
+internal fun handleImagesSelected(
   context: Context,
   uris: List<Uri>,
   onImagesSelected: (List<Bitmap>) -> Unit,

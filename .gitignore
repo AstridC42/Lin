@@ -1,1 +1,4 @@
 .DS_Store
+
+# Local Android SDK location.
+local.properties
