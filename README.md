@@ -137,7 +137,14 @@ is flattened first so it does not read asterisks aloud.
 Every version is published on the
 [Releases page](https://github.com/AstridC42/Star-Storyteller-/releases) with prebuilt APKs
 attached. Take `arm64-v8a` unless you know your phone is something else, or `universal` if you
-would rather not think about it. See [RELEASING.md](RELEASING.md) for how releases are cut.
+would rather not think about it.
+
+Between releases, every push to `main` leaves installable APKs under **Actions → Build Android
+APK → Artifacts**.
+
+[INSTALL.md](INSTALL.md) walks through all of it from a browser and a phone — no Android Studio, no
+terminal — including cutting a release and setting up signing. [RELEASING.md](RELEASING.md) has the
+mechanics.
 
 ## Building
 
