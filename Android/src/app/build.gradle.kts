@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   // Note: set apply to true to enable google-services (requires google-services.json).
@@ -28,6 +30,36 @@ plugins {
   kotlin("kapt")
 }
 
+/**
+ * Release metadata, overridable from CI.
+ *
+ * The release workflow derives both from the git tag it is building, so tagging `v0.2.0` is the
+ * only step needed to cut a release. Local builds fall back to the values checked in here.
+ */
+val starVersionName: String = System.getenv("STAR_VERSION_NAME")?.takeIf { it.isNotBlank() }
+    ?: "0.1.0"
+val starVersionCode: Int = System.getenv("STAR_VERSION_CODE")?.toIntOrNull() ?: 1
+
+/**
+ * Upload-key material, supplied by CI secrets or a local `keystore.properties`.
+ *
+ * When nothing is configured the release build falls back to the debug key, so `assembleRelease`
+ * still works on a fresh clone - the resulting APK is installable but not upgrade-compatible with
+ * a properly signed one.
+ */
+val releaseKeystoreFile: File? =
+    (System.getenv("STAR_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+        ?: run {
+          val props = rootProject.file("keystore.properties")
+          if (props.exists()) {
+            Properties().apply { props.inputStream().use(::load) }.getProperty("storeFile")
+          } else {
+            null
+          }
+        })
+        ?.let(::File)
+        ?.takeIf { it.exists() }
+
 android {
   namespace = "com.google.ai.edge.gallery"
   compileSdk { this.version = release(37) { minorApiLevel = 0 } }
@@ -38,8 +70,8 @@ android {
     applicationId = "com.starstoryteller.assistant"
     minSdk = 31
     targetSdk = 37
-    versionCode = 1
-    versionName = "0.1.0"
+    versionCode = starVersionCode
+    versionName = starVersionName
 
     // Needed for HuggingFace auth workflows.
     // Use the scheme of the "Redirect URLs" in HuggingFace app.
@@ -53,11 +85,34 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  signingConfigs {
+    if (releaseKeystoreFile != null) {
+      create("release") {
+        storeFile = releaseKeystoreFile
+        storePassword = System.getenv("STAR_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("STAR_KEY_ALIAS")
+        keyPassword = System.getenv("STAR_KEY_PASSWORD")
+      }
+    }
+  }
+
   buildTypes {
     release {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("debug")
+      signingConfig =
+          signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+    }
+  }
+
+  // Ship one APK per ABI plus a universal fallback. The LiteRT and MediaPipe native libraries
+  // dominate the download, so a device-matched APK is roughly a third of the universal one.
+  splits {
+    abi {
+      isEnable = true
+      reset()
+      include("arm64-v8a", "armeabi-v7a", "x86_64")
+      isUniversalApk = true
     }
   }
   compileOptions {
