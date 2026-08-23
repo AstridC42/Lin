@@ -1,0 +1,211 @@
+/* Copyright 2025 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================*/
+
+syntax = "proto3";
+
+package com.google.ai.edge.gallery.proto;
+
+import "chat_history.proto";
+
+option java_package = "com.google.ai.edge.gallery.proto";
+option java_multiple_files = true;
+
+enum Theme {
+  THEME_UNSPECIFIED = 0;
+
+  // Force to use light theme.
+  THEME_LIGHT = 1;
+
+  // Force to use dark theme.
+  THEME_DARK = 2;
+
+  // Use the system them setting on user's phone.
+  THEME_AUTO = 3;
+}
+
+message AccessTokenData {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_at_ms = 3;
+}
+
+message ImportedModel {
+  string file_name = 1;
+  int64 file_size = 2;
+
+  oneof config {
+    LlmConfig llm_config = 3;
+  }
+  // Only set for models imported from url.
+  string url = 4;
+}
+
+message LlmConfig {
+  repeated string compatible_accelerators = 1;
+  int32 default_max_tokens = 2;
+  int32 default_topk = 3;
+  float default_topp = 4;
+  float default_temperature = 5;
+  bool support_image = 6;
+  bool support_audio = 7;
+  bool support_tiny_garden = 8;
+  bool support_mobile_actions = 9;
+  bool support_thinking = 10;
+  bool support_speculative_decoding = 11;
+}
+
+message Settings {
+  Theme theme = 1;
+  AccessTokenData access_token_data = 2;  // deprecated
+  repeated string text_input_history = 3;
+  repeated ImportedModel imported_model = 4;
+  // Has the app tos been accepted.
+  bool is_tos_accepted = 5;
+  bool has_run_tiny_garden = 6;
+  bool has_seen_benchmark_comparison_help = 7;
+  // Has the Gemma terms of use been accepted.
+  bool is_gemma_terms_accepted = 8;
+
+  repeated string viewed_promo_id = 10;
+  bool disable_firebase_analytics = 11;
+
+  // Star Storyteller: connection settings for a self-hosted SearXNG instance
+  // used by the assistant's web_search / open_web_page tools.
+  WebSearchSettings web_search_settings = 12;
+
+  // Star Storyteller: assistant preferences (last used mode, spoken replies...).
+  AssistantSettings assistant_settings = 13;
+}
+
+// Connection settings for a SearXNG metasearch instance.
+message WebSearchSettings {
+  // Base URL of the SearXNG instance, e.g. "https://searx.example.org".
+  // Web search is only offered to the model when this is non-empty and
+  // `enabled` is true.
+  string instance_url = 1;
+
+  bool enabled = 2;
+
+  // UI language passed to SearXNG ("auto" when empty).
+  string language = 3;
+
+  // SearXNG safesearch level: 0 = off, 1 = moderate, 2 = strict.
+  int32 safe_search = 4;
+
+  // How many results are handed back to the model per search.
+  int32 max_results = 5;
+
+  // Comma separated SearXNG categories, e.g. "general,news".
+  string categories = 6;
+
+  // Network timeout for a single request, in seconds.
+  int32 timeout_seconds = 7;
+
+  // Optional value for an `Authorization` header, for instances behind a
+  // reverse proxy that requires one.
+  string auth_header = 8;
+
+  // Whether the assistant may download and read a result page in full.
+  bool allow_page_fetch = 9;
+}
+
+// Preferences for the unified assistant screen.
+message AssistantSettings {
+  // Id of the last selected AssistantMode.
+  string mode_id = 1;
+
+  // Whether replies are read out loud with text-to-speech.
+  bool speak_replies = 2;
+
+  // Whether the assistant may start a call itself (ACTION_CALL) instead of
+  // only pre-filling the dialer (ACTION_DIAL).
+  bool allow_direct_calls = 3;
+
+  // Name of the model last used on the assistant screen, so the screen can
+  // restore it on the next launch.
+  string last_model_name = 4;
+}
+
+message McpAuth {
+  message RequestHeader {
+    string header_name = 1;
+    string header_value = 2;
+  }
+
+  message OAuth {}
+
+  oneof auth_method {
+    bool none = 1;
+    RequestHeader request_header = 2;
+    OAuth oauth = 3;
+  }
+}
+
+message UserData {
+  AccessTokenData access_token_data = 1;
+  map<string, string> secrets = 2;
+  repeated ChatSessionProto chat_sessions = 3;
+  // MCP server URL to MCP auth data.
+  map<string, McpAuth> mcp_auths = 4;
+}
+
+enum FillMode {
+  FILL_MODE_UNSPECIFIED = 0;
+  FILL_MODE_DISABLED = 1;
+  FILL_MODE_SOLID = 2;
+  FILL_MODE_COLORIZE = 3;
+}
+
+message Point {
+  float x = 1;
+  float y = 2;
+}
+
+message StrokePath {
+  repeated Point point = 1;
+  int32 brush_color = 2;
+  float brush_size = 3;
+  float brush_softness = 4;
+  int32 blur_type = 5;
+}
+
+// A single cutout, used in scrapbook demo.
+message Cutout {
+  // id of the cutout.
+  string id = 1;
+
+  // Rotation degree applied to the cutout.
+  int32 rotation_degree = 2;
+
+  // The width of the border.
+  int32 border_width = 3;
+
+  // The color of the border.
+  int32 border_color = 4;
+
+  // The fill color.
+  int32 fill_color = 5;
+
+  // The fill mode.
+  FillMode fill_mode = 6;
+
+  // Doodle stroke paths.
+  repeated StrokePath doodle_stroke = 7;
+}
+
+// A collection of cutout, used in scrapbook demo.
+message CutoutCollection {
+  repeated Cutout cutout = 1;
+}
