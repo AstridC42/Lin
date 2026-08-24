@@ -125,18 +125,28 @@
         <uses-native-library android:name="libedgetpu_tachyon.google.so" android:required="false" />
         <uses-native-library android:name="libedgetpu_client.google.so" android:required="false" />
         <!--
-          android:configChanges="uiMode" tells the system don't destroy and
-          recreate the activity when UI mode changes (e.g. setting dark mode).
-          Instead, just recompose the view.
-         -->
+          Star Storyteller: the activity handles its own configuration changes rather than being
+          destroyed and recreated for them.
+
+          uiMode was already here for dark mode. The rest are for foldables. Unfolding changes the
+          screen size, the smallest width, the layout size class and usually the orientation, all
+          at once - and a recreation in the middle of that restarts the screen, drops the keyboard
+          and interrupts a reply mid-stream. Compose reflows from the new configuration on its own,
+          so there is nothing recreation would achieve here.
+
+          screenOrientation="portrait" is gone. On a foldable the inner screen is wide and nearly
+          square, and pinning it to portrait wastes most of it; large-screen devices increasingly
+          ignore the lock anyway, so relying on it meant relying on a layout that was never going
+          to hold.
+        -->
         <activity
             android:name="com.google.ai.edge.gallery.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.Gallery.SplashScreen"
-            android:screenOrientation="portrait"
+            android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize"
-            android:configChanges="uiMode"
-            tools:ignore="DiscouragedApi,LockedOrientationActivity">
+            android:configChanges="uiMode|orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation"
+            tools:ignore="DiscouragedApi">
             <!-- This is for putting the app into launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
