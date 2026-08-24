@@ -873,4 +873,14 @@
   <string name="assistant_listening_title" translatable="true" description="Title of the dialog shown while the assistant is listening. [CHAR_LIMIT=40]">Listening</string>
   <string name="assistant_listening_hint" translatable="true" description="Placeholder shown before anything has been heard. [CHAR_LIMIT=60]">Go ahead \u2014 say what you need.</string>
   <string name="assistant_listening_stop" translatable="true" description="Label of the button that stops listening. [CHAR_LIMIT=15]">Stop</string>
+  <string name="wake_word_channel_name" translatable="true" description="Notification channel for the wake word listener. [CHAR_LIMIT=40]">Wake word listening</string>
+  <string name="wake_word_channel_description" translatable="true" description="Describes the wake word notification channel. [CHAR_LIMIT=150]">Shown whenever Star Storyteller is listening for its wake phrase.</string>
+  <string name="wake_word_notification_title" translatable="true" description="Ongoing notification title. %1$s is the wake phrase. [CHAR_LIMIT=60]">Listening for \u201c%1$s\u201d</string>
+  <string name="wake_word_notification_text" translatable="true" description="Ongoing notification body. [CHAR_LIMIT=120]">The microphone stays on. This uses more battery than normal.</string>
+  <string name="wake_word_stop" translatable="true" description="Notification action that stops listening. [CHAR_LIMIT=15]">Stop</string>
+  <string name="wake_word_tile_label" translatable="true" description="Quick settings tile label. [CHAR_LIMIT=20]">Wake word</string>
+  <string name="wake_word_settings_title" translatable="true" description="Title of the wake word settings dialog. [CHAR_LIMIT=40]">Wake word</string>
+  <string name="wake_word_enable" translatable="true" description="Label of the switch that enables continuous listening. [CHAR_LIMIT=40]">Listen for the wake word</string>
+  <string name="wake_word_phrase_label" translatable="true" description="Label of the field holding the wake phrase. [CHAR_LIMIT=30]">Phrase</string>
+  <string name="wake_word_cost_warning" translatable="true" description="Explains the cost of continuous listening. [CHAR_LIMIT=400]">Android gives no app a true low-power wake word, so this keeps the microphone open and listens continuously. It uses noticeably more battery, and your phone shows the microphone indicator the whole time. A notification stays up while it runs, and the Wake word quick-settings tile turns it off from anywhere.</string>
 </resources>

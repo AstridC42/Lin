@@ -55,6 +55,8 @@ import com.google.ai.edge.gallery.ui.common.tos.AppTosDialog
 import com.google.ai.edge.gallery.ui.common.tos.TosViewModel
 import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
+import com.google.ai.edge.gallery.voice.WakeWordService
+import com.google.ai.edge.gallery.voice.WakeWordSettings
 
 /**
  * The app's start destination.
@@ -146,6 +148,16 @@ fun AssistantRoute(
     val current = repository.readAssistantSettings()
     if (current.loadingModelName != marker) {
       repository.saveAssistantSettings(current.toBuilder().setLoadingModelName(marker).build())
+    }
+  }
+
+  // Bring the wake word listener back after a reboot or a swipe-away. The service is the only
+  // thing that knows how to listen and it does not survive the process, so without this the
+  // setting would silently mean nothing until the tile was tapped again.
+  LaunchedEffect(Unit) {
+    val settings = repository.readAssistantSettings()
+    if (settings.wakeWordEnabled) {
+      WakeWordService.start(context, WakeWordSettings.phraseOrDefault(settings.wakeWordPhrase))
     }
   }
 
