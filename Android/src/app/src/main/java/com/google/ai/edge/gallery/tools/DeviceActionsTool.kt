@@ -265,18 +265,25 @@ class DeviceActionsTool(
       val launcherIntent =
         Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
       val candidates = packageManager.queryIntentActivities(launcherIntent, 0)
-      val needle = appName.trim().lowercase()
-      val match =
-        candidates.firstOrNull {
-          it.loadLabel(packageManager).toString().equals(appName.trim(), ignoreCase = true)
-        }
-          ?: candidates.firstOrNull {
-            it.loadLabel(packageManager).toString().lowercase().contains(needle)
-          }
-          ?: return@runBlocking failure(
-            "No installed app is called \"$appName\". Ask the user for the exact name."
-          )
+      val labels = candidates.map { it.loadLabel(packageManager).toString() }
+      val ranked = rankAppMatches(appName, labels)
 
+      if (ranked.isEmpty()) {
+        return@runBlocking failure(
+          "No installed app is called \"$appName\". Ask the user for the exact name."
+        )
+      }
+      // Two apps the request fits equally well - "play" against Play Store and Play Games - is a
+      // question, not a coin toss. Opening the wrong app is worse than asking.
+      if (ranked.size > 1 && ranked[0].score == ranked[1].score) {
+        return@runBlocking mapOf(
+          "status" to "needs_clarification",
+          "matches" to ranked.take(5).map { mapOf("app" to labels[it.index]) },
+          "hint" to "Several apps match \"$appName\". Ask the user which one, then call again.",
+        )
+      }
+
+      val match = candidates[ranked.first().index]
       val packageName = match.activityInfo.packageName
       val intent =
         packageManager.getLaunchIntentForPackage(packageName)
@@ -438,22 +445,74 @@ class DeviceActionsTool(
     }
   }
 
+  /**
+   * Finds contacts for what the user called someone.
+   *
+   * Two lookups, because neither alone is enough.
+   *
+   * `CONTENT_FILTER_URI` is the query the platform's own dialer search uses. It matches nicknames,
+   * name parts in any order, and the phonetic and normalized forms of a name - so "mum" reaches a
+   * contact whose nickname is Mum, and "sam smith" reaches "Smith, Sam". A plain
+   * `DISPLAY_NAME_PRIMARY LIKE '%name%'` matches none of those, which is why a name the user knew
+   * to be right came back as no contact at all.
+   *
+   * It is a prefix-oriented match though, so it misses a mid-name substring: "smith" does not
+   * always reach "Sam Smith". The old LIKE query is kept as a second pass for exactly that, and
+   * the results are merged.
+   *
+   * Anything the caller wrapped around the name is stripped first. Models routinely pass "call
+   * Sam" or "Sam's mobile" straight through, and every character of that is a character the
+   * address book has to match.
+   */
   private fun queryContacts(name: String): List<ContactMatch> {
-    val matches = mutableListOf<ContactMatch>()
-    try {
-      val projection =
-        arrayOf(
-          ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY,
-          ContactsContract.CommonDataKinds.Phone.NUMBER,
-          ContactsContract.CommonDataKinds.Phone.TYPE,
-          ContactsContract.CommonDataKinds.Phone.LABEL,
+    for (candidate in contactQueryCandidates(name)) {
+      val found = LinkedHashMap<String, ContactMatch>()
+      collectContacts(
+        uri =
+          ContactsContract.CommonDataKinds.Phone.CONTENT_FILTER_URI.buildUpon()
+            .appendPath(candidate)
+            .build(),
+        selection = null,
+        selectionArgs = null,
+        into = found,
+      )
+      if (found.size < MAX_CONTACT_MATCHES) {
+        collectContacts(
+          uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+          selection = "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY} LIKE ?",
+          // LIKE treats these as wildcards, so a name containing one would match far too much.
+          selectionArgs = arrayOf("%${candidate.escapeForLike()}%"),
+          into = found,
+          escape = true,
         )
+      }
+      if (found.isNotEmpty()) return found.values.take(MAX_CONTACT_MATCHES)
+    }
+    return listOf()
+  }
+
+  /** Runs one contacts query, adding what it finds to [into] keyed by name and number. */
+  private fun collectContacts(
+    uri: android.net.Uri,
+    selection: String?,
+    selectionArgs: Array<String>?,
+    into: MutableMap<String, ContactMatch>,
+    escape: Boolean = false,
+  ) {
+    val projection =
+      arrayOf(
+        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY,
+        ContactsContract.CommonDataKinds.Phone.NUMBER,
+        ContactsContract.CommonDataKinds.Phone.TYPE,
+        ContactsContract.CommonDataKinds.Phone.LABEL,
+      )
+    try {
       context.contentResolver
         .query(
-          ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+          uri,
           projection,
-          "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY} LIKE ?",
-          arrayOf("%$name%"),
+          if (escape && selection != null) "$selection ESCAPE '!'" else selection,
+          selectionArgs,
           "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY} ASC",
         )
         ?.use { cursor ->
@@ -461,7 +520,10 @@ class DeviceActionsTool(
           val numberIndex = cursor.getColumnIndex(projection[1])
           val typeIndex = cursor.getColumnIndex(projection[2])
           val labelIndex = cursor.getColumnIndex(projection[3])
-          while (cursor.moveToNext() && matches.size < MAX_CONTACT_MATCHES) {
+          // getColumnIndex returns -1 for a column the provider did not supply, and getString(-1)
+          // throws rather than returning null.
+          if (nameIndex < 0 || numberIndex < 0) return@use
+          while (cursor.moveToNext() && into.size < MAX_CONTACT_MATCHES) {
             val number = cursor.getString(numberIndex)?.trim().orEmpty()
             if (number.isEmpty()) continue
             val displayName = cursor.getString(nameIndex)?.trim().orEmpty().ifEmpty { number }
@@ -472,13 +534,16 @@ class DeviceActionsTool(
                   if (labelIndex >= 0) cursor.getString(labelIndex) else null,
                 )
                 .toString()
-            matches.add(ContactMatch(name = displayName, number = number, label = label))
+            // The same person reached by both queries, or listed twice in the address book, is
+            // one match - otherwise a single contact looks ambiguous and the user is asked to
+            // choose between two identical rows.
+            val key = "${displayName.lowercase()}|${number.filter { it.isDigit() }}"
+            into.getOrPut(key) { ContactMatch(name = displayName, number = number, label = label) }
           }
         }
     } catch (e: Exception) {
       Log.e(TAG, "Failed to query contacts", e)
     }
-    return matches
   }
 
   /** Requests [permission] through the chat UI when it has not been granted yet. */
@@ -530,9 +595,131 @@ class DeviceActionsTool(
     private const val MAX_CONTACT_MATCHES = 8
     private val PHONE_NUMBER_REGEX = Regex("^[+(]?[0-9][0-9()\\-.\\s]{4,}$")
 
+    /**
+     * Words a model routinely passes through as part of a name, none of which are in anyone's
+     * address book. "call sam" matches no contact; "sam" matches Sam.
+     */
+    private val QUERY_NOISE_WORDS =
+      setOf(
+        "call",
+        "phone",
+        "ring",
+        "dial",
+        "text",
+        "message",
+        "msg",
+        "sms",
+        "to",
+        "my",
+        "a",
+        "the",
+        "please",
+        "contact",
+        "number",
+        "up",
+      )
+
+    /**
+     * The queries to try for what the caller passed, best first.
+     *
+     * Stripping "call" off the front is right for "call Sam" and wrong for "Call of Duty Support",
+     * and nothing about the string says which one it is. Rather than pick, both readings are
+     * returned and the search tries them in order: the stripped one first, since that is the
+     * common case, and the literal one after, which is the only thing that finds a contact whose
+     * name genuinely starts with one of those words.
+     */
+    internal fun contactQueryCandidates(raw: String): List<String> =
+      listOf(cleanContactQuery(raw), raw.trim())
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+
+    /**
+     * Reduces what the caller passed to something the address book can match.
+     *
+     * Strips a possessive ("Sam's mobile" -> "Sam"), drops surrounding punctuation and quotes, and
+     * removes leading and trailing noise words. Interior words are left alone: a contact really
+     * can be called "Bank of the West", so only the edges are trimmed.
+     */
+    internal fun cleanContactQuery(raw: String): String {
+      var value = raw.trim().trim('"', '\'', '.', ',', '!', '?')
+      // "Sam's" -> "Sam". Both the ASCII apostrophe and the typographic one, which is what a
+      // phone keyboard and most models actually produce.
+      value = value.replace(Regex("['’]s\\b", RegexOption.IGNORE_CASE), "")
+      val words = value.split(Regex("\\s+")).filter { it.isNotBlank() }.toMutableList()
+      while (words.isNotEmpty() && words.first().lowercase().trim('.', ',') in QUERY_NOISE_WORDS) {
+        words.removeAt(0)
+      }
+      while (words.isNotEmpty() && words.last().lowercase().trim('.', ',') in QUERY_NOISE_WORDS) {
+        words.removeAt(words.size - 1)
+      }
+      // Everything was noise: fall back to the original rather than searching for nothing.
+      if (words.isEmpty()) return value.trim()
+      return words.joinToString(" ").trim()
+    }
+
+    /** One candidate app, and how well it fits the request. Higher scores win. */
+    internal data class AppMatch(val index: Int, val score: Int)
+
+    /** Words that are about opening rather than about which app, so they should not be matched. */
+    private val APP_NOISE_WORDS = setOf("open", "launch", "start", "app", "the", "my", "please", "up")
+
+    /**
+     * Ranks installed app labels against what the user asked for.
+     *
+     * The previous version took the first label *containing* the request, which fails in both
+     * directions. "open my Gmail" contains nothing because the extra words are matched too, and
+     * "play" silently picked whichever of Play Store and Play Games the package manager happened
+     * to list first.
+     *
+     * Scoring, best first: an exact label; the label being what was asked plus more ("chrome" ->
+     * "Google Chrome"); every requested word appearing somewhere in the label; and finally some
+     * requested words matching, scored by how many. Ties are reported rather than guessed.
+     */
+    internal fun rankAppMatches(request: String, labels: List<String>): List<AppMatch> {
+      val cleanedWords =
+        request
+          .trim()
+          .lowercase()
+          .split(Regex("[^\\p{L}\\p{N}]+"))
+          .filter { it.isNotBlank() && it !in APP_NOISE_WORDS }
+      // A request that is nothing but noise words still deserves its literal reading.
+      val words =
+        cleanedWords.ifEmpty {
+          request.trim().lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotBlank() }
+        }
+      if (words.isEmpty()) return listOf()
+      val needle = words.joinToString(" ")
+
+      return labels
+        .mapIndexed { index, rawLabel ->
+          val label = rawLabel.lowercase()
+          val labelWords = label.split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotBlank() }
+          val matchedWords = words.count { word -> labelWords.any { it.startsWith(word) } }
+          val score =
+            when {
+              label == needle -> 1000
+              labelWords.joinToString(" ") == needle -> 900
+              label.contains(needle) -> 800
+              matchedWords == words.size -> 700
+              matchedWords > 0 -> 100 * matchedWords
+              else -> 0
+            }
+          // A shorter label containing the request is the more likely target: asked for "play",
+          // "Play Store" beats "Play Store Games Beta". Too small to outrank a tier.
+          AppMatch(index = index, score = if (score > 0) score - label.length.coerceAtMost(49) else 0)
+        }
+        .filter { it.score > 0 }
+        .sortedByDescending { it.score }
+    }
+
     fun looksLikePhoneNumber(value: String): Boolean = PHONE_NUMBER_REGEX.matches(value.trim())
 
     private fun String.uriEncode(): String = java.net.URLEncoder.encode(this, "UTF-8")
+
+    /** Escapes the wildcards LIKE would otherwise interpret, paired with `ESCAPE '!'`. */
+    internal fun String.escapeForLike(): String =
+      replace("!", "!!").replace("%", "!%").replace("_", "!_")
 
     /** `tel:` accepts digits and a few separators; everything else is dropped. */
     private fun String.telUriEncode(): String = filter { it.isDigit() || it in "+*#;," }
