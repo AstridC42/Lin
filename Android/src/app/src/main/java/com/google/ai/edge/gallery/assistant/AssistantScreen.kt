@@ -25,6 +25,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.HeadsetOff
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.TravelExplore
@@ -38,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -111,6 +114,14 @@ fun AssistantScreen(
   var showWebSearchSettings by remember { mutableStateOf(false) }
   var showWakeWordSettings by remember { mutableStateOf(false) }
 
+  // Hands-free conversation: the assistant speaks its answer, then reopens the microphone, so a
+  // back-and-forth needs no touch at all. Not persisted - leaving the app listening in a loop
+  // across launches is not something to restore silently.
+  var handsFree by remember { mutableStateOf(false) }
+  // Bumped when the loop wants to listen again; keying the listener on it reopens the microphone
+  // for each turn rather than only for the first.
+  var handsFreeTurn by remember { mutableIntStateOf(0) }
+
   // Bumped whenever the web search settings are edited, so the derived values below recompute
   // without having to observe the whole DataStore.
   var webSearchRevision by remember { mutableIntStateOf(0) }
@@ -125,12 +136,16 @@ fun AssistantScreen(
   // so a summon made before the model finished loading still asks its question rather than losing
   // it.
   var dictatedQuery by rememberSaveable { mutableStateOf<String?>(null) }
-  val listening = rememberHandsFreeListening(
-    enabled = startListening,
-    dictateViewModel = dictateViewModel,
-    alreadyHeard = dictatedQuery != null,
-    onHeard = { dictatedQuery = it },
-  )
+  val listening =
+    rememberHandsFreeListening(
+      enabled = startListening || handsFree,
+      dictateViewModel = dictateViewModel,
+      // Each hands-free turn is a fresh chance to listen, so the "already heard this summon" guard
+      // is re-armed per turn rather than latched for the life of the screen.
+      turn = handsFreeTurn,
+      alreadyHeard = dictatedQuery != null,
+      onHeard = { dictatedQuery = it },
+    )
 
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
   val selectedModel = modelManagerUiState.selectedModel
@@ -213,6 +228,17 @@ fun AssistantScreen(
           onModeClicked = { showModeSheet = true },
           onWebSearchClicked = { showWebSearchSettings = true },
         onWakeWordClicked = { showWakeWordSettings = true },
+        handsFree = handsFree,
+        onHandsFreeToggled = {
+          val enabled = !handsFree
+          handsFree = enabled
+          if (enabled) {
+            handsFreeTurn++
+          } else {
+            speaker.stop()
+            listening.cancel()
+          }
+        },
           onSpeakRepliesToggled = {
             val enabled = !speakReplies
             speakReplies = enabled
@@ -229,14 +255,22 @@ fun AssistantScreen(
         )
       },
       onTurnComplete = { model ->
-        if (speakReplies) {
-          val reply =
-            viewModel.getLastMessageWithTypeAndSide(
-              model = model,
-              type = ChatMessageType.TEXT,
-              side = ChatSide.AGENT,
-            )
-          (reply as? ChatMessageText)?.let { speaker.speak(it.content) }
+        val reply =
+          viewModel.getLastMessageWithTypeAndSide(
+            model = model,
+            type = ChatMessageType.TEXT,
+            side = ChatSide.AGENT,
+          ) as? ChatMessageText
+        // The answer has been sent, so the query that produced it is spent. Clearing it here is
+        // what lets the next thing heard be treated as a new question rather than as the same one
+        // arriving twice.
+        dictatedQuery = null
+        when {
+          handsFree && reply != null ->
+            // Listen only once the phone has stopped talking, or it records itself answering.
+            speaker.speak(reply.content) { handsFreeTurn++ }
+          speakReplies && reply != null -> speaker.speak(reply.content)
+          handsFree -> handsFreeTurn++
         }
       },
     )
@@ -313,6 +347,8 @@ private fun AssistantModeBar(
   onModeClicked: () -> Unit,
   onWebSearchClicked: () -> Unit,
   onWakeWordClicked: () -> Unit,
+  handsFree: Boolean,
+  onHandsFreeToggled: () -> Unit,
   onSpeakRepliesToggled: () -> Unit,
   onOpenGallery: (() -> Unit)?,
 ) {
@@ -367,6 +403,27 @@ private fun AssistantModeBar(
           modifier = Modifier.size(AssistChipDefaults.IconSize),
         )
       },
+    )
+
+    AssistChip(
+      onClick = onHandsFreeToggled,
+      label = { Text(stringResource(R.string.assistant_hands_free)) },
+      leadingIcon = {
+        Icon(
+          if (handsFree) Icons.Rounded.Headphones else Icons.Rounded.HeadsetOff,
+          contentDescription = null,
+          modifier = Modifier.size(AssistChipDefaults.IconSize),
+        )
+      },
+      colors =
+        if (handsFree) {
+          AssistChipDefaults.assistChipColors(
+            leadingIconContentColor = MaterialTheme.colorScheme.primary,
+            labelColor = MaterialTheme.colorScheme.primary,
+          )
+        } else {
+          AssistChipDefaults.assistChipColors()
+        },
     )
 
     IconButton(onClick = onSpeakRepliesToggled) {

@@ -55,14 +55,21 @@ enum class AssistantMode(
     descriptionRes = R.string.assistant_mode_auto_desc,
     icon = Icons.Rounded.AutoAwesome,
     promptFragment =
+      // Ordered to match the routing procedure at the top of the prompt, and for the same reason.
+      // The mode block is appended last, so it is the final thing the model reads before the
+      // conversation - and a list that began "answer directly when you already know the answer"
+      // undid the procedure above it, however emphatic that procedure was.
       """
       Current mode: AUTO.
       Decide per message which capability fits, and combine them freely within one turn:
-      - Answer directly when you already know the answer.
-      - Look at any attached image or listen to any attached audio before answering about it.
-      - Use webSearch when the answer depends on anything current or verifiable.
+      - Check the SKILLS list first. Use load_skill for anything a skill covers - looking
+        something up, calendars, email, QR codes, maps, calculations - before answering from
+        memory.
+      - Use runMcpTool when an MCP tool fits the request.
       - Use the device tools for calls, texts, alarms, timers, navigation and apps.
-      - Use load_skill or runMcpTool for multi-step work that a skill or MCP server covers.
+      - Use webSearch when the answer depends on anything current or verifiable.
+      - Look at any attached image or listen to any attached audio before answering about it.
+      - Answer directly from your own knowledge only when none of the above covers the request.
       A single message may need several of these. Handle all parts of it before replying.
       """,
   ),
