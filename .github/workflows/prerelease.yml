@@ -1,0 +1,229 @@
+# Publishes a test build to the Releases page on every change to main.
+#
+# The Releases page is the only practical way to install on a phone with no computer nearby:
+# artifacts arrive as .zip files, and a phone cannot open those into an installer. So every change
+# that lands on main rebuilds the app and updates a single pre-release, `dev`, in place.
+#
+# One pre-release rather than one per commit, on purpose. It always sits at the top of the Releases
+# page holding the newest build, so there is one place to look and no list of stale test builds to
+# scroll past. Numbered releases (v0.2.2 and friends) are cut separately by release.yml and are
+# never touched by this workflow.
+name: Test build
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Android/**'
+      - '.github/workflows/prerelease.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Two pushes in quick succession would otherwise race to move the same tag. Let the newer one win;
+# an older build is not worth publishing once a newer commit exists.
+concurrency:
+  group: prerelease
+  cancel-in-progress: true
+
+jobs:
+  prerelease:
+    name: Build and publish the test build
+    runs-on: ubuntu-latest
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Work out the version
+        id: version
+        run: |
+          set -euo pipefail
+          # Name the build after the release it is heading towards: the newest numbered tag with
+          # its patch bumped. `sort -V` on the tag list ignores the `dev` tag, which is not a v-tag.
+          latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | grep -v -- '-' | sort -V | tail -n 1 || true)"
+          if [ -z "$latest" ]; then
+            major=0; minor=0; patch=1
+          else
+            core="${latest#v}"
+            major="$(echo "$core" | cut -d. -f1)"
+            minor="$(echo "$core" | cut -d. -f2)"
+            patch="$(( $(echo "$core" | cut -d. -f3) + 1 ))"
+          fi
+          version="${major}.${minor}.${patch}-dev.${GITHUB_RUN_NUMBER}"
+
+          # versionCode must only ever increase, or Android refuses the install as a downgrade.
+          # Both workflows pack the semantic version into the high digits and a build number into
+          # the low four, so a numbered release always outranks the test builds leading up to it:
+          #   0.2.3-dev.7  -> 203 * 10000 + 7    = 2030007
+          #   0.2.3        -> 203 * 10000 + 9999 = 2039999
+          #   0.2.4-dev.8  -> 204 * 10000 + 8    = 2040008
+          semantic=$(( major * 10000 + minor * 100 + patch ))
+          if [ "$GITHUB_RUN_NUMBER" -ge 9999 ]; then
+            echo "::error::run number $GITHUB_RUN_NUMBER has caught up with the 9999 reserved for releases"
+            exit 1
+          fi
+          code=$(( semantic * 10000 + GITHUB_RUN_NUMBER ))
+
+          {
+            echo "name=$version"
+            echo "code=$code"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building $version (versionCode $code)"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('Android/src/**/*.gradle.kts', 'Android/src/gradle/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # Without a signing key configured the build falls back to the Android debug key, and Gradle
+      # generates that key wherever ~/.android/debug.keystore does not already exist - which on a
+      # fresh runner is every single run. A different key every build means every build has to be
+      # uninstalled and reinstalled, losing the downloaded models. Caching the keystore keeps one
+      # key across runs, so each test build installs over the last as an ordinary upgrade.
+      #
+      # It is a stopgap: the cache is evicted after a week without a build, and one test build then
+      # needs a manual uninstall. Setting the four signing secrets removes the problem for good.
+      - name: Cache the debug signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: Install Android SDK platform 37
+        run: echo "y" | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"
+
+      - name: Decode the upload keystore
+        id: keystore
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        run: |
+          set -euo pipefail
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          echo "path=$RUNNER_TEMP/upload.jks" >> "$GITHUB_OUTPUT"
+
+      - name: Run the unit tests
+        working-directory: ./Android/src
+        run: ./gradlew --no-daemon testReleaseUnitTest
+
+      - name: Build the APKs
+        working-directory: ./Android/src
+        env:
+          STAR_VERSION_NAME: ${{ steps.version.outputs.name }}
+          STAR_VERSION_CODE: ${{ steps.version.outputs.code }}
+          STAR_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+          STAR_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          STAR_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STAR_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Collect and rename the APKs
+        id: apks
+        env:
+          VERSION: ${{ steps.version.outputs.name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          shopt -s nullglob
+          for apk in Android/src/app/build/outputs/apk/release/*.apk; do
+            base="$(basename "$apk" .apk)"
+            abi="${base#app-}"
+            abi="${abi%-release}"
+            cp "$apk" "dist/star-storyteller-${VERSION}-${abi}.apk"
+          done
+          if [ -z "$(ls -A dist)" ]; then
+            echo "::error::No APKs were produced"
+            exit 1
+          fi
+          ( cd dist && sha256sum *.apk > SHA256SUMS.txt )
+          ls -lh dist
+
+      - name: Write the release notes
+        env:
+          VERSION: ${{ steps.version.outputs.name }}
+          REPO: ${{ github.repository }}
+          SIGNED: ${{ env.KEYSTORE_BASE64 != '' }}
+        run: |
+          set -euo pipefail
+          base="https://github.com/${REPO}/releases/download/dev"
+          size_of() {
+            local file="dist/star-storyteller-${VERSION}-$1.apk"
+            if [ -f "$file" ]; then
+              echo "$(( ( $(stat -c%s "$file") + 524288 ) / 1048576 )) MB"
+            else
+              echo "-"
+            fi
+          }
+          link() { echo "[star-storyteller-${VERSION}-$1.apk](${base}/star-storyteller-${VERSION}-$1.apk)"; }
+
+          {
+            echo "The newest build of \`main\`, rebuilt on every change. **\`${VERSION}\`**, from"
+            echo "commit \`${GITHUB_SHA:0:7}\`."
+            echo
+            echo "## Install"
+            echo
+            echo "Tap the APK that matches your phone. Almost every Android phone made since 2018"
+            echo "is **arm64-v8a**; take the universal APK if you are not sure."
+            echo
+            echo "| Download | Size | For |"
+            echo "| --- | --- | --- |"
+            echo "| $(link arm64-v8a) | $(size_of arm64-v8a) | Nearly all modern phones |"
+            echo "| $(link universal) | $(size_of universal) | Any phone, larger download |"
+            echo "| $(link armeabi-v7a) | $(size_of armeabi-v7a) | Older 32-bit phones |"
+            echo "| $(link x86_64) | $(size_of x86_64) | Emulators and x86 tablets |"
+            echo
+            echo "Checksums: [SHA256SUMS.txt](${base}/SHA256SUMS.txt)."
+            echo
+            echo "_This repository is private, so the links need you signed in to GitHub. If one"
+            echo "does not open, the same files are under **Assets** — on the GitHub mobile app,"
+            echo "tap **View release details** first._"
+            echo
+            if [ "$SIGNED" != "true" ]; then
+              echo "> **Note**: signed with a cached debug key rather than a real upload key. Test"
+              echo "> builds normally install straight over each other, but if one is ever refused"
+              echo "> with \`App not installed\`, the key was regenerated — uninstall and install"
+              echo "> again. Setting the four signing secrets ends that for good; see RELEASING.md."
+              echo
+            fi
+            echo "## What changed"
+            echo
+            git log --no-merges --pretty='- %s' -n 15 || true
+          } > release-notes.md
+
+          cat release-notes.md
+
+      # softprops/action-gh-release creates a missing tag but will not move one that already
+      # exists, and this tag has to follow main. Move it here so the release attaches to the
+      # commit that was actually built.
+      - name: Point the dev tag at this commit
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -f dev
+          git push -f origin dev
+
+      - name: Publish the test build
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          name: Latest test build (${{ steps.version.outputs.name }})
+          body_path: release-notes.md
+          prerelease: true
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
