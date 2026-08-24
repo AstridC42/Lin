@@ -209,13 +209,46 @@ jobs:
       # softprops/action-gh-release creates a missing tag but will not move one that already
       # exists, and this tag has to follow main. Move it here so the release attaches to the
       # commit that was actually built.
+      #
+      # Through the git data API rather than `git push`. Pushing this ref failed the first time a
+      # commit touching .github/workflows landed on main: GitHub refuses a *push* from an App
+      # token that carries workflow file changes, and GITHUB_TOKEN has no way to ask for that
+      # permission. The APKs had built fine and simply never reached the Releases page - which is
+      # the one failure this whole workflow exists to prevent, and it would have come back every
+      # time a workflow file changed. Updating the ref through the API is not subject to that
+      # check.
+      #
+      # Never fatal. A test build that exists is worth publishing even against a tag left pointing
+      # at an older commit; the notes name the real commit either way. Failing here instead would
+      # throw away a finished build over a label.
       - name: Point the dev tag at this commit
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag -f dev
-          git push -f origin dev
+          set -uo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/git/refs"
+          code="$(curl -sS -o /tmp/ref.json -w '%{http_code}' -X PATCH \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${api}/tags/dev" \
+            -d "{\"sha\":\"${GITHUB_SHA}\",\"force\":true}")"
+
+          # 422 is the tag not existing yet, which is the normal first run.
+          if [ "$code" = "422" ] || [ "$code" = "404" ]; then
+            code="$(curl -sS -o /tmp/ref.json -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "${api}" \
+              -d "{\"ref\":\"refs/tags/dev\",\"sha\":\"${GITHUB_SHA}\"}")"
+          fi
+
+          if [ "$code" != "200" ] && [ "$code" != "201" ]; then
+            echo "::warning::Could not move the dev tag (HTTP $code). Publishing anyway; the notes name the commit."
+            cat /tmp/ref.json || true
+          else
+            echo "dev now points at ${GITHUB_SHA}"
+          fi
 
       - name: Publish the test build
         uses: softprops/action-gh-release@v2
