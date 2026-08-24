@@ -57,11 +57,19 @@ jobs:
           # version into one integer. Any pre-release suffix is dropped, since it is not part of
           # the ordering Android understands.
           core="${version%%-*}"
-          major="$(echo "$core" | cut -d. -f1)"
-          minor="$(echo "$core" | cut -d. -f2)"
-          patch="$(echo "$core" | cut -d. -f3)"
-          if ! [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]]; then
-            echo "::error::'$version' is not a MAJOR.MINOR.PATCH version"
+          # Match the whole thing rather than picking out three fields. Reading the fields
+          # individually accepted a fourth: '0.2.1.5' parsed as 0.2.1 with the '.5' discarded, and
+          # got the versionCode of 0.2.1 - so it could not be installed as an upgrade over it, and
+          # a later 0.2.1.6 would have collided with both.
+          if ! [[ "$core" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::'$version' is not a MAJOR.MINOR.PATCH version (three numbers, e.g. 0.2.2)"
+            exit 1
+          fi
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+          patch="${BASH_REMATCH[3]}"
+          if [ "$minor" -gt 99 ] || [ "$patch" -gt 99 ]; then
+            echo "::error::'$version' overflows the versionCode packing; minor and patch must stay under 100"
             exit 1
           fi
           # The low four digits are a build number, and a numbered release takes the highest one so
