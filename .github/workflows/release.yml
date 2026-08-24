@@ -54,8 +54,8 @@ jobs:
           fi
 
           # versionCode has to increase monotonically, so pack the three parts of the semantic
-          # version into one integer: 1.2.3 -> 10203. Any pre-release suffix is dropped, since it
-          # is not part of the ordering Android understands.
+          # version into one integer. Any pre-release suffix is dropped, since it is not part of
+          # the ordering Android understands.
           core="${version%%-*}"
           major="$(echo "$core" | cut -d. -f1)"
           minor="$(echo "$core" | cut -d. -f2)"
@@ -64,7 +64,10 @@ jobs:
             echo "::error::'$version' is not a MAJOR.MINOR.PATCH version"
             exit 1
           fi
-          code=$(( major * 10000 + minor * 100 + patch ))
+          # The low four digits are a build number, and a numbered release takes the highest one so
+          # it always outranks the test builds prerelease.yml published on the way to it:
+          #   0.2.3-dev.7 -> 2030007,  0.2.3 -> 2039999,  0.2.4-dev.1 -> 2040001
+          code=$(( ( major * 10000 + minor * 100 + patch ) * 10000 + 9999 ))
 
           {
             echo "name=$version"
@@ -87,6 +90,17 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('Android/src/**/*.gradle.kts', 'Android/src/gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
+
+      # Shared with prerelease.yml, and for the same reason: without signing secrets the build
+      # falls back to the debug key, which Gradle generates fresh on any machine that does not
+      # already have one. Caching it keeps a single key across every build, numbered release and
+      # test build alike, so they install over each other instead of demanding an uninstall.
+      - name: Cache the debug signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
 
       - name: Install Android SDK platform 37
         run: echo "y" | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"
