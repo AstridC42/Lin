@@ -883,4 +883,9 @@
   <string name="wake_word_enable" translatable="true" description="Label of the switch that enables continuous listening. [CHAR_LIMIT=40]">Listen for the wake word</string>
   <string name="wake_word_phrase_label" translatable="true" description="Label of the field holding the wake phrase. [CHAR_LIMIT=30]">Phrase</string>
   <string name="wake_word_cost_warning" translatable="true" description="Explains the cost of continuous listening. [CHAR_LIMIT=400]">Android gives no app a true low-power wake word, so this keeps the microphone open and listens continuously. It uses noticeably more battery, and your phone shows the microphone indicator the whole time. A notification stays up while it runs, and the Wake word quick-settings tile turns it off from anywhere.</string>
+  <string name="car_talk_title" translatable="true" description="Car screen row that starts talking to the assistant. [CHAR_LIMIT=30]">Talk to Star Storyteller</string>
+  <string name="car_talk_subtitle" translatable="true" description="Explains the car screen talk row. [CHAR_LIMIT=50]">Ask a question or place a call</string>
+  <string name="car_wake_word_title" translatable="true" description="Car screen row that toggles the wake word. [CHAR_LIMIT=30]">Wake word</string>
+  <string name="car_wake_word_on" translatable="true" description="Wake word state shown in the car. [CHAR_LIMIT=30]">Listening \u2014 tap to stop</string>
+  <string name="car_wake_word_off" translatable="true" description="Wake word state shown in the car. [CHAR_LIMIT=30]">Off \u2014 tap to listen</string>
 </resources>
