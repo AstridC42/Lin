@@ -1,0 +1,121 @@
+# Creates an Android upload key without needing a terminal.
+#
+# Signing a release properly needs a keystore, and making one normally means running `keytool`
+# locally. This does it on a runner instead and hands the result back as a download, so the whole
+# thing can be done from a browser.
+#
+# Run it once, follow the instructions in the artifact, then never run it again — a second key
+# would be a *different* key, and nobody could upgrade from a build signed with the first.
+name: Create signing key
+
+on:
+  workflow_dispatch:
+    inputs:
+      common_name:
+        description: 'Name to put in the certificate (shown to nobody in practice)'
+        required: false
+        default: 'Star Storyteller'
+        type: string
+      i_understand:
+        description: 'I understand this replaces nothing — if a key already exists, do not run this'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    name: Create the keystore
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the confirmation
+        if: ${{ inputs.i_understand != true }}
+        run: |
+          echo "::error::Tick the confirmation box to run this. Creating a second key strands every install signed with the first."
+          exit 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Generate the keystore
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/signing"
+          mkdir -p "$out"
+
+          # Random passwords, so nothing depends on a human choosing one well. They are written
+          # only into the artifact, never into the log.
+          storepass="$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 28)"
+          keypass="$storepass"
+
+          keytool -genkeypair \
+            -keystore "$out/upload.jks" \
+            -storetype PKCS12 \
+            -alias upload \
+            -keyalg RSA -keysize 4096 -validity 10000 \
+            -storepass "$storepass" -keypass "$keypass" \
+            -dname "CN=${{ inputs.common_name }}"
+
+          base64 -w0 "$out/upload.jks" > "$out/KEYSTORE_BASE64.txt"
+
+          cat > "$out/READ-ME-FIRST.md" <<EOF
+          # Your upload key
+
+          Three things to do, in this order.
+
+          ## 1. Keep \`upload.jks\` somewhere safe
+
+          A password manager, an encrypted drive, wherever you keep things you cannot lose. **If
+          you lose this file or the password below, every future release is signed with a
+          different key and nobody can upgrade to it — they have to uninstall and reinstall.**
+          This artifact is deleted in one day and is the only copy.
+
+          ## 2. Add four repository secrets
+
+          Settings → Secrets and variables → Actions → New repository secret. Add each of these:
+
+          | Name | Value |
+          | --- | --- |
+          | \`KEYSTORE_BASE64\` | the entire contents of \`KEYSTORE_BASE64.txt\` |
+          | \`KEYSTORE_PASSWORD\` | \`$storepass\` |
+          | \`KEY_ALIAS\` | \`upload\` |
+          | \`KEY_PASSWORD\` | \`$keypass\` |
+
+          \`KEYSTORE_BASE64.txt\` is one very long line. Open it, select all, copy, paste.
+
+          ## 3. Delete this artifact
+
+          Go back to the workflow run and delete the artifact from the Artifacts section. It
+          contains your private key in plain form; the secrets you just set are the copy that
+          matters from now on.
+
+          Once the four secrets exist, every release builds signed with this key automatically.
+          Nothing else to change.
+          EOF
+
+          ls -l "$out"
+
+      - name: Upload the keystore
+        uses: actions/upload-artifact@v4
+        with:
+          name: signing-key-DOWNLOAD-THEN-DELETE
+          path: ${{ runner.temp }}/signing/
+          if-no-files-found: error
+          # Short on purpose: this holds a private key.
+          retention-days: 1
+
+      - name: Say what to do next
+        run: |
+          {
+            echo "### Your signing key is ready"
+            echo
+            echo "1. Download the **signing-key-DOWNLOAD-THEN-DELETE** artifact below."
+            echo "2. Open \`READ-ME-FIRST.md\` inside it and follow the three steps."
+            echo "3. Delete the artifact when you are done."
+            echo
+            echo "The passwords are in that file, not in this log. The artifact expires in 1 day."
+          } >> "$GITHUB_STEP_SUMMARY"

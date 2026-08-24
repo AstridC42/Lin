@@ -71,10 +71,18 @@ fun processLlmResponse(response: String): String {
   return response.replace("\\n", "\n")
 }
 
+/** How long a JSON fetch may spend connecting, and then waiting for data, before giving up. */
+const val JSON_REQUEST_TIMEOUT_MS = 20_000
+
 inline fun <reified T> getJsonResponse(url: String): JsonObjAndTextContent<T>? {
   try {
     val connection = URL(url).openConnection() as HttpURLConnection
     connection.requestMethod = "GET"
+    // Without these, a connection that never answers hangs the caller indefinitely. This runs on
+    // the launch path - the model list is fetched before the first screen can render - so an
+    // unbounded wait shows up as an app that never starts.
+    connection.connectTimeout = JSON_REQUEST_TIMEOUT_MS
+    connection.readTimeout = JSON_REQUEST_TIMEOUT_MS
     connection.connect()
 
     val responseCode = connection.responseCode
