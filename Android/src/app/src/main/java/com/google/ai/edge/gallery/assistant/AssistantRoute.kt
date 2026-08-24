@@ -16,6 +16,9 @@
 
 package com.google.ai.edge.gallery.assistant
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,15 +38,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.customtasks.common.CustomTaskDataForBuiltinTask
 import com.google.ai.edge.gallery.data.BuiltInTaskId
+import com.google.ai.edge.gallery.data.Model
+import com.google.ai.edge.gallery.data.ModelDownloadStatusType
+import com.google.ai.edge.gallery.ui.common.MemoryWarningAlert
+import com.google.ai.edge.gallery.ui.common.isMemoryLow
 import com.google.ai.edge.gallery.ui.common.tos.AppTosDialog
 import com.google.ai.edge.gallery.ui.common.tos.TosViewModel
+import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 
 /**
@@ -69,25 +79,72 @@ fun AssistantRoute(
   initialImageUris: List<String> = listOf(),
   tosViewModel: TosViewModel = hiltViewModel(),
 ) {
+  val context = LocalContext.current
   var showTosDialog by remember { mutableStateOf(!tosViewModel.getIsTosAccepted()) }
   val uiState by modelManagerViewModel.uiState.collectAsState()
   val assistantTask = modelManagerViewModel.getCustomTaskByTaskId(BuiltInTaskId.ASSISTANT)
   val models = assistantTask?.task?.models ?: listOf()
+  val repository = modelManagerViewModel.dataStoreRepository
+
+  // A crash recorded by the previous run, shown once and then discarded.
+  var lastCrash by remember { mutableStateOf(CrashReport.read(context)) }
+
+  // The model the previous launch began loading and never finished. Read once, before anything
+  // clears it: a value here means that launch died mid-load, and loading the same model again
+  // would simply repeat it. See AssistantSettings.loading_model_name.
+  var interruptedModel by remember { mutableStateOf(repository.readAssistantSettings().loadingModelName) }
+  var memoryWarningModel by remember { mutableStateOf<Model?>(null) }
+
+  // Loading a model is only safe to start once nothing above is holding the screen. Anything that
+  // needs the user to act first has to keep the chat from rendering, because rendering it is what
+  // starts the load.
+  val blockedBeforeLoading = lastCrash != null || interruptedModel.isNotEmpty()
 
   // Pick a model as soon as the allowlist is in: the one used last if it is still around,
   // otherwise the first one already on the device, otherwise the first one at all so the chat can
   // at least offer to download it.
-  LaunchedEffect(models.size, uiState.loadingModelAllowlist) {
-    if (models.isEmpty()) return@LaunchedEffect
+  LaunchedEffect(models.size, uiState.loadingModelAllowlist, blockedBeforeLoading) {
+    if (models.isEmpty() || blockedBeforeLoading) return@LaunchedEffect
     val selected = modelManagerViewModel.uiState.value.selectedModel
     if (models.any { it.name == selected.name }) return@LaunchedEffect
 
-    val lastUsed = modelManagerViewModel.dataStoreRepository.readAssistantSettings().lastModelName
+    val lastUsed = repository.readAssistantSettings().lastModelName
     val model =
       models.firstOrNull { it.name == lastUsed }
         ?: models.firstOrNull { modelManagerViewModel.isModelDownloaded(it) }
         ?: models.first()
+
+    // Upstream only ever loaded a model after the user picked one, and warned there if it looked
+    // too large for the device. Restoring a model at launch skips that entirely, so the same check
+    // has to happen here - otherwise the first the user hears of it is the app closing.
+    if (
+      modelManagerViewModel.isModelDownloaded(model) &&
+        isMemoryLow(context, model) &&
+        !repository.readAssistantSettings().memoryWarningAccepted
+    ) {
+      memoryWarningModel = model
+      return@LaunchedEffect
+    }
     modelManagerViewModel.selectModel(model)
+  }
+
+  // Mark a model as being loaded for as long as that is true, so a launch that does not survive it
+  // can tell. Cleared once loading ends - on success, and on a reported error too, since an error
+  // the app lived to report is not the case this guards against.
+  val selectedName = uiState.selectedModel.name
+  val initializationStatus = uiState.modelInitializationStatus[selectedName]?.status
+  LaunchedEffect(selectedName, initializationStatus, blockedBeforeLoading) {
+    if (selectedName.isEmpty() || blockedBeforeLoading) return@LaunchedEffect
+    val marker =
+      loadingMarkerFor(
+        modelName = selectedName,
+        downloadStatus = uiState.modelDownloadStatus[selectedName]?.status,
+        initializationStatus = initializationStatus,
+      )
+    val current = repository.readAssistantSettings()
+    if (current.loadingModelName != marker) {
+      repository.saveAssistantSettings(current.toBuilder().setLoadingModelName(marker).build())
+    }
   }
 
   // Remember the model across launches so the assistant comes back the way it was left.
@@ -109,6 +166,60 @@ fun AssistantRoute(
           tosViewModel.acceptTos()
         }
       )
+
+    // Both of these have to come before the chat: rendering the chat is what starts a model
+    // loading, and each of these is a reason not to start one yet.
+    interruptedModel.isNotEmpty() ->
+      AssistantRecoveryState(
+        modelName = interruptedModel,
+        onTryAgain = {
+          repository.saveAssistantSettings(
+            repository.readAssistantSettings().toBuilder().setLoadingModelName("").build()
+          )
+          interruptedModel = ""
+        },
+        onPickAnother = {
+          // Forget both the stuck model and the choice that led to it, so the next launch starts
+          // from the top of the list rather than straight back into the same load.
+          repository.saveAssistantSettings(
+            repository
+              .readAssistantSettings()
+              .toBuilder()
+              .setLoadingModelName("")
+              .setLastModelName("")
+              .setMemoryWarningAccepted(false)
+              .build()
+          )
+          interruptedModel = ""
+          onOpenGallery()
+        },
+      )
+
+    lastCrash != null ->
+      AssistantCrashState(
+        report = lastCrash.orEmpty(),
+        onDismiss = {
+          CrashReport.clear(context)
+          lastCrash = null
+        },
+      )
+
+    memoryWarningModel != null ->
+      MemoryWarningAlert(
+        onProceeded = {
+          val model = memoryWarningModel
+          repository.saveAssistantSettings(
+            repository.readAssistantSettings().toBuilder().setMemoryWarningAccepted(true).build()
+          )
+          memoryWarningModel = null
+          model?.let { modelManagerViewModel.selectModel(it) }
+        },
+        onDismissed = {
+          memoryWarningModel = null
+          onOpenGallery()
+        },
+      )
+
     assistantTask == null || models.isEmpty() ->
       AssistantStartupState(
         loading = uiState.loadingModelAllowlist,
@@ -130,6 +241,100 @@ fun AssistantRoute(
             onOpenGallery = onOpenGallery,
           )
       )
+  }
+}
+
+/**
+ * What to record in `AssistantSettings.loading_model_name` for the state a model is currently in.
+ *
+ * The name is recorded only while a load could still be in flight, and cleared the moment it can
+ * no longer be: a load that finished, a load that failed in a way the app survived to report, or a
+ * model that is not downloaded and so was never loaded at all. Only a process that disappears
+ * between those two points leaves the name behind, which is exactly the case the marker is for.
+ */
+internal fun loadingMarkerFor(
+  modelName: String,
+  downloadStatus: ModelDownloadStatusType?,
+  initializationStatus: ModelInitializationStatusType?,
+): String =
+  when {
+    modelName.isEmpty() -> ""
+    initializationStatus == ModelInitializationStatusType.INITIALIZED -> ""
+    // An error that reached the UI means the app outlived the failure and can say so itself.
+    initializationStatus == ModelInitializationStatusType.ERROR -> ""
+    downloadStatus == ModelDownloadStatusType.SUCCEEDED -> modelName
+    else -> ""
+  }
+
+/**
+ * Shown when the previous launch died while loading a model.
+ *
+ * Loading a model too large for the device is killed by the kernel, not raised as an exception, so
+ * there is nothing to catch and nothing recorded. With the assistant as the app's first screen and
+ * the remembered model loaded on sight, that repeats on every launch: the app closes instantly,
+ * every time, with no way in. This is the way in.
+ */
+@Composable
+private fun AssistantRecoveryState(
+  modelName: String,
+  onTryAgain: () -> Unit,
+  onPickAnother: () -> Unit,
+) {
+  Column(
+    modifier = Modifier.fillMaxSize().padding(32.dp),
+    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+    horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    Text(
+      stringResource(R.string.assistant_recovery_title),
+      style = MaterialTheme.typography.titleMedium,
+      textAlign = TextAlign.Center,
+    )
+    Text(
+      stringResource(R.string.assistant_recovery_content, modelName),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      textAlign = TextAlign.Center,
+    )
+    Button(onClick = onPickAnother) {
+      Text(stringResource(R.string.assistant_recovery_pick_another))
+    }
+    TextButton(onClick = onTryAgain) { Text(stringResource(R.string.assistant_retry)) }
+  }
+}
+
+/**
+ * Shows the crash recorded by the previous run.
+ *
+ * The text is selectable on purpose. The app is installed on a phone with no computer attached, so
+ * copying the trace into a message is the only way it can be reported at all.
+ */
+@Composable
+private fun AssistantCrashState(report: String, onDismiss: () -> Unit) {
+  Column(
+    modifier = Modifier.fillMaxSize().padding(24.dp),
+    verticalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    Text(
+      stringResource(R.string.assistant_crash_title),
+      style = MaterialTheme.typography.titleMedium,
+    )
+    Text(
+      stringResource(R.string.assistant_crash_content),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    SelectionContainer(modifier = Modifier.weight(1f)) {
+      Text(
+        report,
+        style = MaterialTheme.typography.bodySmall,
+        fontFamily = FontFamily.Monospace,
+        modifier = Modifier.verticalScroll(rememberScrollState()),
+      )
+    }
+    Button(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+      Text(stringResource(R.string.assistant_crash_continue))
+    }
   }
 }
 

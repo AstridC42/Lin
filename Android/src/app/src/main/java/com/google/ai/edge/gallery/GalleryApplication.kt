@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery
 
 import android.app.Application
+import com.google.ai.edge.gallery.assistant.CrashReport
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.notifications.NotificationScheduleManager
 import com.google.ai.edge.gallery.ui.theme.ThemeSettings
@@ -32,6 +33,11 @@ class GalleryApplication : Application() {
 
   override fun onCreate() {
     super.onCreate()
+    // First, so that a crash in any of the setup below is still recorded. The app is installed
+    // from a release page onto a phone with no computer attached, where logcat is not available
+    // and an unrecorded crash can only ever be reported as "it closed".
+    CrashReport.install(this)
+
     // Initialize the notification schedule manager to load the scheduled notifications from the
     // disk.
     notificationScheduleManager.initialize()
