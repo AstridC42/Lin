@@ -69,6 +69,7 @@ import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
  *   in the back stack, so this normally sends the app to the background.
  * @param initialQuery a question to ask straight away, e.g. from the system assist gesture.
  * @param initialImageUris images shared into the app to attach to that first message.
+ * @param startListening open the microphone straight away, for a hands-free summon.
  */
 @Composable
 fun AssistantRoute(
@@ -77,6 +78,7 @@ fun AssistantRoute(
   onExit: () -> Unit,
   initialQuery: String? = null,
   initialImageUris: List<String> = listOf(),
+  startListening: Boolean = false,
   tosViewModel: TosViewModel = hiltViewModel(),
 ) {
   val context = LocalContext.current
@@ -238,6 +240,7 @@ fun AssistantRoute(
             onNavUp = onExit,
             initialQuery = initialQuery,
             initialImageUris = initialImageUris,
+            startListening = startListening,
             onOpenGallery = onOpenGallery,
           )
       )

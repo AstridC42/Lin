@@ -20,16 +20,24 @@ import android.app.SearchManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import com.google.ai.edge.gallery.voice.EXTRA_START_LISTENING
 
 /**
  * What an incoming intent is asking the assistant to do.
  *
  * @property query text to send as the first message; empty when the intent only opened the app.
  * @property imageUris images to attach to that first message, as content URI strings.
+ * @property startListening open the microphone immediately instead of waiting for the keyboard.
+ *   Set when the assistant was summoned hands-free - the assist gesture, a headset button, a car's
+ *   voice control - where nobody is in a position to reach for the screen.
  */
-data class AssistantLaunchRequest(val query: String = "", val imageUris: List<String> = listOf()) {
+data class AssistantLaunchRequest(
+  val query: String = "",
+  val imageUris: List<String> = listOf(),
+  val startListening: Boolean = false,
+) {
   val isEmpty: Boolean
-    get() = query.isEmpty() && imageUris.isEmpty()
+    get() = query.isEmpty() && imageUris.isEmpty() && !startListening
 }
 
 /**
@@ -50,7 +58,12 @@ object AssistantIntents {
     if (intent == null) return AssistantLaunchRequest()
     return when (intent.action) {
       Intent.ACTION_ASSIST,
-      "android.intent.action.VOICE_COMMAND" -> AssistantLaunchRequest()
+      "android.intent.action.VOICE_COMMAND" ->
+        AssistantLaunchRequest(
+          // Only when the voice session summoned us. The same action arriving from a launcher
+          // shortcut is someone tapping an icon, who did not ask to be recorded.
+          startListening = intent.getBooleanExtra(EXTRA_START_LISTENING, false)
+        )
 
       Intent.ACTION_SEARCH,
       Intent.ACTION_WEB_SEARCH ->

@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +62,7 @@ import com.google.ai.edge.gallery.ui.common.chat.ChatMessageInfo
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageText
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageType
 import com.google.ai.edge.gallery.ui.common.chat.ChatSide
+import com.google.ai.edge.gallery.ui.common.textandvoiceinput.HoldToDictateViewModel
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.theme.emptyStateContent
 import com.google.ai.edge.gallery.ui.theme.emptyStateTitle
@@ -91,8 +93,10 @@ fun AssistantScreen(
   searxngClient: SearxngClient,
   initialQuery: String? = null,
   initialImageUris: List<String> = listOf(),
+  startListening: Boolean = false,
   onOpenGallery: (() -> Unit)? = null,
   viewModel: AssistantViewModel = hiltViewModel(),
+  dictateViewModel: HoldToDictateViewModel = hiltViewModel(),
   skillManagerViewModel: SkillManagerViewModel = hiltViewModel(),
   mcpManagerViewModel: McpManagerViewModel = hiltViewModel(),
 ) {
@@ -113,6 +117,18 @@ fun AssistantScreen(
     remember(webSearchRevision) {
       searxngClient.instanceUrlOrNull()?.let { AssistantTask.hostOf(it) }.orEmpty()
     }
+
+  // A hands-free summon has to become a question by itself. The text it produces is handed to the
+  // chat as its initial query, which the chat already knows how to send once the model is ready -
+  // so a summon made before the model finished loading still asks its question rather than losing
+  // it.
+  var dictatedQuery by rememberSaveable { mutableStateOf<String?>(null) }
+  val listening = rememberHandsFreeListening(
+    enabled = startListening,
+    dictateViewModel = dictateViewModel,
+    alreadyHeard = dictatedQuery != null,
+    onHeard = { dictatedQuery = it },
+  )
 
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
   val selectedModel = modelManagerUiState.selectedModel
@@ -182,7 +198,7 @@ fun AssistantScreen(
     viewModel = viewModel,
     skillManagerViewModel = skillManagerViewModel,
     mcpManagerViewModel = mcpManagerViewModel,
-    initialQuery = initialQuery,
+    initialQuery = dictatedQuery ?: initialQuery,
     initialImageUris = initialImageUris,
     baseSystemPromptResolver = systemPromptResolver,
     emptyStateHeadline = { AssistantEmptyStateHeadline() },
@@ -220,6 +236,10 @@ fun AssistantScreen(
       }
     },
   )
+
+  if (listening.active) {
+    ListeningDialog(heard = listening.partialText, onCancel = listening.cancel)
+  }
 
   if (showModeSheet) {
     AssistantModeSheet(

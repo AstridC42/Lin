@@ -208,6 +208,53 @@
             android:exported="true"
             android:theme="@style/Theme.Gallery.OssLicenses" />
 
+        <!--
+          Star Storyteller: the services that make the app a real digital assistant rather than
+          just an app that answers an ASSIST intent.
+
+          The intent filter on MainActivity is enough to appear in some assist-app lists, but the
+          assist gesture, the power-button hold, a Bluetooth headset button and a car's voice
+          control are all routed to whichever app implements VoiceInteractionService. Without
+          these three the hands-free routes have nowhere to land.
+
+          BIND_VOICE_INTERACTION is held by the system only, so exporting these does not expose
+          them to other apps.
+        -->
+        <service
+            android:name="com.google.ai.edge.gallery.voice.StarVoiceInteractionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="com.google.ai.edge.gallery.voice.StarVoiceInteractionSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+
+        <!--
+          Required by the voice interaction configuration: the platform rejects it outright when
+          recognitionService is missing. It forwards to the device's own recognizer; the app does
+          its listening in the chat, where it can show what it heard.
+        -->
+        <service
+            android:name="com.google.ai.edge.gallery.voice.StarRecognitionService"
+            android:exported="true"
+            android:permission="android.permission.RECORD_AUDIO">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
