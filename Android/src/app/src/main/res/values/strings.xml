@@ -870,4 +870,7 @@
   <string name="assistant_crash_title" translatable="true" description="Title shown when the previous run crashed. [CHAR_LIMIT=60]">Star Storyteller stopped unexpectedly</string>
   <string name="assistant_crash_content" translatable="true" description="Explains the crash report below and asks for it to be reported. [CHAR_LIMIT=200]">This is what went wrong last time. Press and hold to copy it if you are reporting the problem.</string>
   <string name="assistant_crash_continue" translatable="true" description="Label of the button that dismisses the crash report. [CHAR_LIMIT=15]">Continue</string>
+  <string name="assistant_listening_title" translatable="true" description="Title of the dialog shown while the assistant is listening. [CHAR_LIMIT=40]">Listening</string>
+  <string name="assistant_listening_hint" translatable="true" description="Placeholder shown before anything has been heard. [CHAR_LIMIT=60]">Go ahead \u2014 say what you need.</string>
+  <string name="assistant_listening_stop" translatable="true" description="Label of the button that stops listening. [CHAR_LIMIT=15]">Stop</string>
 </resources>

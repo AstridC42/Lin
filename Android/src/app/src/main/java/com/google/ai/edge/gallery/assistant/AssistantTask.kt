@@ -138,6 +138,7 @@ class AssistantTask(
       searxngClient = searxngClient,
       initialQuery = myData.initialQuery,
       initialImageUris = myData.initialImageUris,
+      startListening = myData.startListening,
       onOpenGallery = myData.onOpenGallery,
     )
   }

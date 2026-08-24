@@ -115,6 +115,7 @@ class MainActivity : ComponentActivity() {
               modelManagerViewModel = modelManagerViewModel,
               initialAssistantQuery = assistantRequest.query.ifEmpty { null },
               initialAssistantImageUris = assistantRequest.imageUris,
+              startAssistantListening = assistantRequest.startListening,
             )
 
             // Fade out a "mask" that has the same color as the background of the splash screen
