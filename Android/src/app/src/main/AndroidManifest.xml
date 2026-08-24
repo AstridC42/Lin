@@ -291,6 +291,30 @@
             </intent-filter>
         </service>
 
+        <!--
+          Star Storyteller: Android Auto.
+
+          The car screen is not the chat. Android Auto renders from a fixed set of templates with
+          hard caps on text and refresh rate, and a scrolling conversation is neither an available
+          shape nor a safe one at speed. This is a short way to start talking to the assistant
+          without picking the phone up; the phone does the listening and the speaking.
+
+          A sideloaded app stays invisible in Android Auto until developer mode and "Unknown
+          sources" are turned on in the phone's Android Auto settings.
+        -->
+        <service
+            android:name="com.google.ai.edge.gallery.car.StarCarAppService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.IOT" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="1" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
