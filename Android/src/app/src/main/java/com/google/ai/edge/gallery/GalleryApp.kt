@@ -36,11 +36,13 @@ fun GalleryApp(
   modelManagerViewModel: ModelManagerViewModel,
   initialAssistantQuery: String? = null,
   initialAssistantImageUris: List<String> = listOf(),
+  startAssistantListening: Boolean = false,
 ) {
   GalleryNavHost(
     navController = navController,
     modelManagerViewModel = modelManagerViewModel,
     initialAssistantQuery = initialAssistantQuery,
     initialAssistantImageUris = initialAssistantImageUris,
+    startAssistantListening = startAssistantListening,
   )
 }

@@ -49,6 +49,9 @@ data class CustomTaskDataForBuiltinTask(
   // Content URIs of images to attach to that initial message. Set when the user shares images
   // into the app, or fires the system assist gesture with a screenshot.
   val initialImageUris: List<String> = listOf(),
+  // Open the microphone as soon as the screen appears, rather than waiting for the keyboard. Set
+  // when the assistant was summoned hands-free, where nobody can reach the screen.
+  val startListening: Boolean = false,
   // Opens the capability gallery. Only set for the assistant screen, which replaces the gallery
   // as the app's start destination and therefore has to offer a way back to it.
   val onOpenGallery: (() -> Unit)? = null,

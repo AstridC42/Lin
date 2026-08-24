@@ -160,6 +160,7 @@ fun GalleryNavHost(
   initialAssistantQuery: String? = null,
   /** Images shared into the app, attached to the assistant's first message. */
   initialAssistantImageUris: List<String> = listOf(),
+  startAssistantListening: Boolean = false,
 ) {
   val lifecycleOwner = LocalLifecycleOwner.current
   var showModelManager by remember { mutableStateOf(false) }
@@ -213,6 +214,7 @@ fun GalleryNavHost(
         onExit = { activity?.moveTaskToBack(true) },
         initialQuery = initialAssistantQuery,
         initialImageUris = initialAssistantImageUris,
+        startListening = startAssistantListening,
       )
     }
 
