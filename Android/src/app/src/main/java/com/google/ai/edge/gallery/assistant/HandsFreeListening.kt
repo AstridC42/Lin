@@ -60,9 +60,10 @@ data class HandsFreeListeningState(
  * now". Landing on a chat with an empty text box would put the burden straight back on the user's
  * hands, which is the one thing those routes exist to avoid.
  *
- * Listening happens exactly once per summon. [alreadyHeard] is what makes that true across
- * recomposition and across a rotation or a fold, so the microphone does not reopen underneath a
- * question that has already been asked.
+ * Listening happens exactly once per summon, and once per turn of a hands-free conversation.
+ * [alreadyHeard] is what makes that true across recomposition and across a rotation or a fold, so
+ * the microphone does not reopen underneath a question that has already been asked; [turn] is what
+ * re-arms it for the next question in a conversation.
  *
  * If `RECORD_AUDIO` has not been granted this asks for it, and does not listen if it is refused -
  * a refused microphone leaves the chat perfectly usable by hand.
@@ -71,13 +72,16 @@ data class HandsFreeListeningState(
 fun rememberHandsFreeListening(
   enabled: Boolean,
   dictateViewModel: HoldToDictateViewModel,
+  turn: Int = 0,
   alreadyHeard: Boolean,
   onHeard: (String) -> Unit,
 ): HandsFreeListeningState {
   val context = LocalContext.current
   val dictateState by dictateViewModel.uiState.collectAsState()
 
-  var started by remember { mutableStateOf(false) }
+  // Re-keyed on the turn so each round of a hands-free conversation listens again. Without that,
+  // the guard that makes a summon listen exactly once would also stop the second question.
+  var started by remember(turn) { mutableStateOf(false) }
   var permissionAsked by remember { mutableStateOf(false) }
   var permissionGranted by remember {
     mutableStateOf(

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -31,9 +32,23 @@ import androidx.compose.ui.unit.dp
  * The widest a column of conversation should get, regardless of the screen behind it.
  *
  * Past roughly this width a line of text stops being comfortable to read: the eye loses its place
- * coming back to the start of the next line. Every reading medium settles somewhere near it.
+ * coming back to the start of the next line.
+ *
+ * It was 720dp, chosen for readability alone, and that turned out to be wider than an unfolded
+ * foldable held in portrait - so on the device this was written for, the cap never engaged and
+ * unfolding changed nothing visible. 600dp is the width Android itself treats as the boundary
+ * between a phone and a large screen, so the layout now changes exactly where the system decides
+ * there is spare width to give back.
  */
-private val MAX_CONVERSATION_WIDTH: Dp = 720.dp
+private val MAX_CONVERSATION_WIDTH: Dp = 600.dp
+
+/**
+ * Below this, the screen is a phone and every point of width is needed.
+ *
+ * Matches Android's own compact/medium boundary, so "the layout changed" lines up with "the system
+ * considers this a large screen".
+ */
+private val LARGE_SCREEN_MIN_WIDTH: Dp = 600.dp
 
 /**
  * Centres its content and stops it growing past a readable width on a large screen.
@@ -49,7 +64,18 @@ private val MAX_CONVERSATION_WIDTH: Dp = 720.dp
 @Composable
 fun AdaptiveWidthContainer(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
   BoxWithConstraints(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-    val width = if (maxWidth > MAX_CONVERSATION_WIDTH) MAX_CONVERSATION_WIDTH else maxWidth
+    val width =
+      if (maxWidth >= LARGE_SCREEN_MIN_WIDTH) minOf(maxWidth, MAX_CONVERSATION_WIDTH) else maxWidth
     Box(modifier = Modifier.width(width).fillMaxHeight()) { content() }
   }
 }
+
+/**
+ * Whether the current screen is one Android considers large.
+ *
+ * Exposed so a screen can offer more on a wide display than a narrow one does, rather than only
+ * being centred on it.
+ */
+@Composable
+fun isLargeScreen(): Boolean =
+  LocalConfiguration.current.screenWidthDp.dp >= LARGE_SCREEN_MIN_WIDTH
