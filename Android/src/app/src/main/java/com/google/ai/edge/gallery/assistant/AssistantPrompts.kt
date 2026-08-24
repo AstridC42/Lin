@@ -99,9 +99,9 @@ object AssistantPrompts {
   ): String = buildString {
     appendLine(PERSONA.trimIndent())
     appendLine()
-    appendLine("=== WHAT YOU CAN DO ===")
+    appendLine(ROUTING.trimIndent())
     appendLine()
-    appendLine(CAPABILITY_CONVERSATION.trimIndent())
+    appendLine("=== WHAT YOU CAN DO ===")
     appendLine()
     appendLine(CAPABILITY_MEDIA.trimIndent())
     appendLine()
@@ -179,10 +179,41 @@ object AssistantPrompts {
     the right length for a spoken-style answer; use a short list only when the content is a list.
     """
 
-  private const val CAPABILITY_CONVERSATION =
+  /**
+   * The routing procedure, and the reason it is written the way it is.
+   *
+   * This has to come before anything else in the prompt, in this imperative numbered form, because
+   * a 2B model follows the top of its prompt and stops reading for intent. An earlier version led
+   * with "answer directly from what you know; say so when you are not sure", and the model obeyed
+   * it perfectly: asked to check Wikipedia, with a query-wikipedia skill loaded and its tools
+   * registered, it replied that it could not check Wikipedia. Nothing was wrong with the wiring.
+   * It had been told to answer from memory and to admit ignorance, so it did.
+   *
+   * Upstream's agent prompt is this blunt for the same reason. Answering from memory is the last
+   * step here, not the first.
+   */
+  private const val ROUTING =
     """
-    CONVERSATION
-    Answer directly from what you know. When you are not sure, say so instead of inventing detail.
+    === WHAT TO DO WITH EVERY MESSAGE ===
+
+    For EVERY request, work through these in order and stop at the first one that applies. Do this
+    silently: no commentary about which step you are on.
+
+    1. SKILL. Look at the SKILLS list below. If any skill covers the request, call
+       load_skill with its name and follow its instructions exactly. Anything involving looking
+       something up, a calculation, a calendar, email, QR codes or maps is very likely a skill.
+       Check the list before you decide you cannot do something.
+    2. MCP TOOL. If an MCP TOOLS list is present and one of those tools fits, call it with
+       runMcpTool.
+    3. DEVICE ACTION. If the request is about the phone itself - calling, texting, alarms, timers,
+       opening an app, directions, the torch, settings - use the matching device action below.
+    4. WEB SEARCH. If web search is available below and the request needs current information,
+       search.
+    5. ANSWER DIRECTLY. Only when none of the above applies, answer from what you know. If you are
+       not sure, say so rather than inventing detail.
+
+    Never say you are unable to do something before you have checked steps 1 to 4. "I cannot look
+    that up" is only true if no skill, no tool and no search covers it.
     """
 
   private const val CAPABILITY_MEDIA =
@@ -234,8 +265,9 @@ object AssistantPrompts {
   private const val CAPABILITY_SKILLS =
     """
     SKILLS
-    Skills are step-by-step instructions for tasks that need more than one call. Find the matching
-    skill below, load it with load_skill, then follow its instructions exactly.
+    Step 1 of the procedure above. These are step-by-step instructions for tasks that need more
+    than one call. Load one with load_skill(name) and follow it exactly. This is the list - if
+    something here fits the request, use it rather than answering from memory.
     """
 
   private const val CAPABILITY_MCP =
