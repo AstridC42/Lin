@@ -136,6 +136,23 @@ message AssistantSettings {
   // Name of the model last used on the assistant screen, so the screen can
   // restore it on the next launch.
   string last_model_name = 4;
+
+  // Name of a model whose load was started but never finished.
+  //
+  // Written just before the assistant asks for a model to be loaded and
+  // cleared once loading ends, either way. A launch that finds this already
+  // set therefore knows the previous launch died while loading that model -
+  // which a crash handler cannot detect, because loading a model too large
+  // for the device is killed by the kernel rather than raised as an
+  // exception. Since the assistant is the app's first screen and loads the
+  // remembered model on sight, that would otherwise repeat on every launch
+  // and leave the app permanently unopenable.
+  string loading_model_name = 5;
+
+  // Set when the user has been warned that the remembered model may not fit
+  // in this device's memory and has chosen to load it anyway, so the warning
+  // is not repeated on every launch.
+  bool memory_warning_accepted = 6;
 }
 
 message McpAuth {
