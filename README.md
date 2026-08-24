@@ -117,9 +117,13 @@ instead of guessing.
 
 ## Using it as the phone's assistant
 
-The app registers for `ASSIST` and `VOICE_COMMAND`, so it can be selected under
-**Settings → Apps → Default apps → Digital assistant app**, after which the
-assist gesture and the power-button hold open the chat.
+The app implements a full `VoiceInteractionService`, so it can be selected under
+**Settings → Apps → Default apps → Digital assistant app**. Once it is, every
+hands-free route the platform offers reaches it: the assist gesture, holding the
+power button, a Bluetooth headset button and a car's voice control. Being
+summoned that way opens the microphone straight away rather than landing on an
+empty text box — what you say becomes the first message, even if the model is
+still loading when you say it.
 
 It also accepts:
 
@@ -131,6 +135,44 @@ It also accepts:
 
 Replies can be read out loud with the platform text-to-speech engine; markdown
 is flattened first so it does not read asterisks aloud.
+
+### Wake word
+
+Off by default, under the **Wake word** chip in the chat, or the quick-settings
+tile of the same name.
+
+Be aware of what it is. Android gives no third-party app a real low-power wake
+word — `AlwaysOnHotwordDetector` only serves phrases the device's audio DSP was
+built and enrolled with, which means the manufacturer's own. So this keeps the
+microphone open and runs ordinary speech recognition over it. It costs
+noticeably more battery than a hardware hotword, your phone shows the microphone
+indicator the whole time, and a notification with a **Stop** button stays up
+while it runs. The quick-settings tile is the fastest way to switch it off in a
+room where it should not be listening.
+
+The phrase defaults to "hey star" and can be changed. Matching is on whole
+words, so it does not fire on "hey started the car".
+
+### Android Auto
+
+The car screen offers two things: start talking to the assistant, and toggle the
+wake word. It is deliberately not the chat — Android Auto renders from fixed
+templates with hard caps on text and refresh rate, and reading a model's
+paragraph at speed is what those rules exist to prevent. The phone does the
+listening and the speaking; the car screen is how you start without picking it
+up.
+
+A sideloaded app stays invisible in Android Auto until **developer mode** and
+**Unknown sources** are enabled in the phone's Android Auto settings. That is
+Android Auto's rule for apps outside the Play Store, not something the app can
+arrange for itself.
+
+### Foldables
+
+The app is no longer locked to portrait and handles fold and unfold without
+being recreated, so unfolding mid-reply does not restart the screen or drop the
+keyboard. On the wide inner screen the conversation is centred and capped at a
+readable width rather than stretched across the whole display.
 
 ## Download
 
