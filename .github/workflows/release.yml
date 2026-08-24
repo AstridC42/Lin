@@ -150,25 +150,47 @@ jobs:
           VERSION: ${{ steps.version.outputs.name }}
           TAG: ${{ steps.version.outputs.tag }}
           SIGNED: ${{ steps.apks.outputs.signed }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           previous="$(git tag --list 'v*' --sort=-v:refname | grep -v "^${TAG}$" | head -n 1 || true)"
 
+          # Assets live under a predictable URL, so the notes can link straight to them. Listing
+          # bare filenames instead is what made the GitHub mobile app look broken: it renders the
+          # notes but keeps the Assets section behind "View release details", so the table read
+          # as a list of downloads that could not be tapped.
+          base="https://github.com/${REPO}/releases/download/${TAG}"
+          size_of() {
+            # Human-readable size of a built APK, so the table says what a tap will cost.
+            local file="dist/star-storyteller-${VERSION}-$1.apk"
+            if [ -f "$file" ]; then
+              echo "$(( ( $(stat -c%s "$file") + 524288 ) / 1048576 )) MB"
+            else
+              echo "-"
+            fi
+          }
+          link() { echo "[star-storyteller-${VERSION}-$1.apk](${base}/star-storyteller-${VERSION}-$1.apk)"; }
+
           {
             echo "## Install"
             echo
-            echo "Download the APK that matches your phone and open it. Almost every Android phone"
-            echo "made since 2018 is **arm64-v8a**; take the universal APK if you are not sure."
+            echo "Tap the APK that matches your phone. Almost every Android phone made since 2018"
+            echo "is **arm64-v8a**; take the universal APK if you are not sure."
             echo
-            echo "| Download | For |"
-            echo "| --- | --- |"
-            echo "| \`star-storyteller-${VERSION}-arm64-v8a.apk\` | Nearly all modern phones |"
-            echo "| \`star-storyteller-${VERSION}-armeabi-v7a.apk\` | Older 32-bit phones |"
-            echo "| \`star-storyteller-${VERSION}-x86_64.apk\` | Emulators and x86 tablets |"
-            echo "| \`star-storyteller-${VERSION}-universal.apk\` | Any phone, larger download |"
+            echo "| Download | Size | For |"
+            echo "| --- | --- | --- |"
+            echo "| $(link arm64-v8a) | $(size_of arm64-v8a) | Nearly all modern phones |"
+            echo "| $(link universal) | $(size_of universal) | Any phone, larger download |"
+            echo "| $(link armeabi-v7a) | $(size_of armeabi-v7a) | Older 32-bit phones |"
+            echo "| $(link x86_64) | $(size_of x86_64) | Emulators and x86 tablets |"
             echo
             echo "Android will warn that the app comes from an unknown source; allow installs from"
-            echo "your browser or file manager to continue. Checksums are in \`SHA256SUMS.txt\`."
+            echo "your browser or file manager to continue. Checksums:"
+            echo "[SHA256SUMS.txt](${base}/SHA256SUMS.txt)."
+            echo
+            echo "_This repository is private, so the links above need you signed in to GitHub."
+            echo "If one does not open, the same files are under **Assets** at the bottom of this"
+            echo "release — on the GitHub mobile app, tap **View release details** first._"
             echo
             if [ "$SIGNED" != "true" ]; then
               echo "> **Note**: this build is signed with the Android debug key, so it cannot be"

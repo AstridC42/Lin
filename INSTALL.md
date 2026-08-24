@@ -13,6 +13,10 @@ Open the [Releases page](https://github.com/AstridC42/Star-Storyteller-/releases
 itself and tap the APK. Release files download as-is, so Android offers to install it straight
 away.
 
+The release notes link each APK directly. If a link does not open — the repository is private, so
+they need you signed in — the same files are under **Assets** at the bottom of the release. On the
+GitHub mobile app that section sits behind **View release details**.
+
 Which file:
 
 | File | For |
