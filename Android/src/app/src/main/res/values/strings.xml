@@ -864,4 +864,10 @@
   <string name="assistant_model_list_failed" translatable="true" description="Title shown when the model list could not be loaded. [CHAR_LIMIT=60]">Could not load the model list</string>
   <!-- Label of the button that retries loading the model list. [CHAR_LIMIT=15] -->
   <string name="assistant_retry" translatable="true" description="Label of the button that retries loading the model list. [CHAR_LIMIT=15]">Try again</string>
+  <string name="assistant_recovery_title" translatable="true" description="Title shown when the app closed while loading a model last time. [CHAR_LIMIT=60]">Star Storyteller closed while loading a model</string>
+  <string name="assistant_recovery_content" translatable="true" description="Explains that the last launch did not survive loading a model. %1$s is the model name. [CHAR_LIMIT=300]">The last time the app started, it stopped while loading %1$s. That usually means the model needs more memory than this phone has. Pick a smaller model to carry on, or try this one again.</string>
+  <string name="assistant_recovery_pick_another" translatable="true" description="Label of the button that opens the gallery to choose a different model. [CHAR_LIMIT=25]">Pick another model</string>
+  <string name="assistant_crash_title" translatable="true" description="Title shown when the previous run crashed. [CHAR_LIMIT=60]">Star Storyteller stopped unexpectedly</string>
+  <string name="assistant_crash_content" translatable="true" description="Explains the crash report below and asks for it to be reported. [CHAR_LIMIT=200]">This is what went wrong last time. Press and hold to copy it if you are reporting the problem.</string>
+  <string name="assistant_crash_continue" translatable="true" description="Label of the button that dismisses the crash report. [CHAR_LIMIT=15]">Continue</string>
 </resources>
