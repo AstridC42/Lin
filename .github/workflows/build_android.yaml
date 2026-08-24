@@ -1,33 +1,127 @@
-  name: Build Android APK
-  
-  on:
-    workflow_dispatch:
-    push:
-      branches: [ "main" ]
-      paths:
-        - 'Android/**'
-    pull_request:
-      branches: [ "main" ]
-      paths:
-        - 'Android/**'
-  
-  jobs:
-    build_apk:
-      name: Build Android APK
-      runs-on: ubuntu-latest
-      defaults:
-        run:
-          working-directory: ./Android/src
-      steps:
-        - name: Checkout the source code
-          uses: actions/checkout@v3
-        - uses: actions/setup-java@v4
-          with:
-            distribution: 'temurin'
-            java-version: '21'
-        - name: Install Android SDK Platform 37
-          run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0"
-        - name: Build
-          run: ./gradlew assembleRelease
-  
-  
+# Builds the app on every change to Android/ and keeps the APKs.
+#
+# The build itself is upstream's; what is added here is uploading the result. Without that, every
+# run produced an APK and discarded it, so the only way to get an installable file was to cut a
+# release. Now any commit can be installed: open the run, download the APK for your phone.
+#
+# Artifacts arrive as a .zip (GitHub always zips them), which is fine on a computer and awkward on
+# a phone. For a file you can tap straight from the phone's browser, cut a release instead — see
+# RELEASING.md.
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Android/**'
+      - '.github/workflows/build_android.yaml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'Android/**'
+      - '.github/workflows/build_android.yaml'
+
+jobs:
+  build_apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Android/src
+    steps:
+      - name: Checkout the source code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('Android/src/**/*.gradle.kts', 'Android/src/gradle/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install Android SDK Platform 37
+        run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0"
+
+      - name: Run the unit tests
+        run: ./gradlew --no-daemon testReleaseUnitTest
+
+      - name: Build
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Name the APKs after the commit
+        id: rename
+        env:
+          # On a pull_request event the checkout is an ephemeral refs/pull/N/merge commit, so
+          # `git rev-parse HEAD` would name something that does not exist in the repository.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          short="${HEAD_SHA:0:7}"
+          mkdir -p "$RUNNER_TEMP/apks"
+          shopt -s nullglob
+          for apk in app/build/outputs/apk/release/*.apk; do
+            base="$(basename "$apk" .apk)"
+            abi="${base#app-}"
+            abi="${abi%-release}"
+            cp "$apk" "$RUNNER_TEMP/apks/star-storyteller-${short}-${abi}.apk"
+          done
+          if [ -z "$(ls -A "$RUNNER_TEMP/apks")" ]; then
+            echo "::error::No APKs were produced"
+            exit 1
+          fi
+          ls -lh "$RUNNER_TEMP/apks"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+
+      # One artifact per ABI, so you download the ~43 MB you need rather than all ~190 MB.
+      - name: Upload arm64-v8a (almost certainly the one you want)
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-arm64-v8a-${{ steps.rename.outputs.short }}
+          path: ${{ runner.temp }}/apks/*-arm64-v8a.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload universal
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-universal-${{ steps.rename.outputs.short }}
+          path: ${{ runner.temp }}/apks/*-universal.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload armeabi-v7a
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-armeabi-v7a-${{ steps.rename.outputs.short }}
+          path: ${{ runner.temp }}/apks/*-armeabi-v7a.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x86_64
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-x86_64-${{ steps.rename.outputs.short }}
+          path: ${{ runner.temp }}/apks/*-x86_64.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Say where the APKs are
+        run: |
+          {
+            echo "### APKs for \`${{ steps.rename.outputs.short }}\`"
+            echo
+            echo "Scroll to **Artifacts** at the bottom of this page and download"
+            echo "\`apk-arm64-v8a-${{ steps.rename.outputs.short }}\` unless you know your phone is"
+            echo "something else. Unzip it, put the \`.apk\` on your phone, and tap it."
+            echo
+            echo "These are signed with the debug key unless release signing is configured, so"
+            echo "they cannot be installed over a differently signed copy."
+          } >> "$GITHUB_STEP_SUMMARY"

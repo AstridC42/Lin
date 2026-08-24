@@ -23,7 +23,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.ai.edge.gallery.AppLifecycleProvider
-import com.google.ai.edge.gallery.BuildConfig
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.common.ProjectConfig
 import com.google.ai.edge.gallery.common.SystemPromptHelper
@@ -92,6 +91,18 @@ private const val MODEL_ALLOWLIST_FILENAME = "model_allowlist.json"
 private const val MODEL_ALLOWLIST_TEST_FILENAME = "model_allowlist_test.json"
 private const val ALLOWLIST_BASE_URL =
   "https://raw.githubusercontent.com/google-ai-edge/gallery/refs/heads/main/model_allowlists"
+
+/**
+ * The upstream allowlist this build asks for.
+ *
+ * Upstream names these files after *its* app version, so deriving the name from our own
+ * versionName requests a file that has never existed and 404s on every launch. Bump this when
+ * upstream publishes a newer one worth picking up.
+ */
+private const val UPSTREAM_ALLOWLIST_VERSION = "1_0_19"
+
+/** Copy of [UPSTREAM_ALLOWLIST_VERSION] shipped in assets, so a fresh install works offline. */
+private const val BUNDLED_MODEL_ALLOWLIST_ASSET = "model_allowlist.json"
 
 private const val TEST_MODEL_ALLOW_LIST = ""
 
@@ -989,9 +1000,9 @@ constructor(
         }
 
         if (modelAllowlist == null) {
-          // Load from github.
-          var version = BuildConfig.VERSION_NAME.replace(".", "_")
-          val url = getAllowlistUrl(version)
+          // Load from github. Pinned to an upstream version that exists — see
+          // UPSTREAM_ALLOWLIST_VERSION.
+          val url = getAllowlistUrl(UPSTREAM_ALLOWLIST_VERSION)
           Log.d(TAG, "Loading model allowlist from internet. Url: $url")
           val data = getJsonResponse<ModelAllowlist>(url = url)
           modelAllowlist = data?.jsonObj
@@ -1006,7 +1017,19 @@ constructor(
         }
 
         if (modelAllowlist == null) {
-          _uiState.update { it.copy(loadingModelAllowlistError = "Failed to load model list") }
+          Log.w(TAG, "No allowlist from the internet or disk. Falling back to the bundled copy.")
+          modelAllowlist = readBundledModelAllowlist()
+        }
+
+        if (modelAllowlist == null) {
+          // Clear the loading flag as well as setting the error: a caller that only renders a
+          // spinner while loading would otherwise spin forever with the error never shown.
+          _uiState.update {
+            it.copy(
+              loadingModelAllowlist = false,
+              loadingModelAllowlistError = "Failed to load the model list",
+            )
+          }
           return@launch
         }
 
@@ -1121,6 +1144,12 @@ constructor(
         Log.d(TAG, "loadModelAllowlist: Done")
       } catch (e: Exception) {
         Log.e(TAG, "Failed to load model allowlist", e)
+        _uiState.update {
+          it.copy(
+            loadingModelAllowlist = false,
+            loadingModelAllowlistError = "Failed to load the model list: ${e.message ?: e}",
+          )
+        }
       }
     }
   }
@@ -1151,6 +1180,23 @@ constructor(
       Log.d(TAG, "Done: saving model allowlist to disk.")
     } catch (e: Exception) {
       Log.e(TAG, "failed to write model allowlist to disk", e)
+    }
+  }
+
+  /**
+   * Reads the allowlist shipped inside the APK.
+   *
+   * Last resort, so a fresh install with no network - or one whose remote fetch 404s - still has
+   * models to offer instead of hanging with nothing to show.
+   */
+  private fun readBundledModelAllowlist(): ModelAllowlist? {
+    return try {
+      val content =
+        context.assets.open(BUNDLED_MODEL_ALLOWLIST_ASSET).bufferedReader().use { it.readText() }
+      Gson().fromJson(content, ModelAllowlist::class.java)
+    } catch (e: Exception) {
+      Log.e(TAG, "failed to read the bundled model allowlist", e)
+      null
     }
   }
 

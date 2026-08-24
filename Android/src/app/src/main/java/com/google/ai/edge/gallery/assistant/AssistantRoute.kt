@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -110,7 +111,12 @@ fun AssistantRoute(
       )
     assistantTask == null || models.isEmpty() ->
       AssistantStartupState(
-        loading = uiState.loadingModelAllowlist || assistantTask == null,
+        loading = uiState.loadingModelAllowlist,
+        error = uiState.loadingModelAllowlistError,
+        onRetry = {
+          modelManagerViewModel.clearLoadModelAllowlistError()
+          modelManagerViewModel.loadModelAllowlist()
+        },
         onOpenGallery = onOpenGallery,
       )
     else ->
@@ -127,33 +133,66 @@ fun AssistantRoute(
   }
 }
 
-/** Shown while the model list is loading, or when it came back without any usable model. */
+/**
+ * Shown while the model list is loading, when loading it failed, or when it came back empty.
+ *
+ * The failure case has to be visible here. This is the app's first screen, so a state that only
+ * ever renders a spinner turns any allowlist failure into an app that hangs on launch with nothing
+ * to tap and no reason given.
+ */
 @Composable
-private fun AssistantStartupState(loading: Boolean, onOpenGallery: () -> Unit) {
+private fun AssistantStartupState(
+  loading: Boolean,
+  error: String,
+  onRetry: () -> Unit,
+  onOpenGallery: () -> Unit,
+) {
   Column(
     modifier = Modifier.fillMaxSize().padding(32.dp),
     verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    if (loading) {
-      CircularProgressIndicator(
-        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-        strokeWidth = 3.dp,
-        modifier = Modifier.size(24.dp),
-      )
-      Text(
-        stringResource(R.string.loading_model_list),
-        style = MaterialTheme.typography.bodyMedium,
-      )
-    } else {
-      Text(
-        stringResource(R.string.assistant_no_models),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-      )
-      Button(onClick = onOpenGallery) {
-        Text(stringResource(R.string.assistant_open_gallery))
+    when {
+      loading -> {
+        CircularProgressIndicator(
+          trackColor = MaterialTheme.colorScheme.surfaceVariant,
+          strokeWidth = 3.dp,
+          modifier = Modifier.size(24.dp),
+        )
+        Text(
+          stringResource(R.string.loading_model_list),
+          style = MaterialTheme.typography.bodyMedium,
+        )
+      }
+
+      error.isNotEmpty() -> {
+        Text(
+          stringResource(R.string.assistant_model_list_failed),
+          style = MaterialTheme.typography.titleMedium,
+          textAlign = TextAlign.Center,
+        )
+        Text(
+          error,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          textAlign = TextAlign.Center,
+        )
+        Button(onClick = onRetry) { Text(stringResource(R.string.assistant_retry)) }
+        TextButton(onClick = onOpenGallery) {
+          Text(stringResource(R.string.assistant_open_gallery))
+        }
+      }
+
+      else -> {
+        Text(
+          stringResource(R.string.assistant_no_models),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          textAlign = TextAlign.Center,
+        )
+        Button(onClick = onOpenGallery) {
+          Text(stringResource(R.string.assistant_open_gallery))
+        }
       }
     }
   }
