@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material.icons.rounded.VoiceOverOff
@@ -108,6 +109,7 @@ fun AssistantScreen(
   var speakReplies by remember { mutableStateOf(storedSettings.speakReplies) }
   var showModeSheet by remember { mutableStateOf(false) }
   var showWebSearchSettings by remember { mutableStateOf(false) }
+  var showWakeWordSettings by remember { mutableStateOf(false) }
 
   // Bumped whenever the web search settings are edited, so the derived values below recompute
   // without having to observe the whole DataStore.
@@ -210,6 +212,7 @@ fun AssistantScreen(
           speakReplies = speakReplies,
           onModeClicked = { showModeSheet = true },
           onWebSearchClicked = { showWebSearchSettings = true },
+        onWakeWordClicked = { showWakeWordSettings = true },
           onSpeakRepliesToggled = {
             val enabled = !speakReplies
             speakReplies = enabled
@@ -251,6 +254,13 @@ fun AssistantScreen(
         showModeSheet = false
       },
       onDismiss = { showModeSheet = false },
+    )
+  }
+
+  if (showWakeWordSettings) {
+    WakeWordSettingsDialog(
+      dataStoreRepository = dataStoreRepository,
+      onDismiss = { showWakeWordSettings = false },
     )
   }
 
@@ -302,6 +312,7 @@ private fun AssistantModeBar(
   speakReplies: Boolean,
   onModeClicked: () -> Unit,
   onWebSearchClicked: () -> Unit,
+  onWakeWordClicked: () -> Unit,
   onSpeakRepliesToggled: () -> Unit,
   onOpenGallery: (() -> Unit)?,
 ) {
@@ -344,6 +355,18 @@ private fun AssistantModeBar(
             labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         },
+    )
+
+    AssistChip(
+      onClick = onWakeWordClicked,
+      label = { Text(stringResource(R.string.wake_word_tile_label)) },
+      leadingIcon = {
+        Icon(
+          Icons.Rounded.Mic,
+          contentDescription = null,
+          modifier = Modifier.size(AssistChipDefaults.IconSize),
+        )
+      },
     )
 
     IconButton(onClick = onSpeakRepliesToggled) {
