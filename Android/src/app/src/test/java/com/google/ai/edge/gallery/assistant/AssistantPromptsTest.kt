@@ -168,4 +168,62 @@ class AssistantPromptsTest {
     assertEquals(AssistantMode.AUTO, AssistantMode.fromId("nonsense"))
     assertEquals(AssistantMode.RESEARCH, AssistantMode.fromId("research"))
   }
+
+  /**
+   * The ordering that decides whether skills are used at all.
+   *
+   * A small model follows the top of its prompt and the very end of it, and stops reading for
+   * intent in between. The prompt used to lead with "answer directly from what you know" and to
+   * end - in the mode block, the last thing before the conversation - with "answer directly when
+   * you already know the answer". With a query-wikipedia skill installed and its tools registered,
+   * asking the assistant to check Wikipedia produced "I cannot check Wikipedia": the model was
+   * obeying the prompt exactly. Nothing about the wiring was wrong, so nothing about the wiring
+   * would have shown it.
+   *
+   * These assertions are about position, not wording, because position is what failed.
+   */
+  @Test
+  fun tellsTheModelToCheckSkillsBeforeAnsweringFromMemory() {
+    val prompt =
+      AssistantPrompts.resolve(
+        currentPrompt = "",
+        mode = AssistantMode.AUTO,
+        hasMcpTools = false,
+        webSearchEnabled = false,
+      )
+
+    val routing = prompt.indexOf("WHAT TO DO WITH EVERY MESSAGE")
+    val skills = prompt.indexOf("SKILLS")
+    assertTrue("the routing procedure must be present", routing >= 0)
+    assertTrue("the skills list must be present", skills >= 0)
+
+    // The routing procedure comes before the capability descriptions.
+    assertTrue(
+      "routing must come before the capability list",
+      routing < prompt.indexOf("=== WHAT YOU CAN DO ==="),
+    )
+
+    // Within the routing procedure, loading a skill is ordered before answering from memory.
+    val loadSkill = prompt.indexOf("load_skill", routing)
+    val answerDirectly = prompt.indexOf("ANSWER DIRECTLY", routing)
+    assertTrue("load_skill must be mentioned in the routing procedure", loadSkill >= 0)
+    assertTrue("answering directly must be the last step", answerDirectly > loadSkill)
+  }
+
+  /** The mode block is appended last, so it must not reopen what the routing closed. */
+  @Test
+  fun theAutoModeBlockDoesNotPutAnsweringFromMemoryFirst() {
+    val prompt =
+      AssistantPrompts.resolve(
+        currentPrompt = "",
+        mode = AssistantMode.AUTO,
+        hasMcpTools = false,
+        webSearchEnabled = false,
+      )
+    val modeBlock = prompt.substring(prompt.indexOf("Current mode: AUTO"))
+    val skillFirst = modeBlock.indexOf("load_skill")
+    val memoryLast = modeBlock.indexOf("Answer directly from your own knowledge")
+    assertTrue("the auto mode block should mention load_skill", skillFirst >= 0)
+    assertTrue("answering from memory must come after the tool options", memoryLast > skillFirst)
+  }
 }

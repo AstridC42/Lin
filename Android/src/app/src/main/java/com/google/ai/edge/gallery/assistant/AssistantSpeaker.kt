@@ -18,6 +18,7 @@ package com.google.ai.edge.gallery.assistant
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -38,35 +39,90 @@ class AssistantSpeaker(context: Context) {
   private var engine: TextToSpeech? = null
   private var ready = false
 
+  // Progress callbacks arrive on a binder thread; everything waiting on them is UI state.
+  private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
   init {
     engine =
       TextToSpeech(context.applicationContext) { status ->
         ready = status == TextToSpeech.SUCCESS
         if (ready) {
           engine?.language = Locale.getDefault()
+          engine?.setOnUtteranceProgressListener(
+            object : UtteranceProgressListener() {
+              override fun onStart(utteranceId: String?) {}
+
+              override fun onDone(utteranceId: String?) {
+                handler.post { finish() }
+              }
+
+              @Deprecated("Required by the base class")
+              override fun onError(utteranceId: String?) {
+                handler.post { finish() }
+              }
+
+              override fun onError(utteranceId: String?, errorCode: Int) {
+                handler.post { finish() }
+              }
+
+              // A flushed utterance never reports done, so a caller waiting on the one it just
+              // replaced would wait forever.
+              override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                handler.post { finish() }
+              }
+            }
+          )
         } else {
           Log.w(TAG, "Text-to-speech is unavailable on this device (status $status)")
         }
       }
   }
 
-  /** Speaks [text], replacing anything currently being spoken. */
-  fun speak(text: String) {
+  /** Called when the current utterance finishes, is cancelled, or fails. Cleared after it runs. */
+  private var onFinished: (() -> Unit)? = null
+
+  /**
+   * Speaks [text], replacing anything currently being spoken.
+   *
+   * [onDone] runs when speaking ends, however it ends. A hands-free conversation depends on that
+   * being reliable: the microphone reopens when the assistant stops talking, and an utterance that
+   * failed silently and never reported back would leave the loop waiting forever with no way to
+   * carry on except tapping the screen - which is the one thing hands-free means you cannot do.
+   * It also must not fire early, or the microphone opens while the phone is still speaking and
+   * records the assistant answering itself.
+   */
+  fun speak(text: String, onDone: (() -> Unit)? = null) {
     val spoken = toSpeakableText(text)
-    if (spoken.isEmpty()) return
-    val currentEngine = engine ?: return
-    if (!ready) {
-      Log.d(TAG, "Text-to-speech is not ready yet; dropping this reply")
+    val currentEngine = engine
+    if (spoken.isEmpty() || currentEngine == null || !ready) {
+      if (!ready) Log.d(TAG, "Text-to-speech is not ready yet; dropping this reply")
+      // Report completion anyway: from the caller's point of view the speaking is over, and a
+      // caller waiting on it has to be released whether or not a word was said.
+      onDone?.invoke()
       return
     }
-    currentEngine.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+    onFinished = onDone
+    val result = currentEngine.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+    if (result != TextToSpeech.SUCCESS) {
+      Log.w(TAG, "Text-to-speech refused the utterance (result $result)")
+      finish()
+    }
+  }
+
+  /** Runs the pending completion callback exactly once. */
+  private fun finish() {
+    val callback = onFinished
+    onFinished = null
+    callback?.invoke()
   }
 
   fun stop() {
     engine?.stop()
+    finish()
   }
 
   fun release() {
+    onFinished = null
     engine?.stop()
     engine?.shutdown()
     engine = null
