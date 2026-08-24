@@ -190,52 +190,54 @@ fun AssistantScreen(
     }
   }
 
-  AgentChatScreen(
-    task = task,
-    modelManagerViewModel = modelManagerViewModel,
-    navigateUp = navigateUp,
-    agentTools = agentTools,
-    viewModel = viewModel,
-    skillManagerViewModel = skillManagerViewModel,
-    mcpManagerViewModel = mcpManagerViewModel,
-    initialQuery = dictatedQuery ?: initialQuery,
-    initialImageUris = initialImageUris,
-    baseSystemPromptResolver = systemPromptResolver,
-    emptyStateHeadline = { AssistantEmptyStateHeadline() },
-    aboveInputContent = {
-      AssistantModeBar(
-        mode = mode,
-        webSearchEnabled = webSearchEnabled,
-        speakReplies = speakReplies,
-        onModeClicked = { showModeSheet = true },
-        onWebSearchClicked = { showWebSearchSettings = true },
-        onSpeakRepliesToggled = {
-          val enabled = !speakReplies
-          speakReplies = enabled
-          dataStoreRepository.saveAssistantSettings(
-            dataStoreRepository
-              .readAssistantSettings()
-              .toBuilder()
-              .setSpeakReplies(enabled)
-              .build()
-          )
-          if (!enabled) speaker.stop()
-        },
-        onOpenGallery = onOpenGallery,
-      )
-    },
-    onTurnComplete = { model ->
-      if (speakReplies) {
-        val reply =
-          viewModel.getLastMessageWithTypeAndSide(
-            model = model,
-            type = ChatMessageType.TEXT,
-            side = ChatSide.AGENT,
-          )
-        (reply as? ChatMessageText)?.let { speaker.speak(it.content) }
-      }
-    },
-  )
+  AdaptiveWidthContainer {
+    AgentChatScreen(
+      task = task,
+      modelManagerViewModel = modelManagerViewModel,
+      navigateUp = navigateUp,
+      agentTools = agentTools,
+      viewModel = viewModel,
+      skillManagerViewModel = skillManagerViewModel,
+      mcpManagerViewModel = mcpManagerViewModel,
+      initialQuery = dictatedQuery ?: initialQuery,
+      initialImageUris = initialImageUris,
+      baseSystemPromptResolver = systemPromptResolver,
+      emptyStateHeadline = { AssistantEmptyStateHeadline() },
+      aboveInputContent = {
+        AssistantModeBar(
+          mode = mode,
+          webSearchEnabled = webSearchEnabled,
+          speakReplies = speakReplies,
+          onModeClicked = { showModeSheet = true },
+          onWebSearchClicked = { showWebSearchSettings = true },
+          onSpeakRepliesToggled = {
+            val enabled = !speakReplies
+            speakReplies = enabled
+            dataStoreRepository.saveAssistantSettings(
+              dataStoreRepository
+                .readAssistantSettings()
+                .toBuilder()
+                .setSpeakReplies(enabled)
+                .build()
+            )
+            if (!enabled) speaker.stop()
+          },
+          onOpenGallery = onOpenGallery,
+        )
+      },
+      onTurnComplete = { model ->
+        if (speakReplies) {
+          val reply =
+            viewModel.getLastMessageWithTypeAndSide(
+              model = model,
+              type = ChatMessageType.TEXT,
+              side = ChatSide.AGENT,
+            )
+          (reply as? ChatMessageText)?.let { speaker.speak(it.content) }
+        }
+      },
+    )
+  }
 
   if (listening.active) {
     ListeningDialog(heard = listening.partialText, onCancel = listening.cancel)
