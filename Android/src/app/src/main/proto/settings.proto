@@ -153,6 +153,16 @@ message AssistantSettings {
   // in this device's memory and has chosen to load it anyway, so the warning
   // is not repeated on every launch.
   bool memory_warning_accepted = 6;
+
+  // Whether the always-listening wake word service may run.
+  //
+  // Off unless the user turns it on. It holds the microphone open for as long
+  // as it runs, which is a real cost in battery and a real privacy decision,
+  // and neither is something to enable on someone's behalf.
+  bool wake_word_enabled = 7;
+
+  // The phrase that summons the assistant. Empty means the default.
+  string wake_word_phrase = 8;
 }
 
 message McpAuth {

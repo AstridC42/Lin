@@ -41,6 +41,8 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <!-- Star Storyteller: the always-listening wake word service holds the microphone. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -263,6 +265,30 @@
             <meta-data
                 android:name="android.speech"
                 android:resource="@xml/recognition_service" />
+        </service>
+
+        <!--
+          Star Storyteller: continuous listening for a spoken wake phrase.
+
+          Off unless the user turns it on. Android gives no app-definable hardware hotword -
+          AlwaysOnHotwordDetector only serves keyphrases the device's DSP was enrolled with - so
+          this keeps the microphone open and runs ordinary recognition over it, with an ongoing
+          notification for as long as it does.
+        -->
+        <service
+            android:name="com.google.ai.edge.gallery.voice.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <service
+            android:name="com.google.ai.edge.gallery.voice.WakeWordTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_foreground"
+            android:label="@string/wake_word_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
         </service>
 
         <provider
