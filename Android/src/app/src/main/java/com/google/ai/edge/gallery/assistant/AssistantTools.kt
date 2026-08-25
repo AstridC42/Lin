@@ -20,6 +20,8 @@ import com.google.ai.edge.gallery.customtasks.agentchat.AgentToolsImpl
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.tools.DeviceActionsTool
+import com.google.ai.edge.gallery.tools.MediaControlTool
+import com.google.ai.edge.gallery.tools.NotificationsTool
 import com.google.ai.edge.gallery.tools.ToolDefinition
 import com.google.ai.edge.gallery.tools.WebSearchTool
 
@@ -48,10 +50,19 @@ class AssistantTools(
     )
   }
 
+  private val notificationsTool by lazy { NotificationsTool(context = context) }
+
+  private val mediaControlTool by lazy { MediaControlTool(context = context) }
+
   override fun getAvailableTools(): List<ToolDefinition> {
     val tools = mutableListOf<ToolDefinition>()
     tools.addAll(super.getAvailableTools())
     tools.add(deviceActionsTool)
+    // Offered whether or not notification access has been granted, unlike web search. A tool that
+    // is absent leaves the model saying it cannot read notifications at all; one that is present
+    // and reports the missing permission lets it tell the user how to fix it.
+    tools.add(notificationsTool)
+    tools.add(mediaControlTool)
     if (searxngClient.isConfigured()) {
       tools.add(webSearchTool)
     }

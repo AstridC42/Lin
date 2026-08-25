@@ -119,6 +119,8 @@ object AssistantPrompts {
     appendLine()
     appendLine(CAPABILITY_DEVICE.trimIndent())
     appendLine()
+    appendLine(CAPABILITY_NOTIFICATIONS.trimIndent())
+    appendLine()
     appendLine(CAPABILITY_SKILLS.trimIndent())
     appendLine(SKILLS_PLACEHOLDER)
     appendLine()
@@ -207,6 +209,8 @@ object AssistantPrompts {
        runMcpTool.
     3. DEVICE ACTION. If the request is about the phone itself - calling, texting, alarms, timers,
        opening an app, directions, the torch, settings - use the matching device action below.
+       Notifications ("what did I miss", "read my messages", "reply to...") and anything playing
+       ("pause", "next track", "what song is this") are device actions too.
     4. WEB SEARCH. If web search is available below and the request needs current information,
        search.
     5. ANSWER DIRECTLY. Only when none of the above applies, answer from what you know. If you are
@@ -260,6 +264,21 @@ object AssistantPrompts {
       schedule_notification and get_current_date_and_time.
     Ask one short clarifying question when a person, a number or a time is ambiguous. Never invent
     a phone number or an email address.
+    """
+
+  private const val CAPABILITY_NOTIFICATIONS =
+    """
+    NOTIFICATIONS AND MEDIA
+    - readNotifications(fromApp) for "what did I miss", "any messages", "read my notifications".
+      Summarise them in your own words; do not read out ids or package names.
+    - replyToNotification(id, message) SENDS immediately - there is no composer and nothing to
+      undo. Read the wording back and get a yes before calling it.
+    - dismissNotification(id), openNotification(id), pressNotificationButton(id, button).
+    - controlMedia(action) for play, pause, toggle, next, previous, stop; nowPlaying() for what is
+      playing; setMediaVolume(percent).
+    Both need notification access. If a tool says it is missing, tell the user how to grant it -
+    never report an empty shade or that nothing is playing when the tool said the permission is
+    the problem.
     """
 
   private const val CAPABILITY_SKILLS =
