@@ -39,6 +39,14 @@
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <!-- Star Storyteller: lets setAlarm / setTimer skip the clock app's confirmation screen. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!--
+      Star Storyteller: the assistant's own reminders fire at a stated time, and an inexact alarm
+      can drift by many minutes - which for "remind me at four" is a wrong answer, not a late one.
+      USE_EXACT_ALARM is granted on install for an app whose purpose includes alarms and reminders;
+      SCHEDULE_EXACT_ALARM is the requestable fallback on builds that do not grant it.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <!-- Star Storyteller: the always-listening wake word service holds the microphone. -->
@@ -148,6 +156,8 @@
             android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="uiMode|orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             tools:ignore="DiscouragedApi">
             <!-- This is for putting the app into launcher -->
             <intent-filter>
@@ -343,6 +353,41 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!--
+          Star Storyteller: home-screen widget. Reaches the assistant without depending on the
+          assist gesture, which needs the assistant role and is awkward on some manufacturer
+          builds even with it.
+        -->
+        <receiver
+            android:name="com.google.ai.edge.gallery.widget.AssistantWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/assistant_widget_info" />
+        </receiver>
+
+        <!-- Star Storyteller: delivers one reminder when it comes due. -->
+        <receiver
+            android:name="com.google.ai.edge.gallery.reminders.ReminderReceiver"
+            android:exported="false" />
+
+        <!--
+          Re-arms pending reminders after a restart. AlarmManager drops its pending intents on
+          reboot, so without this a reminder set before a restart would never arrive and nothing
+          would say so.
+        -->
+        <receiver
+            android:name="com.google.ai.edge.gallery.reminders.ReminderBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

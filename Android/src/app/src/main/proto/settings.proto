@@ -87,6 +87,9 @@ message Settings {
 
   // Star Storyteller: assistant preferences (last used mode, spoken replies...).
   AssistantSettings assistant_settings = 13;
+
+  // Star Storyteller: reminders the assistant delivers itself.
+  Reminders reminders = 14;
 }
 
 // Connection settings for a SearXNG metasearch instance.
@@ -163,6 +166,29 @@ message AssistantSettings {
 
   // The phrase that summons the assistant. Empty means the default.
   string wake_word_phrase = 8;
+}
+
+// A reminder the assistant will deliver at a set time.
+//
+// The assistant's own, not the clock app's: an alarm handed to the clock app
+// is the clock app's from then on and cannot be listed, changed or cancelled
+// by asking. These can.
+message Reminder {
+  // Stable id, used to cancel or reschedule.
+  string id = 1;
+
+  // What to say when it fires.
+  string text = 2;
+
+  // When to fire, as epoch milliseconds.
+  int64 due_at_millis = 3;
+
+  // Set once delivered, so a reboot does not resurrect it.
+  bool delivered = 4;
+}
+
+message Reminders {
+  repeated Reminder reminder = 1;
 }
 
 message McpAuth {
