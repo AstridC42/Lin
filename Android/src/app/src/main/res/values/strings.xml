@@ -920,4 +920,16 @@
   <string name="reminder_channel_description" translatable="true" description="Describes the reminder channel. [CHAR_LIMIT=150]">Reminders you asked Star Storyteller to keep.</string>
   <string name="reminder_notification_title" translatable="true" description="Title of a reminder notification. [CHAR_LIMIT=40]">Reminder</string>
   <string name="widget_prompt" translatable="true" description="Placeholder text on the home screen widget. [CHAR_LIMIT=40]">Ask Star Storyteller</string>
+  <string name="smart_home_title" translatable="true" description="Title of the smart home settings dialog. [CHAR_LIMIT=40]">Smart home</string>
+  <string name="smart_home_short" translatable="true" description="Short label for the smart home button. [CHAR_LIMIT=20]">Smart home</string>
+  <string name="smart_home_explainer" translatable="true" description="Explains how to connect Home Assistant. [CHAR_LIMIT=400]">Connect Home Assistant. Create a long-lived access token from your Home Assistant profile page and paste it here. A .local address only works while the phone is on the same network.</string>
+  <string name="smart_home_url_label" translatable="true" description="Label for the Home Assistant address field. [CHAR_LIMIT=30]">Address</string>
+  <string name="smart_home_token_label" translatable="true" description="Label for the token field. [CHAR_LIMIT=30]">Access token</string>
+  <string name="smart_home_enable" translatable="true" description="Label for the smart home enable switch. [CHAR_LIMIT=45]">Let the assistant control the house</string>
+  <string name="smart_home_test" translatable="true" description="Button that tests the Home Assistant connection. [CHAR_LIMIT=30]">Test connection</string>
+  <string name="smart_home_testing" translatable="true" description="Shown while testing. [CHAR_LIMIT=30]">Testing\u2026</string>
+  <string name="manual_smart_home_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Smart home</string>
+  <string name="manual_smart_home_body" translatable="true" description="Explains smart home support. [CHAR_LIMIT=450]">Lights, switches, blinds, locks, thermostats and scenes through Home Assistant. Google Home has no API a sideloaded app can use, so Nest and Cast devices are reached through Home Assistant\u2019s own integrations for them.</string>
+  <string name="manual_reminders_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Reminders</string>
+  <string name="manual_reminders_body" translatable="true" description="Explains reminders. [CHAR_LIMIT=300]">Ask it to remind you and it keeps the reminder itself, so you can ask what is set and cancel it later. Survives a restart, unlike an alarm handed to the clock app.</string>
 </resources>

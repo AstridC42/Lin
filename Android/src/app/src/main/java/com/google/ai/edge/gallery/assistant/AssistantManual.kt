@@ -79,6 +79,7 @@ fun AssistantManual(
   onOpenGallery: (() -> Unit)?,
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
+  onOpenSmartHomeSettings: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
@@ -165,6 +166,9 @@ fun AssistantManual(
           OutlinedButton(onClick = onOpenWakeWordSettings) {
             Text(stringResource(R.string.wake_word_tile_label))
           }
+          OutlinedButton(onClick = onOpenSmartHomeSettings) {
+            Text(stringResource(R.string.smart_home_short))
+          }
         }
       }
     }
@@ -225,6 +229,14 @@ private fun manualSections(): List<ManualSection> = listOf(
     listOf(stringResource(R.string.manual_skills_body)),
   ),
   ManualSection(
+    stringResource(R.string.manual_smart_home_title),
+    listOf(stringResource(R.string.manual_smart_home_body)),
+  ),
+  ManualSection(
+    stringResource(R.string.manual_reminders_title),
+    listOf(stringResource(R.string.manual_reminders_body)),
+  ),
+  ManualSection(
     stringResource(R.string.manual_web_title),
     listOf(stringResource(R.string.manual_web_body)),
   ),
@@ -240,6 +252,7 @@ fun AssistantManualPane(
   onOpenGallery: (() -> Unit)?,
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
+  onOpenSmartHomeSettings: () -> Unit,
 ) {
   Surface(
     modifier = Modifier.width(MANUAL_PANEL_WIDTH).fillMaxHeight(),
@@ -249,6 +262,7 @@ fun AssistantManualPane(
       onOpenGallery = onOpenGallery,
       onOpenWebSearchSettings = onOpenWebSearchSettings,
       onOpenWakeWordSettings = onOpenWakeWordSettings,
+      onOpenSmartHomeSettings = onOpenSmartHomeSettings,
       modifier = Modifier.fillMaxHeight(),
     )
   }
@@ -286,6 +300,7 @@ fun AssistantManualSheet(
   onOpenGallery: (() -> Unit)?,
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
+  onOpenSmartHomeSettings: () -> Unit,
   onDismiss: () -> Unit,
 ) {
   ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -293,6 +308,7 @@ fun AssistantManualSheet(
       onOpenGallery = onOpenGallery,
       onOpenWebSearchSettings = onOpenWebSearchSettings,
       onOpenWakeWordSettings = onOpenWakeWordSettings,
+      onOpenSmartHomeSettings = onOpenSmartHomeSettings,
     )
   }
 }
