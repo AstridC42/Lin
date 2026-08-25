@@ -889,4 +889,27 @@
   <string name="car_wake_word_on" translatable="true" description="Wake word state shown in the car. [CHAR_LIMIT=30]">Listening \u2014 tap to stop</string>
   <string name="car_wake_word_off" translatable="true" description="Wake word state shown in the car. [CHAR_LIMIT=30]">Off \u2014 tap to listen</string>
   <string name="assistant_hands_free" translatable="true" description="Chip that toggles a spoken back-and-forth conversation. [CHAR_LIMIT=20]">Hands-free</string>
+  <string name="manual_title" translatable="true" description="Title of the side manual. [CHAR_LIMIT=40]">What Star Storyteller can do</string>
+  <string name="manual_role_held" translatable="true" description="Shown when the app is the device assistant. [CHAR_LIMIT=60]">This is your digital assistant</string>
+  <string name="manual_role_not_held" translatable="true" description="Shown when the app is not the device assistant. [CHAR_LIMIT=60]">Not your digital assistant yet</string>
+  <string name="manual_role_explainer" translatable="true" description="Explains what becoming the assistant unlocks. [CHAR_LIMIT=300]">Until it is, the assist gesture, holding the power button, a headset button and your car cannot reach it. Android asks you to confirm.</string>
+  <string name="manual_make_default" translatable="true" description="Button that asks to become the device assistant. [CHAR_LIMIT=30]">Make it my assistant</string>
+  <string name="manual_voice_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Voice</string>
+  <string name="manual_voice_talk" translatable="true" description="Manual line about the talk button. [CHAR_LIMIT=200]">Talk — tap to speak your message instead of typing it.</string>
+  <string name="manual_voice_speak" translatable="true" description="Manual line about spoken replies. [CHAR_LIMIT=200]">Speak — read every reply out loud.</string>
+  <string name="manual_voice_handsfree" translatable="true" description="Manual line about hands-free mode. [CHAR_LIMIT=250]">Hands-free — the assistant answers aloud, then listens again, so you can talk without touching the phone.</string>
+  <string name="manual_voice_wake" translatable="true" description="Manual line about the wake word. [CHAR_LIMIT=250]">Wake word — say a phrase to summon it. Keeps the microphone on, so it costs battery.</string>
+  <string name="manual_modes_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Modes</string>
+  <string name="manual_modes_body" translatable="true" description="Explains what modes do. [CHAR_LIMIT=300]">Auto, Chat, Media, Web, Device and Agent bias how it answers. No mode removes anything: you can attach a photo and ask for a phone call in the same message, in any mode.</string>
+  <string name="manual_device_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">On your phone</string>
+  <string name="manual_device_body" translatable="true" description="Lists device actions. [CHAR_LIMIT=400]">Calls, texts, alarms, timers, opening apps, maps and directions, the torch, settings. Calls and texts are prepared for you to send — it never sends on your behalf unless you turn that on.</string>
+  <string name="manual_skills_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Skills and MCP</string>
+  <string name="manual_skills_body" translatable="true" description="Explains skills. [CHAR_LIMIT=300]">Multi-step recipes it can load on demand — Wikipedia, calendar, email, QR codes, maps, hashes. Connect MCP servers for more. Manage both from the chips under the message box.</string>
+  <string name="manual_web_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Web search</string>
+  <string name="manual_web_body" translatable="true" description="Explains web search. [CHAR_LIMIT=250]">Needs your own SearXNG instance. Without one it cannot look anything up and will say so rather than guess.</string>
+  <string name="manual_car_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">In the car</string>
+  <string name="manual_car_body" translatable="true" description="Explains Android Auto. [CHAR_LIMIT=350]">Android Auto shows a short screen for talking to it. A sideloaded app only appears once Android Auto\u2019s own settings have developer mode and Unknown sources turned on.</string>
+  <string name="assistant_talk" translatable="true" description="Chip that starts voice input. [CHAR_LIMIT=15]">Talk</string>
+  <string name="assistant_speak" translatable="true" description="Chip that toggles spoken replies. [CHAR_LIMIT=15]">Speak</string>
+  <string name="assistant_manual" translatable="true" description="Chip that opens the manual on a phone. [CHAR_LIMIT=15]">Guide</string>
 </resources>

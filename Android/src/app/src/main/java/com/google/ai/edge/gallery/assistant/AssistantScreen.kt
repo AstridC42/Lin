@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.HeadsetOff
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.TravelExplore
@@ -120,7 +121,11 @@ fun AssistantScreen(
   var handsFree by remember { mutableStateOf(false) }
   // Bumped when the loop wants to listen again; keying the listener on it reopens the microphone
   // for each turn rather than only for the first.
-  var handsFreeTurn by remember { mutableIntStateOf(0) }
+  // One counter for every reason to open the microphone: a hands-free turn, or the Talk button.
+  // Keying the listener on it is what re-arms listening, which otherwise happens once and never
+  // again.
+  var listenTurn by remember { mutableIntStateOf(0) }
+  var showManual by remember { mutableStateOf(false) }
 
   // Bumped whenever the web search settings are edited, so the derived values below recompute
   // without having to observe the whole DataStore.
@@ -138,11 +143,11 @@ fun AssistantScreen(
   var dictatedQuery by rememberSaveable { mutableStateOf<String?>(null) }
   val listening =
     rememberHandsFreeListening(
-      enabled = startListening || handsFree,
+      enabled = startListening || handsFree || listenTurn > 0,
       dictateViewModel = dictateViewModel,
       // Each hands-free turn is a fresh chance to listen, so the "already heard this summon" guard
       // is re-armed per turn rather than latched for the life of the screen.
-      turn = handsFreeTurn,
+      turn = listenTurn,
       alreadyHeard = dictatedQuery != null,
       onHeard = { dictatedQuery = it },
     )
@@ -207,7 +212,18 @@ fun AssistantScreen(
     }
   }
 
-  AdaptiveWidthContainer {
+  val manualOnScreen = isLargeScreen()
+
+  AssistantTwoPane(
+    showManual = manualOnScreen,
+    manual = {
+      AssistantManualPane(
+        onOpenGallery = onOpenGallery,
+        onOpenWebSearchSettings = { showWebSearchSettings = true },
+        onOpenWakeWordSettings = { showWakeWordSettings = true },
+      )
+    },
+  ) {
     AgentChatScreen(
       task = task,
       modelManagerViewModel = modelManagerViewModel,
@@ -228,12 +244,15 @@ fun AssistantScreen(
           onModeClicked = { showModeSheet = true },
           onWebSearchClicked = { showWebSearchSettings = true },
         onWakeWordClicked = { showWakeWordSettings = true },
+        onTalkClicked = { listenTurn++ },
+        onManualClicked = { showManual = true },
+        showManualButton = !isLargeScreen(),
         handsFree = handsFree,
         onHandsFreeToggled = {
           val enabled = !handsFree
           handsFree = enabled
           if (enabled) {
-            handsFreeTurn++
+            listenTurn++
           } else {
             speaker.stop()
             listening.cancel()
@@ -268,9 +287,9 @@ fun AssistantScreen(
         when {
           handsFree && reply != null ->
             // Listen only once the phone has stopped talking, or it records itself answering.
-            speaker.speak(reply.content) { handsFreeTurn++ }
+            speaker.speak(reply.content) { listenTurn++ }
           speakReplies && reply != null -> speaker.speak(reply.content)
-          handsFree -> handsFreeTurn++
+          handsFree -> listenTurn++
         }
       },
     )
@@ -288,6 +307,21 @@ fun AssistantScreen(
         showModeSheet = false
       },
       onDismiss = { showModeSheet = false },
+    )
+  }
+
+  if (showManual) {
+    AssistantManualSheet(
+      onOpenGallery = onOpenGallery,
+      onOpenWebSearchSettings = {
+        showManual = false
+        showWebSearchSettings = true
+      },
+      onOpenWakeWordSettings = {
+        showManual = false
+        showWakeWordSettings = true
+      },
+      onDismiss = { showManual = false },
     )
   }
 
@@ -347,6 +381,9 @@ private fun AssistantModeBar(
   onModeClicked: () -> Unit,
   onWebSearchClicked: () -> Unit,
   onWakeWordClicked: () -> Unit,
+  onTalkClicked: () -> Unit,
+  onManualClicked: () -> Unit,
+  showManualButton: Boolean,
   handsFree: Boolean,
   onHandsFreeToggled: () -> Unit,
   onSpeakRepliesToggled: () -> Unit,
@@ -365,6 +402,21 @@ private fun AssistantModeBar(
         Icon(
           mode.icon,
           contentDescription = stringResource(R.string.cd_assistant_mode_button),
+          modifier = Modifier.size(AssistChipDefaults.IconSize),
+        )
+      },
+    )
+
+    // The only way to speak to the assistant. The microphone in the "+" menu records an audio
+    // clip for the model to listen to, which is a different thing and needs an audio-capable
+    // model; there was no dictation anywhere, so the app could not be talked to at all.
+    AssistChip(
+      onClick = onTalkClicked,
+      label = { Text(stringResource(R.string.assistant_talk)) },
+      leadingIcon = {
+        Icon(
+          Icons.Rounded.Mic,
+          contentDescription = null,
           modifier = Modifier.size(AssistChipDefaults.IconSize),
         )
       },
@@ -426,14 +478,40 @@ private fun AssistantModeBar(
         },
     )
 
-    IconButton(onClick = onSpeakRepliesToggled) {
-      Icon(
-        if (speakReplies) Icons.Rounded.RecordVoiceOver else Icons.Rounded.VoiceOverOff,
-        contentDescription = stringResource(R.string.cd_assistant_speak_replies),
-        tint =
-          if (speakReplies) MaterialTheme.colorScheme.primary
-          else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(20.dp),
+    // A labelled chip rather than a bare icon. As an unlabelled speaker glyph this was the only
+    // way to hear a reply and nobody found it, so the app read as having no voice output at all.
+    AssistChip(
+      onClick = onSpeakRepliesToggled,
+      label = { Text(stringResource(R.string.assistant_speak)) },
+      leadingIcon = {
+        Icon(
+          if (speakReplies) Icons.Rounded.RecordVoiceOver else Icons.Rounded.VoiceOverOff,
+          contentDescription = stringResource(R.string.cd_assistant_speak_replies),
+          modifier = Modifier.size(AssistChipDefaults.IconSize),
+        )
+      },
+      colors =
+        if (speakReplies) {
+          AssistChipDefaults.assistChipColors(
+            leadingIconContentColor = MaterialTheme.colorScheme.primary,
+            labelColor = MaterialTheme.colorScheme.primary,
+          )
+        } else {
+          AssistChipDefaults.assistChipColors()
+        },
+    )
+
+    if (showManualButton) {
+      AssistChip(
+        onClick = onManualClicked,
+        label = { Text(stringResource(R.string.assistant_manual)) },
+        leadingIcon = {
+          Icon(
+            Icons.Rounded.MenuBook,
+            contentDescription = null,
+            modifier = Modifier.size(AssistChipDefaults.IconSize),
+          )
+        },
       )
     }
 
