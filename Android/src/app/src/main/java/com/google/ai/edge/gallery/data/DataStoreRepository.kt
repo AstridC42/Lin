@@ -26,6 +26,7 @@ import com.google.ai.edge.gallery.proto.CutoutCollection
 import com.google.ai.edge.gallery.proto.ImportedModel
 import com.google.ai.edge.gallery.proto.Reminders
 import com.google.ai.edge.gallery.proto.Settings
+import com.google.ai.edge.gallery.proto.SmartHomeSettings
 import com.google.ai.edge.gallery.proto.Skill
 import com.google.ai.edge.gallery.proto.Skills
 import com.google.ai.edge.gallery.proto.Theme
@@ -151,6 +152,12 @@ interface DataStoreRepository {
 
   /** Persists the assistant's reminders. */
   fun saveReminders(reminders: Reminders)
+
+  /** Home Assistant connection settings. */
+  fun readSmartHomeSettings(): SmartHomeSettings
+
+  /** Persists the Home Assistant connection settings. */
+  fun saveSmartHomeSettings(settings: SmartHomeSettings)
 }
 
 /** Repository for managing data using Proto DataStore. */
@@ -521,6 +528,18 @@ class DefaultDataStoreRepository(
   override fun saveReminders(reminders: Reminders) {
     runBlocking {
       dataStore.updateData { current -> current.toBuilder().setReminders(reminders).build() }
+    }
+  }
+
+  override fun readSmartHomeSettings(): SmartHomeSettings {
+    return runBlocking { dataStore.data.first().smartHomeSettings }
+  }
+
+  override fun saveSmartHomeSettings(settings: SmartHomeSettings) {
+    runBlocking {
+      dataStore.updateData { current ->
+        current.toBuilder().setSmartHomeSettings(settings).build()
+      }
     }
   }
 }

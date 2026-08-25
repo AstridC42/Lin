@@ -90,6 +90,9 @@ message Settings {
 
   // Star Storyteller: reminders the assistant delivers itself.
   Reminders reminders = 14;
+
+  // Star Storyteller: Home Assistant connection for smart home control.
+  SmartHomeSettings smart_home_settings = 15;
 }
 
 // Connection settings for a SearXNG metasearch instance.
@@ -185,6 +188,21 @@ message Reminder {
 
   // Set once delivered, so a reboot does not resurrect it.
   bool delivered = 4;
+}
+
+// Connection settings for a Home Assistant instance.
+message SmartHomeSettings {
+  // Base URL, e.g. "http://homeassistant.local:8123".
+  string base_url = 1;
+
+  // A long-lived access token, created in Home Assistant under the user
+  // profile. Home Assistant issues these specifically for this purpose.
+  string access_token = 2;
+
+  bool enabled = 3;
+
+  // Network timeout for a single request, in seconds.
+  int32 timeout_seconds = 4;
 }
 
 message Reminders {

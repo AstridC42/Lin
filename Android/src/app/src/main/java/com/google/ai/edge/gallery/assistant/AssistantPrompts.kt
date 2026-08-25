@@ -86,8 +86,10 @@ object AssistantPrompts {
     hasMcpTools: Boolean,
     webSearchEnabled: Boolean,
     webSearchInstance: String = "",
+    smartHomeEnabled: Boolean = false,
   ): String {
-    val body = buildBody(mode, hasMcpTools, webSearchEnabled, webSearchInstance)
+    val body =
+      buildBody(mode, hasMcpTools, webSearchEnabled, webSearchInstance, smartHomeEnabled)
     return "$MARKER_PREFIX${fingerprintOf(body)}$MARKER_SUFFIX\n$body"
   }
 
@@ -96,6 +98,7 @@ object AssistantPrompts {
     hasMcpTools: Boolean,
     webSearchEnabled: Boolean,
     webSearchInstance: String,
+    smartHomeEnabled: Boolean,
   ): String = buildString {
     appendLine(PERSONA.trimIndent())
     appendLine()
@@ -121,6 +124,10 @@ object AssistantPrompts {
     appendLine()
     appendLine(CAPABILITY_NOTIFICATIONS.trimIndent())
     appendLine()
+    if (smartHomeEnabled) {
+      appendLine(CAPABILITY_SMART_HOME.trimIndent())
+      appendLine()
+    }
     appendLine(CAPABILITY_SKILLS.trimIndent())
     appendLine(SKILLS_PLACEHOLDER)
     appendLine()
@@ -150,6 +157,7 @@ object AssistantPrompts {
     hasMcpTools: Boolean,
     webSearchEnabled: Boolean,
     webSearchInstance: String = "",
+    smartHomeEnabled: Boolean = false,
   ): String =
     if (currentPrompt.isBlank() || isGenerated(currentPrompt)) {
       build(
@@ -157,6 +165,7 @@ object AssistantPrompts {
         hasMcpTools = hasMcpTools,
         webSearchEnabled = webSearchEnabled,
         webSearchInstance = webSearchInstance,
+        smartHomeEnabled = smartHomeEnabled,
       )
     } else {
       buildString {
@@ -282,6 +291,19 @@ object AssistantPrompts {
     Both need notification access. If a tool says it is missing, tell the user how to grant it -
     never report an empty shade or that nothing is playing when the tool said the permission is
     the problem.
+    """
+
+  private const val CAPABILITY_SMART_HOME =
+    """
+    SMART HOME
+    The user's home is reachable through Home Assistant.
+    - listSmartHomeDevices(filter) first, to get exact device ids. Never invent one.
+    - setSmartHomeDevice(deviceId, on) turns things on and off, opens and closes blinds, locks
+      and unlocks.
+    - setSmartHomeLevel(deviceId, level) for brightness, fan speed, blind position and target
+      temperature.
+    If a name is ambiguous - two lamps that could both be "the lamp" - ask which one rather than
+    guessing. Turning off the wrong thing in someone's house is not a small mistake.
     """
 
   private const val CAPABILITY_SKILLS =

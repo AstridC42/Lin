@@ -26,6 +26,7 @@ import com.google.ai.edge.gallery.customtasks.agentchat.AgentTools
 import com.google.ai.edge.gallery.customtasks.common.CustomTask
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.search.SearxngClient
+import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.skills.SkillManager
 import com.google.ai.edge.gallery.tools.RuntimeToolDispatcher
 import dagger.Module
@@ -50,17 +51,27 @@ internal object AssistantTaskModule {
   fun provideSearxngClient(dataStoreRepository: DataStoreRepository): SearxngClient =
     SearxngClient(readSettings = { dataStoreRepository.readWebSearchSettings() })
 
+  /** Reads its settings on every call, so a changed address takes effect without a restart. */
+  @Provides
+  @Singleton
+  fun provideHomeAssistantClient(dataStoreRepository: DataStoreRepository): HomeAssistantClient =
+    HomeAssistantClient(readSettings = { dataStoreRepository.readSmartHomeSettings() })
+
   @Provides
   @Singleton
   @AssistantAgentTools
   fun provideAssistantTools(
     skillManager: SkillManager,
     searxngClient: SearxngClient,
+    homeAssistantClient: HomeAssistantClient,
     dataStoreRepository: DataStoreRepository,
   ): AgentTools =
-    AssistantTools(searxngClient = searxngClient, settingsRepository = dataStoreRepository).apply {
-      skillsProvider = skillManager
-    }
+    AssistantTools(
+        searxngClient = searxngClient,
+        homeAssistantClient = homeAssistantClient,
+        settingsRepository = dataStoreRepository,
+      )
+      .apply { skillsProvider = skillManager }
 
   @Provides
   @Singleton
@@ -86,6 +97,7 @@ internal object AssistantTaskModule {
     @AssistantExecutor executor: AgentRuntimeExecutor,
     dataStoreRepository: DataStoreRepository,
     searxngClient: SearxngClient,
+    homeAssistantClient: HomeAssistantClient,
   ): CustomTask =
     AssistantTask(
       context = context,
@@ -94,5 +106,6 @@ internal object AssistantTaskModule {
       executor = executor,
       dataStoreRepository = dataStoreRepository,
       searxngClient = searxngClient,
+      homeAssistantClient = homeAssistantClient,
     )
 }

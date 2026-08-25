@@ -32,6 +32,7 @@ import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.search.SearxngClient
+import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.skills.SkillsProvider
 import com.google.ai.edge.gallery.skills.formatSelectedSkills
 import com.google.ai.edge.litertlm.Contents
@@ -57,6 +58,7 @@ class AssistantTask(
   private val executor: AgentRuntimeExecutor,
   private val dataStoreRepository: DataStoreRepository,
   private val searxngClient: SearxngClient,
+  private val homeAssistantClient: HomeAssistantClient,
 ) : CustomTask {
 
   override val task: Task by lazy {
@@ -136,6 +138,7 @@ class AssistantTask(
       agentTools = agentTools,
       dataStoreRepository = dataStoreRepository,
       searxngClient = searxngClient,
+      homeAssistantClient = homeAssistantClient,
       initialQuery = myData.initialQuery,
       initialImageUris = myData.initialImageUris,
       startListening = myData.startListening,
@@ -162,6 +165,7 @@ class AssistantTask(
         hasMcpTools = toolsPrompt.isNotEmpty(),
         webSearchEnabled = searxngClient.isConfigured(),
         webSearchInstance = searxngClient.instanceUrlOrNull()?.let { hostOf(it) }.orEmpty(),
+        smartHomeEnabled = homeAssistantClient.isConfigured(),
       )
     return PromptExpander()
       .formatSystemInstructions(
