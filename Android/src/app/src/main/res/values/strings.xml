@@ -916,4 +916,8 @@
   <string name="manual_notifications_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Notifications and media</string>
   <string name="manual_notifications_body" translatable="true" description="Explains notification access. [CHAR_LIMIT=400]">Ask what you missed, have messages read out, reply, dismiss. Needs notification access, which Android only grants from system settings \u2014 and which lets it see every notification on the phone.</string>
   <string name="manual_media_body" translatable="true" description="Explains media control. [CHAR_LIMIT=250]">Play, pause, skip and volume for whatever is playing. Android puts this behind the same notification access.</string>
+  <string name="reminder_channel_name" translatable="true" description="Notification channel for reminders. [CHAR_LIMIT=40]">Reminders</string>
+  <string name="reminder_channel_description" translatable="true" description="Describes the reminder channel. [CHAR_LIMIT=150]">Reminders you asked Star Storyteller to keep.</string>
+  <string name="reminder_notification_title" translatable="true" description="Title of a reminder notification. [CHAR_LIMIT=40]">Reminder</string>
+  <string name="widget_prompt" translatable="true" description="Placeholder text on the home screen widget. [CHAR_LIMIT=40]">Ask Star Storyteller</string>
 </resources>
