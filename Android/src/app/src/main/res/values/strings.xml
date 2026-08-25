@@ -912,4 +912,8 @@
   <string name="assistant_talk" translatable="true" description="Chip that starts voice input. [CHAR_LIMIT=15]">Talk</string>
   <string name="assistant_speak" translatable="true" description="Chip that toggles spoken replies. [CHAR_LIMIT=15]">Speak</string>
   <string name="assistant_manual" translatable="true" description="Chip that opens the manual on a phone. [CHAR_LIMIT=15]">Guide</string>
+  <string name="manual_grant_notifications" translatable="true" description="Button that opens notification access settings. [CHAR_LIMIT=40]">Allow reading notifications</string>
+  <string name="manual_notifications_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Notifications and media</string>
+  <string name="manual_notifications_body" translatable="true" description="Explains notification access. [CHAR_LIMIT=400]">Ask what you missed, have messages read out, reply, dismiss. Needs notification access, which Android only grants from system settings \u2014 and which lets it see every notification on the phone.</string>
+  <string name="manual_media_body" translatable="true" description="Explains media control. [CHAR_LIMIT=250]">Play, pause, skip and volume for whatever is playing. Android puts this behind the same notification access.</string>
 </resources>

@@ -53,6 +53,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
 import com.google.ai.edge.gallery.R
+import com.google.ai.edge.gallery.notifications.StarNotificationListener
 import com.google.ai.edge.gallery.voice.AssistantRole
 
 /** How wide the manual is when it sits beside the chat. */
@@ -85,10 +86,16 @@ fun AssistantManual(
   // Re-read when the screen comes back, since the role is granted in a system dialog outside the
   // app and the answer would otherwise be stale exactly when the user came back to check it.
   var roleHeld by remember { mutableStateOf(AssistantRole.isHeld(context)) }
+  var notificationsGranted by remember {
+    mutableStateOf(StarNotificationListener.isGranted(context))
+  }
   val lifecycleOwner = LocalLifecycleOwner.current
   DisposableEffect(lifecycleOwner) {
     val observer = LifecycleEventObserver { _, event ->
-      if (event == Lifecycle.Event.ON_RESUME) roleHeld = AssistantRole.isHeld(context)
+      if (event == Lifecycle.Event.ON_RESUME) {
+        roleHeld = AssistantRole.isHeld(context)
+        notificationsGranted = StarNotificationListener.isGranted(context)
+      }
     }
     lifecycleOwner.lifecycle.addObserver(observer)
     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -136,6 +143,19 @@ fun AssistantManual(
             modifier = Modifier.fillMaxWidth(),
           ) {
             Text(stringResource(R.string.manual_make_default))
+          }
+        }
+        // Android does not let an app request notification access in a dialog, so the only way
+        // to offer it is a button into system settings. Gone once granted, so the panel does not
+        // nag about something already done.
+        if (!notificationsGranted) {
+          OutlinedButton(
+            onClick = {
+              runCatching { context.startActivity(StarNotificationListener.settingsIntent()) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(stringResource(R.string.manual_grant_notifications))
           }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -192,6 +212,13 @@ private fun manualSections(): List<ManualSection> = listOf(
   ManualSection(
     stringResource(R.string.manual_device_title),
     listOf(stringResource(R.string.manual_device_body)),
+  ),
+  ManualSection(
+    stringResource(R.string.manual_notifications_title),
+    listOf(
+      stringResource(R.string.manual_notifications_body),
+      stringResource(R.string.manual_media_body),
+    ),
   ),
   ManualSection(
     stringResource(R.string.manual_skills_title),
