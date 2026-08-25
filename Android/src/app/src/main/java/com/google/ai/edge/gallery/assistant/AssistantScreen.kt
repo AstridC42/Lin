@@ -63,6 +63,7 @@ import com.google.ai.edge.gallery.customtasks.agentchat.resetSessionWithCurrentS
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.search.SearxngClient
+import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageInfo
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageText
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageType
@@ -96,6 +97,7 @@ fun AssistantScreen(
   agentTools: AgentTools,
   dataStoreRepository: DataStoreRepository,
   searxngClient: SearxngClient,
+  homeAssistantClient: HomeAssistantClient,
   initialQuery: String? = null,
   initialImageUris: List<String> = listOf(),
   startListening: Boolean = false,
@@ -114,6 +116,7 @@ fun AssistantScreen(
   var showModeSheet by remember { mutableStateOf(false) }
   var showWebSearchSettings by remember { mutableStateOf(false) }
   var showWakeWordSettings by remember { mutableStateOf(false) }
+  var showSmartHomeSettings by remember { mutableStateOf(false) }
 
   // Hands-free conversation: the assistant speaks its answer, then reopens the microphone, so a
   // back-and-forth needs no touch at all. Not persisted - leaving the app listening in a loop
@@ -157,8 +160,10 @@ fun AssistantScreen(
   val uiSystemPrompt by viewModel.uiSystemPrompt.collectAsState()
 
   // The mode lives in the system prompt, so it is folded in here rather than sent as a message.
+  val smartHomeEnabled = remember(webSearchRevision) { homeAssistantClient.isConfigured() }
+
   val systemPromptResolver =
-    remember(mode, webSearchEnabled, webSearchHost) {
+    remember(mode, webSearchEnabled, webSearchHost, smartHomeEnabled) {
       { currentPrompt: String, hasMcpTools: Boolean ->
         AssistantPrompts.resolve(
           currentPrompt = currentPrompt,
@@ -166,6 +171,7 @@ fun AssistantScreen(
           hasMcpTools = hasMcpTools,
           webSearchEnabled = webSearchEnabled,
           webSearchInstance = webSearchHost,
+          smartHomeEnabled = smartHomeEnabled,
         )
       }
     }
@@ -195,6 +201,7 @@ fun AssistantScreen(
             hasMcpTools = hasMcpTools,
             webSearchEnabled = webSearchEnabled,
             webSearchInstance = webSearchHost,
+            smartHomeEnabled = smartHomeEnabled,
           )
         },
       )
@@ -221,6 +228,7 @@ fun AssistantScreen(
         onOpenGallery = onOpenGallery,
         onOpenWebSearchSettings = { showWebSearchSettings = true },
         onOpenWakeWordSettings = { showWakeWordSettings = true },
+        onOpenSmartHomeSettings = { showSmartHomeSettings = true },
       )
     },
   ) {
@@ -321,7 +329,24 @@ fun AssistantScreen(
         showManual = false
         showWakeWordSettings = true
       },
+      onOpenSmartHomeSettings = {
+        showManual = false
+        showSmartHomeSettings = true
+      },
       onDismiss = { showManual = false },
+    )
+  }
+
+  if (showSmartHomeSettings) {
+    SmartHomeSettingsDialog(
+      dataStoreRepository = dataStoreRepository,
+      client = homeAssistantClient,
+      onDismiss = {
+        showSmartHomeSettings = false
+        // Shares the revision counter with web search: both change which tools exist, and the
+        // derived values above recompute from it.
+        webSearchRevision++
+      },
     )
   }
 

@@ -167,6 +167,33 @@ A sideloaded app stays invisible in Android Auto until **developer mode** and
 Android Auto's rule for apps outside the Play Store, not something the app can
 arrange for itself.
 
+### Notifications, media, reminders and the house
+
+- **Notifications** — "what did I miss", read messages out, reply, dismiss. Needs
+  notification access, granted from system settings; the Guide panel has the
+  button. It is the most invasive permission on the phone, and nothing is read
+  until it is granted.
+- **Media** — play, pause, skip, volume, and what is playing, for whatever app
+  owns the audio. Android puts this behind the same notification access.
+- **Reminders** — kept by the assistant rather than handed to the clock app, so
+  you can ask what is set and cancel it. They survive a reboot.
+- **Smart home** — lights, switches, blinds, locks, thermostats and scenes
+  through **Home Assistant**: paste its address and a long-lived access token
+  into the Guide panel and press *Test connection*.
+
+  **Google Home is not directly supported, and cannot be.** Google exposes no
+  API for a third-party Android app to control devices in someone's Home
+  structure without registration in the Google Home Developer Console, an OAuth
+  consent screen and per-project approval — none of which a sideloaded app can
+  satisfy. Nest and Cast devices are reachable through Home Assistant's own
+  integrations for them, which arrive through the same tools.
+
+### A widget, and the lock screen
+
+There is a home-screen widget: tap the body to type, tap the microphone to talk.
+It works whether or not the app is your default assistant, which the assist
+gesture does not. The app can also open over the lock screen.
+
 ### Foldables
 
 The app is no longer locked to portrait and handles fold and unfold without
