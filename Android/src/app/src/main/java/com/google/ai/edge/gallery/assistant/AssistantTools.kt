@@ -19,10 +19,12 @@ package com.google.ai.edge.gallery.assistant
 import com.google.ai.edge.gallery.customtasks.agentchat.AgentToolsImpl
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.search.SearxngClient
+import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.tools.DeviceActionsTool
 import com.google.ai.edge.gallery.tools.MediaControlTool
 import com.google.ai.edge.gallery.tools.NotificationsTool
 import com.google.ai.edge.gallery.tools.RemindersTool
+import com.google.ai.edge.gallery.tools.SmartHomeTool
 import com.google.ai.edge.gallery.tools.ToolDefinition
 import com.google.ai.edge.gallery.tools.WebSearchTool
 
@@ -39,6 +41,7 @@ import com.google.ai.edge.gallery.tools.WebSearchTool
  */
 class AssistantTools(
   private val searxngClient: SearxngClient,
+  private val homeAssistantClient: HomeAssistantClient,
   private val settingsRepository: DataStoreRepository,
 ) : AgentToolsImpl() {
 
@@ -54,6 +57,8 @@ class AssistantTools(
   private val notificationsTool by lazy { NotificationsTool(context = context) }
 
   private val mediaControlTool by lazy { MediaControlTool(context = context) }
+
+  private val smartHomeTool by lazy { SmartHomeTool(client = homeAssistantClient) }
 
   private val remindersTool by lazy {
     RemindersTool(context = context, repository = settingsRepository)
@@ -71,6 +76,11 @@ class AssistantTools(
     tools.add(remindersTool)
     if (searxngClient.isConfigured()) {
       tools.add(webSearchTool)
+    }
+    // Only when an instance is set up, for the same reason as web search: a model told about a
+    // tool that can only fail will keep reaching for it and reporting the failure as a result.
+    if (homeAssistantClient.isConfigured()) {
+      tools.add(smartHomeTool)
     }
     return tools
   }
