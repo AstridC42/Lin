@@ -36,6 +36,9 @@ jobs:
       # Lifted to the job so steps can branch on whether signing is configured; the `secrets`
       # context is not available in a step's `if:` condition, but `env` is.
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      # Must match prerelease.yml exactly, or a release and the test builds around it are signed
+      # with different keys and cannot replace one another.
+      CI_KEYSTORE_PASSWORD: star-storyteller-ci
     steps:
       - name: Check out the source
         uses: actions/checkout@v4
@@ -99,30 +102,62 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('Android/src/**/*.gradle.kts', 'Android/src/gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
 
-      # Shared with prerelease.yml, and for the same reason: without signing secrets the build
-      # falls back to the debug key, which Gradle generates fresh on any machine that does not
-      # already have one. Caching it keeps a single key across every build, numbered release and
-      # test build alike, so they install over each other instead of demanding an uninstall.
-      - name: Cache the debug signing key
+      # The same signing arrangement as prerelease.yml, and it has to be the same key: a numbered
+      # release that will not install over the test build it came from is useless.
+      #
+      # Both used to rely on AGP's debug key with ~/.android/debug.keystore cached. That never
+      # saved - the cache path did not exist when the post-job step ran - so every build got a
+      # fresh key and none of them would install over another. The key is now created at a path
+      # this workflow owns and handed to Gradle explicitly.
+      - name: Restore the CI signing key
+        id: signing-cache
         if: ${{ env.KEYSTORE_BASE64 == '' }}
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore-v1
+          path: ci-keystore
+          key: star-ci-signing-key-v2
+
+      - name: Create the CI signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' && steps.signing-cache.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ci-keystore
+          keytool -genkeypair -v \
+            -keystore ci-keystore/star-ci.jks -storetype PKCS12 -alias star \
+            -keyalg RSA -keysize 4096 -validity 10950 \
+            -storepass "$CI_KEYSTORE_PASSWORD" -keypass "$CI_KEYSTORE_PASSWORD" \
+            -dname "CN=Star Storyteller Test Builds, OU=CI, O=Star Storyteller"
+
+      - name: Save the CI signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' && steps.signing-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ci-keystore
+          key: star-ci-signing-key-v2
 
       - name: Install Android SDK platform 37
         run: echo "y" | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"
 
-      # Signing is optional. With the four secrets set, releases are signed with your upload key
-      # and users can upgrade in place. Without them the build falls back to the debug key, which
-      # still installs but cannot be upgraded over a differently signed build.
-      - name: Decode the upload keystore
+      - name: Work out which key to sign with
         id: keystore
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
         run: |
           set -euo pipefail
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
-          echo "path=$RUNNER_TEMP/upload.jks" >> "$GITHUB_OUTPUT"
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+            {
+              echo "path=$RUNNER_TEMP/upload.jks"
+              echo "password=${{ secrets.KEYSTORE_PASSWORD }}"
+              echo "alias=${{ secrets.KEY_ALIAS }}"
+              echo "key_password=${{ secrets.KEY_PASSWORD }}"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "path=$GITHUB_WORKSPACE/ci-keystore/star-ci.jks"
+              echo "password=$CI_KEYSTORE_PASSWORD"
+              echo "alias=star"
+              echo "key_password=$CI_KEYSTORE_PASSWORD"
+            } >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run the unit tests
         working-directory: ./Android/src
@@ -134,9 +169,9 @@ jobs:
           STAR_VERSION_NAME: ${{ steps.version.outputs.name }}
           STAR_VERSION_CODE: ${{ steps.version.outputs.code }}
           STAR_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
-          STAR_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          STAR_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          STAR_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STAR_KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.password }}
+          STAR_KEY_ALIAS: ${{ steps.keystore.outputs.alias }}
+          STAR_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
         run: ./gradlew --no-daemon assembleRelease
 
       - name: Collect and rename the APKs
@@ -160,6 +195,21 @@ jobs:
           fi
           ( cd dist && sha256sum *.apk > SHA256SUMS.txt )
           ls -lh dist
+
+          # apksigner, not keytool: minSdk is 31, so the APK carries only v2/v3 signatures and no
+          # v1 JAR signature. `keytool -printcert -jarfile` finds nothing in one and prints an
+          # empty string without failing, which would have put an empty fingerprint in the notes.
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          fingerprint="$("$apksigner" verify --print-certs \
+            "dist/star-storyteller-${VERSION}-arm64-v8a.apk" \
+            | grep -m1 'Signer #1 certificate SHA-256 digest:' \
+            | sed 's/.*digest: *//')"
+          if [ -z "$fingerprint" ]; then
+            echo "::error::Could not read the signing certificate from the APK"
+            exit 1
+          fi
+          echo "Signed with SHA-256 $fingerprint"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
           if [ -n "${KEYSTORE_BASE64:-}" ]; then
             echo "signed=true" >> "$GITHUB_OUTPUT"
           else
@@ -172,6 +222,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.name }}
           TAG: ${{ steps.version.outputs.tag }}
           SIGNED: ${{ steps.apks.outputs.signed }}
+          FINGERPRINT: ${{ steps.apks.outputs.fingerprint }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -214,11 +265,14 @@ jobs:
             echo "If one does not open, the same files are under **Assets** at the bottom of this"
             echo "release — on the GitHub mobile app, tap **View release details** first._"
             echo
+            echo "Signing key: \`${FINGERPRINT}\`."
             if [ "$SIGNED" != "true" ]; then
-              echo "> **Note**: this build is signed with the Android debug key, so it cannot be"
-              echo "> installed over a differently signed copy. Uninstall any earlier version first."
-              echo
+              echo "This is a CI test key, kept in the Actions cache."
             fi
+            echo
+            echo "Android will not install over a copy signed with a different key. If the install"
+            echo "is refused with \`App not installed\`, uninstall the old version first."
+            echo
             echo "## Set it as your assistant"
             echo
             echo "Settings → Apps → Default apps → Digital assistant app → Star Storyteller."
