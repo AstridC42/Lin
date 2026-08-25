@@ -76,20 +76,33 @@ device-matched APK is about a third of the universal one.
 
 ## Signing
 
-Signing is optional, and the workflows work without it — the build falls back to the Android debug
-key. That APK installs fine, but it cannot be installed *over* a copy signed with a different key,
-so anyone on the old build has to uninstall first, losing their downloaded models.
+Android refuses to install an APK over a copy signed with a different key. So every build has to
+be signed with the *same* key as the one before it, or none of them can be installed as updates —
+and the only way out is uninstalling, which loses the downloaded models.
 
-That matters more than it sounds, because Gradle *generates* the debug key wherever
-`~/.android/debug.keystore` does not already exist — which on a fresh CI runner is every single
-run. Left alone, every test build would be signed with a brand new key and every install would
-mean an uninstall first. Both workflows therefore cache that keystore under a fixed key, so one
-debug key is reused across builds and each one installs over the last as an ordinary upgrade.
+Both workflows create a signing key at a path they own, cache it under a fixed key, and hand it to
+Gradle through `STAR_KEYSTORE_PATH`. Both use the same one, so a numbered release installs over
+the test builds that led to it.
 
-The cache is a stopgap, not a fix: GitHub evicts a cache after a week without a hit, and the build
-after that has a new key and needs one manual uninstall. Setting the four secrets below ends it
-for good, and takes priority over the cached key automatically. Every unsigned build says which
-situation it is in, in its own release notes.
+This replaced an earlier attempt that cached `~/.android/debug.keystore` and let AGP's debug
+signing pick it up. **That never worked once.** Every run ended with
+
+```
+Path Validation Error: Path(s) specified in the action for caching do(es) not exist,
+hence no cache is being saved.
+```
+
+so nothing was ever cached, every build generated a fresh debug key, and every build refused to
+install over the one before it. The mistake was depending on where another tool happens to put a
+file; the key is now created explicitly.
+
+Every build reports the SHA-256 of its signing certificate in the log and in its release notes,
+because a build that will not install differs there and nowhere else — and that was invisible
+until someone tried to install it.
+
+The cache is still not permanent: GitHub evicts one after a week without a hit, and the build
+after that has a new key and needs a manual uninstall. Setting the four secrets below removes that
+last risk, and takes priority over the CI key automatically.
 
 To sign properly, create an upload key once:
 
