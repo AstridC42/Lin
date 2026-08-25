@@ -315,6 +315,14 @@
             android:name="androidx.car.app.minCarApiLevel"
             android:value="1" />
 
+        <!--
+          Required for the app to appear in Android Auto at all. Without it the CarAppService above
+          is never offered, silently - see res/xml/automotive_app_desc.xml.
+        -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
