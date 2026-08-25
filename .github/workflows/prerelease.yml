@@ -33,6 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      # Not a secret in any meaningful sense: it protects a keystore that lives only in the
+      # Actions cache, never in the repository. What matters is that it is the *same* every run,
+      # so a restored keystore can still be opened.
+      CI_KEYSTORE_PASSWORD: star-storyteller-ci
     steps:
       - name: Check out the source
         uses: actions/checkout@v4
@@ -90,31 +94,76 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('Android/src/**/*.gradle.kts', 'Android/src/gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
 
-      # Without a signing key configured the build falls back to the Android debug key, and Gradle
-      # generates that key wherever ~/.android/debug.keystore does not already exist - which on a
-      # fresh runner is every single run. A different key every build means every build has to be
-      # uninstalled and reinstalled, losing the downloaded models. Caching the keystore keeps one
-      # key across runs, so each test build installs over the last as an ordinary upgrade.
+      # Signing, and why it is done this way.
       #
-      # It is a stopgap: the cache is evicted after a week without a build, and one test build then
-      # needs a manual uninstall. Setting the four signing secrets removes the problem for good.
-      - name: Cache the debug signing key
+      # Android refuses to install a build over one signed with a different key, so every test
+      # build has to be signed with the *same* key as the last one or none of them can be
+      # installed as updates.
+      #
+      # The previous attempt cached ~/.android/debug.keystore and let AGP's debug signing use it.
+      # It never once worked: the post-job step reported "Path(s) specified in the action for
+      # caching do(es) not exist, hence no cache is being saved" on every run, so nothing was ever
+      # stored, every build generated a fresh debug key, and every build refused to install over
+      # the one before it. Relying on where another tool happens to put a file was the mistake.
+      #
+      # So the key is created here, at a path this workflow owns, and handed to Gradle explicitly
+      # through STAR_KEYSTORE_PATH. Nothing depends on AGP's debug key any more.
+      - name: Restore the CI signing key
+        id: signing-cache
         if: ${{ env.KEYSTORE_BASE64 == '' }}
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore-v1
+          path: ci-keystore
+          key: star-ci-signing-key-v2
+
+      - name: Create the CI signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' && steps.signing-cache.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ci-keystore
+          keytool -genkeypair -v \
+            -keystore ci-keystore/star-ci.jks -storetype PKCS12 -alias star \
+            -keyalg RSA -keysize 4096 -validity 10950 \
+            -storepass "$CI_KEYSTORE_PASSWORD" -keypass "$CI_KEYSTORE_PASSWORD" \
+            -dname "CN=Star Storyteller Test Builds, OU=CI, O=Star Storyteller"
+        env:
+          CI_KEYSTORE_PASSWORD: ${{ env.CI_KEYSTORE_PASSWORD }}
+
+      # Saved only when it was just created; cache/save errors on an existing key.
+      - name: Save the CI signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' && steps.signing-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ci-keystore
+          key: star-ci-signing-key-v2
 
       - name: Install Android SDK platform 37
         run: echo "y" | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"
 
-      - name: Decode the upload keystore
+      # One place that decides which key signs this build, so the build steps below do not have to
+      # know which of the two situations they are in.
+      - name: Work out which key to sign with
         id: keystore
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
         run: |
           set -euo pipefail
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
-          echo "path=$RUNNER_TEMP/upload.jks" >> "$GITHUB_OUTPUT"
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+            {
+              echo "path=$RUNNER_TEMP/upload.jks"
+              echo "password=${{ secrets.KEYSTORE_PASSWORD }}"
+              echo "alias=${{ secrets.KEY_ALIAS }}"
+              echo "key_password=${{ secrets.KEY_PASSWORD }}"
+              echo "kind=upload"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "path=$GITHUB_WORKSPACE/ci-keystore/star-ci.jks"
+              echo "password=$CI_KEYSTORE_PASSWORD"
+              echo "alias=star"
+              echo "key_password=$CI_KEYSTORE_PASSWORD"
+              echo "kind=ci"
+            } >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run the unit tests
         working-directory: ./Android/src
@@ -126,9 +175,9 @@ jobs:
           STAR_VERSION_NAME: ${{ steps.version.outputs.name }}
           STAR_VERSION_CODE: ${{ steps.version.outputs.code }}
           STAR_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
-          STAR_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          STAR_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          STAR_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STAR_KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.password }}
+          STAR_KEY_ALIAS: ${{ steps.keystore.outputs.alias }}
+          STAR_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
         run: ./gradlew --no-daemon assembleRelease
 
       - name: Collect and rename the APKs
@@ -152,11 +201,31 @@ jobs:
           ( cd dist && sha256sum *.apk > SHA256SUMS.txt )
           ls -lh dist
 
+          # The certificate the APKs were signed with. A build that will not install over the last
+          # one differs here and nowhere else, and that was invisible until someone tried to
+          # install it - so it goes in the log and in the release notes.
+          #
+          # apksigner, not keytool: minSdk is 31, so the APK carries only v2/v3 signatures and no
+          # v1 JAR signature. `keytool -printcert -jarfile` finds nothing in one and prints an
+          # empty string without failing, which would have put an empty fingerprint in the notes.
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          fingerprint="$("$apksigner" verify --print-certs \
+            "dist/star-storyteller-${VERSION}-arm64-v8a.apk" \
+            | grep -m1 'Signer #1 certificate SHA-256 digest:' \
+            | sed 's/.*digest: *//')"
+          if [ -z "$fingerprint" ]; then
+            echo "::error::Could not read the signing certificate from the APK"
+            exit 1
+          fi
+          echo "Signed with SHA-256 $fingerprint"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
       - name: Write the release notes
         env:
           VERSION: ${{ steps.version.outputs.name }}
           REPO: ${{ github.repository }}
           SIGNED: ${{ env.KEYSTORE_BASE64 != '' }}
+          FINGERPRINT: ${{ steps.apks.outputs.fingerprint }}
         run: |
           set -euo pipefail
           base="https://github.com/${REPO}/releases/download/dev"
@@ -192,13 +261,17 @@ jobs:
             echo "does not open, the same files are under **Assets** — on the GitHub mobile app,"
             echo "tap **View release details** first._"
             echo
+            echo "Signing key: \`${FINGERPRINT}\`."
             if [ "$SIGNED" != "true" ]; then
-              echo "> **Note**: signed with a cached debug key rather than a real upload key. Test"
-              echo "> builds normally install straight over each other, but if one is ever refused"
-              echo "> with \`App not installed\`, the key was regenerated — uninstall and install"
-              echo "> again. Setting the four signing secrets ends that for good; see RELEASING.md."
-              echo
+              echo "This is a CI test key, kept in the Actions cache."
             fi
+            echo
+            echo "If a build ever refuses to install with \`App not installed\`, compare that"
+            echo "fingerprint with the one on the build you have. Android will not install over a"
+            echo "differently signed copy, so uninstall first - the models will need downloading"
+            echo "again. Setting the four signing secrets makes the key permanent; see"
+            echo "RELEASING.md."
+            echo
             echo "## What changed"
             echo
             git log --no-merges --pretty='- %s' -n 15 || true
