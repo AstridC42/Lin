@@ -24,6 +24,7 @@ import com.google.ai.edge.gallery.proto.BenchmarkResults
 import com.google.ai.edge.gallery.proto.Cutout
 import com.google.ai.edge.gallery.proto.CutoutCollection
 import com.google.ai.edge.gallery.proto.ImportedModel
+import com.google.ai.edge.gallery.proto.Reminders
 import com.google.ai.edge.gallery.proto.Settings
 import com.google.ai.edge.gallery.proto.Skill
 import com.google.ai.edge.gallery.proto.Skills
@@ -144,6 +145,12 @@ interface DataStoreRepository {
 
   /** Persists the preferences of the unified assistant screen. */
   fun saveAssistantSettings(settings: AssistantSettings)
+
+  /** Reminders the assistant delivers itself. */
+  fun readReminders(): Reminders
+
+  /** Persists the assistant's reminders. */
+  fun saveReminders(reminders: Reminders)
 }
 
 /** Repository for managing data using Proto DataStore. */
@@ -504,6 +511,16 @@ class DefaultDataStoreRepository(
   override fun saveAssistantSettings(settings: AssistantSettings) {
     runBlocking {
       dataStore.updateData { current -> current.toBuilder().setAssistantSettings(settings).build() }
+    }
+  }
+
+  override fun readReminders(): Reminders {
+    return runBlocking { dataStore.data.first().reminders }
+  }
+
+  override fun saveReminders(reminders: Reminders) {
+    runBlocking {
+      dataStore.updateData { current -> current.toBuilder().setReminders(reminders).build() }
     }
   }
 }

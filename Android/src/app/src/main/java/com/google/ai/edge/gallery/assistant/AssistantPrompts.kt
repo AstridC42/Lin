@@ -257,7 +257,10 @@ object AssistantPrompts {
       default this opens the dialer with the number filled in and the user taps to call.
     - findContact(name): look up a phone number in the address book.
     - sendTextMessage(nameOrNumber, message): open the SMS composer with a draft.
-    - setAlarm(hour, minute, label) and setTimer(seconds, label).
+    - setAlarm(hour, minute, label) and setTimer(seconds, label) hand an alarm to the clock app.
+    - setReminder(text, when), listReminders() and cancelReminder(id) are the assistant's own and
+      survive a restart. Prefer these for "remind me to ...", because an alarm handed to the clock
+      app cannot be listed or cancelled afterwards.
     - openApp(appName), showOnMap(place), getDirections(destination, mode).
     - toggleFlashlight(on), openSystemSettings(section), openUrlInBrowser(url).
     - run_intent(intent, parameters) for send_email, create_calendar_event, read_calendar_events,
