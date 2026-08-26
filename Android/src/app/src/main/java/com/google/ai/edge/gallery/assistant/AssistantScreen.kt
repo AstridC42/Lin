@@ -22,6 +22,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,6 +44,7 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -264,7 +268,15 @@ fun AssistantScreen(
       initialQuery = dictatedQuery ?: initialQuery,
       initialImageUris = initialImageUris,
       baseSystemPromptResolver = systemPromptResolver,
-      emptyStateHeadline = { AssistantEmptyStateHeadline() },
+      emptyStateHeadline = {
+        AssistantEmptyStateHeadline(
+          webSearchEnabled = webSearchEnabled,
+          smartHomeEnabled = smartHomeEnabled,
+          // Sending it straight away rather than filling the text box: these are complete
+          // requests, and a tap that only types something needs a second tap to do anything.
+          onSuggestion = { dictatedQuery = it },
+        )
+      },
       aboveInputContent = {
         AssistantModeBar(
           mode = mode,
@@ -403,14 +415,36 @@ fun AssistantScreen(
   }
 }
 
-/** The welcome text shown before the first message. */
+/**
+ * What fills the screen before the first message.
+ *
+ * The suggestions are the point of it. Everything this assistant can do that an ordinary chat
+ * cannot - reading the notification shade, setting a reminder that survives a reboot, loading a
+ * skill to look something up - is invisible until it is asked for, and nobody asks for a capability
+ * they have no reason to think exists. A screen that only says "what can I do for you?" is a screen
+ * that gets asked the questions any chatbot could answer.
+ *
+ * So they are examples of the kinds of request that go somewhere, not a menu, and they are filtered
+ * to what is actually wired up: offering a web search on a phone with no instance configured would
+ * teach exactly the wrong lesson on the first try.
+ */
 @Composable
-private fun AssistantEmptyStateHeadline() {
+private fun AssistantEmptyStateHeadline(
+  webSearchEnabled: Boolean,
+  smartHomeEnabled: Boolean,
+  onSuggestion: (String) -> Unit,
+) {
   Column(
-    modifier = Modifier.padding(horizontal = 40.dp).padding(bottom = 48.dp),
+    modifier = Modifier.padding(horizontal = 32.dp).padding(bottom = 40.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
+    Icon(
+      painterResource(R.drawable.gemini_star),
+      contentDescription = null,
+      tint = MaterialTheme.colorScheme.primary,
+      modifier = Modifier.size(44.dp),
+    )
     Text(
       stringResource(R.string.assistant_emptystate_title),
       style = emptyStateTitle,
@@ -422,6 +456,25 @@ private fun AssistantEmptyStateHeadline() {
       color = MaterialTheme.colorScheme.onSurfaceVariant,
       textAlign = TextAlign.Center,
     )
+
+    val suggestions = buildList {
+      add(stringResource(R.string.assistant_suggestion_weather))
+      add(stringResource(R.string.assistant_suggestion_missed))
+      add(stringResource(R.string.assistant_suggestion_lookup))
+      add(stringResource(R.string.assistant_suggestion_remind))
+      if (webSearchEnabled) add(stringResource(R.string.assistant_suggestion_search))
+      if (smartHomeEnabled) add(stringResource(R.string.assistant_suggestion_lights))
+      add(stringResource(R.string.assistant_suggestion_playing))
+    }
+    FlowRow(
+      modifier = Modifier.padding(top = 8.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+      verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+      for (suggestion in suggestions) {
+        SuggestionChip(onClick = { onSuggestion(suggestion) }, label = { Text(suggestion) })
+      }
+    }
   }
 }
 
