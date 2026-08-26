@@ -18,7 +18,10 @@ package com.google.ai.edge.gallery.tools
 
 import android.util.Log
 import com.google.ai.edge.gallery.search.PageFetchOutcome
+import com.google.ai.edge.gallery.search.ImageDownloadOutcome
+import com.google.ai.edge.gallery.search.ImageSearchOutcome
 import com.google.ai.edge.gallery.search.SearxngClient
+import com.google.ai.edge.gallery.search.WebImageHit
 import com.google.ai.edge.gallery.search.WebSearchOutcome
 import com.google.ai.edge.litertlm.Tool
 import com.google.ai.edge.litertlm.ToolParam
@@ -38,7 +41,19 @@ private const val TAG = "AGWebSearchTool"
  * no instance is configured the tools still exist but return an actionable error, which keeps the
  * model from silently inventing an answer.
  */
-class WebSearchTool(private val searxngClient: SearxngClient) : ToolDefinition {
+class WebSearchTool(
+  private val searxngClient: SearxngClient,
+  /**
+   * Puts a picture into the conversation.
+   *
+   * Routed through the same slot the JavaScript skill runtime uses, which the chat screen already
+   * drains once a turn finishes - so a picture arrives as an ordinary chat message with no new
+   * plumbing, and none of the ordering problems of pushing one mid-turn.
+   */
+  private val showImageInChat: (base64: String) -> Unit = {},
+  /** Puts a web page into the conversation, through the same slot. */
+  private val showPageInChat: (url: String) -> Unit = {},
+) : ToolDefinition {
   override val alwaysAllow: Boolean = true
   override var executionContext: ToolExecutionContext? = null
 
@@ -128,6 +143,79 @@ class WebSearchTool(private val searxngClient: SearxngClient) : ToolDefinition {
 
   @Tool(
     description =
+      "Find a picture on the web and show it in the chat. Use for \"show me a photo of...\", " +
+        "\"what does X look like\". The picture appears in the conversation on its own."
+  )
+  fun showImageFromWeb(
+    @ToolParam(description = "What the picture should be of, for example 'Mount Fuji at sunrise'.")
+    query: String
+  ): Map<String, Any> {
+    return runBlocking(Dispatchers.Default) {
+      sendProgress("Looking for a picture of \"$query\"", inProgress = true)
+      when (val outcome = searxngClient.searchImages(query)) {
+        is ImageSearchOutcome.Failure -> {
+          sendProgress("No picture found", inProgress = false)
+          failure(outcome.message)
+        }
+        is ImageSearchOutcome.Success -> {
+          // Try the results in order. An image URL from a search index is often stale, hotlink
+          // blocked, or a page that merely looks like a picture, and giving up on the first
+          // failure would report "no pictures" for a query that has plenty.
+          var shown: WebImageHit? = null
+          for (candidate in outcome.images) {
+            val download = searxngClient.downloadImage(candidate.imageUrl)
+            if (download is ImageDownloadOutcome.Success) {
+              showImageInChat(download.base64)
+              shown = candidate
+              break
+            }
+          }
+          if (shown == null) {
+            sendProgress("No picture could be loaded", inProgress = false)
+            return@runBlocking failure(
+              "Pictures were found but none of them could be downloaded. Offer the user the link " +
+                "instead: ${outcome.images.firstOrNull()?.sourceUrl.orEmpty()}"
+            )
+          }
+          sendProgress("Showed a picture", inProgress = false)
+          mapOf(
+            "status" to "succeeded",
+            "shown" to shown.title,
+            "source" to shown.sourceUrl,
+            "hint" to
+              "The picture is already in the conversation - do not describe it in detail or " +
+                "repeat its URL. Say in one line what it shows and cite the source page.",
+          )
+        }
+      }
+    }
+  }
+
+  @Tool(
+    description =
+      "Open a web page inside the chat so the user can read it there. Use when they ask to see " +
+        "a link rather than have it summarised."
+  )
+  fun showWebPageInChat(
+    @ToolParam(description = "The full URL to show.") url: String
+  ): Map<String, Any> {
+    return runBlocking(Dispatchers.Default) {
+      val trimmed = url.trim()
+      if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+        return@runBlocking failure("\"$url\" is not a web address.")
+      }
+      showPageInChat(trimmed)
+      sendProgress("Opened the page in the chat", inProgress = false)
+      mapOf(
+        "status" to "succeeded",
+        "url" to trimmed,
+        "hint" to "The page is in the conversation. Say in one line what it is; do not paste it.",
+      )
+    }
+  }
+
+  @Tool(
+    description =
       "Download one web page and return its readable text. Use it after webSearch when a result " +
         "snippet is not detailed enough to answer, or when the user gives you a URL to read."
   )
@@ -168,6 +256,9 @@ class WebSearchTool(private val searxngClient: SearxngClient) : ToolDefinition {
       }
     }
   }
+
+  private fun failure(message: String): Map<String, Any> =
+    mapOf("status" to "failed", "error" to message)
 
   private suspend fun sendProgress(
     label: String,

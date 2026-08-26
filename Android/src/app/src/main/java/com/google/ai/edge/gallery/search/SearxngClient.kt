@@ -53,6 +53,29 @@ sealed interface WebSearchOutcome {
   data class Failure(val message: String) : WebSearchOutcome
 }
 
+/** A single picture returned by an image search. */
+data class WebImageHit(
+  val title: String,
+  /** The picture itself. */
+  val imageUrl: String,
+  /** The page it appears on, so a citation points somewhere a person can read. */
+  val sourceUrl: String,
+)
+
+/** The outcome of one image query. */
+sealed interface ImageSearchOutcome {
+  data class Success(val query: String, val images: List<WebImageHit>) : ImageSearchOutcome
+
+  data class Failure(val message: String) : ImageSearchOutcome
+}
+
+/** The outcome of downloading one picture. */
+sealed interface ImageDownloadOutcome {
+  data class Success(val url: String, val base64: String) : ImageDownloadOutcome
+
+  data class Failure(val message: String) : ImageDownloadOutcome
+}
+
 /** The outcome of downloading a single web page as plain text. */
 sealed interface PageFetchOutcome {
   data class Success(val url: String, val title: String, val text: String, val truncated: Boolean) :
@@ -155,6 +178,150 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
     }
 
   /** Downloads [url] and reduces it to readable plain text, capped at [maxChars] characters. */
+  /**
+   * Searches for pictures.
+   *
+   * SearXNG's image category returns a separate `img_src` alongside the page URL, and the two are
+   * not interchangeable: `img_src` is what can be displayed, `url` is the page it came from and is
+   * what a citation should point at. Results without an `img_src` are dropped rather than shown as
+   * a link that looks like a picture and is not.
+   */
+  suspend fun searchImages(query: String, limit: Int = DEFAULT_IMAGE_LIMIT): ImageSearchOutcome =
+    withContext(Dispatchers.IO) {
+      val settings = readSettings()
+      val baseUrl =
+        instanceUrlOrNull()
+          ?: return@withContext ImageSearchOutcome.Failure(
+            "No SearXNG instance is set up, so pictures cannot be looked up."
+          )
+      if (query.isBlank()) {
+        return@withContext ImageSearchOutcome.Failure("The search query is empty.")
+      }
+      val params =
+        buildList {
+            add("q" to query)
+            add("format" to "json")
+            add("categories" to "images")
+            add("language" to settings.language.ifBlank { "auto" })
+            add("safesearch" to settings.safeSearch.coerceIn(0, 2).toString())
+            add("pageno" to "1")
+          }
+          .joinToString("&") { (k, v) -> "${encode(k)}=${encode(v)}" }
+
+      val body =
+        try {
+          httpGet("$baseUrl/search?$params", settings, accept = "application/json")
+        } catch (e: SearxngHttpException) {
+          return@withContext ImageSearchOutcome.Failure(describeHttpFailure(e, baseUrl))
+        } catch (e: IOException) {
+          return@withContext ImageSearchOutcome.Failure(
+            "Could not reach the SearXNG instance at $baseUrl (${e.message ?: "network error"})."
+          )
+        }
+
+      try {
+        val root = JSONObject(body)
+        val results = root.optJSONArray("results") ?: JSONArray()
+        val images = mutableListOf<WebImageHit>()
+        for (i in 0 until results.length()) {
+          if (images.size >= limit) break
+          val item = results.optJSONObject(i) ?: continue
+          val imageUrl = item.optString("img_src").trim()
+          if (imageUrl.isEmpty()) continue
+          val pageUrl = item.optString("url").trim()
+          images.add(
+            WebImageHit(
+              title = item.optString("title").trim().ifEmpty { query },
+              imageUrl = absolute(imageUrl, baseUrl),
+              sourceUrl = pageUrl,
+            )
+          )
+        }
+        if (images.isEmpty()) {
+          return@withContext ImageSearchOutcome.Failure("No pictures found for \"$query\".")
+        }
+        ImageSearchOutcome.Success(query = query, images = images)
+      } catch (e: Exception) {
+        Log.e(TAG, "Could not read the image results", e)
+        ImageSearchOutcome.Failure(
+          "The instance at $baseUrl did not return usable image results."
+        )
+      }
+    }
+
+  /**
+   * Downloads one picture, as base64, so the chat can show it.
+   *
+   * Bounded on purpose. The bytes are held in memory, base64 grows them by a third, and the result
+   * is put into a chat message - so a full-resolution photograph would cost far more than it is
+   * worth on a phone that is also holding a language model in RAM.
+   */
+  suspend fun downloadImage(url: String, maxBytes: Int = MAX_IMAGE_BYTES): ImageDownloadOutcome =
+    withContext(Dispatchers.IO) {
+      if (url.isBlank()) return@withContext ImageDownloadOutcome.Failure("No picture URL.")
+      val settings = readSettings()
+      val timeout = (settings.timeoutSeconds.takeIf { it > 0 } ?: DEFAULT_TIMEOUT_SECONDS) * 1000
+      var connection: HttpURLConnection? = null
+      try {
+        connection =
+          (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = timeout
+            readTimeout = timeout
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", USER_AGENT)
+            setRequestProperty("Accept", "image/*")
+          }
+        val contentType = connection.contentType.orEmpty()
+        if (contentType.isNotEmpty() && !contentType.startsWith("image/")) {
+          return@withContext ImageDownloadOutcome.Failure(
+            "That address is not a picture (it returned $contentType)."
+          )
+        }
+        // Content-Length is a hint and is often absent or wrong, so the read below is bounded too.
+        val declared = connection.contentLength
+        if (declared > maxBytes) {
+          return@withContext ImageDownloadOutcome.Failure("That picture is too large to show.")
+        }
+        val bytes =
+          connection.inputStream.use { input ->
+            val buffer = java.io.ByteArrayOutputStream()
+            val chunk = ByteArray(16 * 1024)
+            while (true) {
+              val read = input.read(chunk)
+              if (read <= 0) break
+              buffer.write(chunk, 0, read)
+              if (buffer.size() > maxBytes) {
+                return@withContext ImageDownloadOutcome.Failure(
+                  "That picture is too large to show."
+                )
+              }
+            }
+            buffer.toByteArray()
+          }
+        if (bytes.isEmpty()) {
+          return@withContext ImageDownloadOutcome.Failure("That picture came back empty.")
+        }
+        ImageDownloadOutcome.Success(
+          url = url,
+          base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP),
+        )
+      } catch (e: Exception) {
+        Log.e(TAG, "Could not download $url", e)
+        ImageDownloadOutcome.Failure("That picture could not be downloaded.")
+      } finally {
+        connection?.disconnect()
+      }
+    }
+
+  /** SearXNG returns some image URLs relative to itself, typically its own proxy. */
+  private fun absolute(candidate: String, baseUrl: String): String =
+    when {
+      candidate.startsWith("http://") || candidate.startsWith("https://") -> candidate
+      candidate.startsWith("//") -> "https:$candidate"
+      candidate.startsWith("/") -> "$baseUrl$candidate"
+      else -> candidate
+    }
+
   suspend fun fetchPageText(url: String, maxChars: Int = DEFAULT_PAGE_CHAR_LIMIT): PageFetchOutcome =
     withContext(Dispatchers.IO) {
       val settings = readSettings()
@@ -313,6 +480,12 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
     const val DEFAULT_TIMEOUT_SECONDS = 20
     const val DEFAULT_MAX_RESULTS = 5
     const val DEFAULT_PAGE_CHAR_LIMIT = 6000
+
+    /** How many pictures to offer. More than a handful is noise on a phone screen. */
+    const val DEFAULT_IMAGE_LIMIT = 6
+
+    /** Largest picture worth base64-ing into a chat message. */
+    const val MAX_IMAGE_BYTES = 3 * 1024 * 1024
 
     private const val USER_AGENT =
       "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +
