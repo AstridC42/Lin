@@ -16,13 +16,18 @@
 
 package com.google.ai.edge.gallery.assistant
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Headphones
@@ -37,18 +42,21 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -110,11 +118,23 @@ fun AssistantScreen(
   val context = LocalContext.current
   val speaker = rememberAssistantSpeaker()
 
+  // The engine starts on whatever the phone defaults to, so the saved choice has to be handed to
+  // it every time the screen appears - not only when it is changed in the dialog.
+  LaunchedEffect(speaker) {
+    val saved = dataStoreRepository.readAssistantSettings()
+    speaker.applyPreferences(
+      voiceId = saved.ttsVoiceName,
+      rate = saved.ttsSpeechRate,
+      pitch = saved.ttsPitch,
+    )
+  }
+
   val storedSettings = remember { dataStoreRepository.readAssistantSettings() }
   var mode by remember { mutableStateOf(AssistantMode.fromId(storedSettings.modeId)) }
   var speakReplies by remember { mutableStateOf(storedSettings.speakReplies) }
   var showModeSheet by remember { mutableStateOf(false) }
   var showWebSearchSettings by remember { mutableStateOf(false) }
+  var showVoiceSettings by remember { mutableStateOf(false) }
   var showWakeWordSettings by remember { mutableStateOf(false) }
   var showSmartHomeSettings by remember { mutableStateOf(false) }
 
@@ -229,6 +249,7 @@ fun AssistantScreen(
         onOpenWebSearchSettings = { showWebSearchSettings = true },
         onOpenWakeWordSettings = { showWakeWordSettings = true },
         onOpenSmartHomeSettings = { showSmartHomeSettings = true },
+        onOpenVoiceSettings = { showVoiceSettings = true },
       )
     },
   ) {
@@ -251,6 +272,7 @@ fun AssistantScreen(
           speakReplies = speakReplies,
           onModeClicked = { showModeSheet = true },
           onWebSearchClicked = { showWebSearchSettings = true },
+          onVoiceSettingsClicked = { showVoiceSettings = true },
         onWakeWordClicked = { showWakeWordSettings = true },
         onTalkClicked = { listenTurn++ },
         onManualClicked = { showManual = true },
@@ -333,6 +355,10 @@ fun AssistantScreen(
         showManual = false
         showSmartHomeSettings = true
       },
+      onOpenVoiceSettings = {
+        showManual = false
+        showVoiceSettings = true
+      },
       onDismiss = { showManual = false },
     )
   }
@@ -347,6 +373,14 @@ fun AssistantScreen(
         // derived values above recompute from it.
         webSearchRevision++
       },
+    )
+  }
+
+  if (showVoiceSettings) {
+    VoiceSettingsDialog(
+      dataStoreRepository = dataStoreRepository,
+      speaker = speaker,
+      onDismiss = { showVoiceSettings = false },
     )
   }
 
@@ -405,6 +439,7 @@ private fun AssistantModeBar(
   speakReplies: Boolean,
   onModeClicked: () -> Unit,
   onWebSearchClicked: () -> Unit,
+  onVoiceSettingsClicked: () -> Unit,
   onWakeWordClicked: () -> Unit,
   onTalkClicked: () -> Unit,
   onManualClicked: () -> Unit,
@@ -505,25 +540,15 @@ private fun AssistantModeBar(
 
     // A labelled chip rather than a bare icon. As an unlabelled speaker glyph this was the only
     // way to hear a reply and nobody found it, so the app read as having no voice output at all.
-    AssistChip(
+    // Held down, it opens the voice picker - the setting people look for the moment they have
+    // heard the default voice once.
+    LongPressChip(
+      label = stringResource(R.string.assistant_speak),
+      icon = if (speakReplies) Icons.Rounded.RecordVoiceOver else Icons.Rounded.VoiceOverOff,
+      contentDescription = stringResource(R.string.cd_assistant_speak_replies),
+      highlighted = speakReplies,
       onClick = onSpeakRepliesToggled,
-      label = { Text(stringResource(R.string.assistant_speak)) },
-      leadingIcon = {
-        Icon(
-          if (speakReplies) Icons.Rounded.RecordVoiceOver else Icons.Rounded.VoiceOverOff,
-          contentDescription = stringResource(R.string.cd_assistant_speak_replies),
-          modifier = Modifier.size(AssistChipDefaults.IconSize),
-        )
-      },
-      colors =
-        if (speakReplies) {
-          AssistChipDefaults.assistChipColors(
-            leadingIconContentColor = MaterialTheme.colorScheme.primary,
-            labelColor = MaterialTheme.colorScheme.primary,
-          )
-        } else {
-          AssistChipDefaults.assistChipColors()
-        },
+      onLongClick = onVoiceSettingsClicked,
     )
 
     if (showManualButton) {
@@ -549,6 +574,51 @@ private fun AssistantModeBar(
           modifier = Modifier.size(20.dp),
         )
       }
+    }
+  }
+}
+
+/**
+ * A chip that does one thing tapped and another held down.
+ *
+ * Material's own [AssistChip] takes a single `onClick` and handles pointer input itself, so a long
+ * press placed on it from outside never arrives - the chip has already consumed the gesture. This
+ * is the same shape drawn over a [combinedClickable] instead, which is the only way to give a chip
+ * a second, hidden action without leaving the chip row's visual language.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LongPressChip(
+  label: String,
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  contentDescription: String?,
+  highlighted: Boolean,
+  onClick: () -> Unit,
+  onLongClick: () -> Unit,
+) {
+  val contentColor =
+    if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+  Surface(
+    shape = RoundedCornerShape(8.dp),
+    color = Color.Transparent,
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    modifier =
+      Modifier.height(32.dp)
+        .clip(RoundedCornerShape(8.dp))
+        .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      Icon(
+        icon,
+        contentDescription = contentDescription,
+        tint = contentColor,
+        modifier = Modifier.size(AssistChipDefaults.IconSize),
+      )
+      Text(label, style = MaterialTheme.typography.labelLarge, color = contentColor)
     }
   }
 }

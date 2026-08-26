@@ -19,6 +19,7 @@ package com.google.ai.edge.gallery.assistant
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -39,6 +40,18 @@ class AssistantSpeaker(context: Context) {
   private var engine: TextToSpeech? = null
   private var ready = false
 
+  /**
+   * The chosen voice and speed, held here because they outlive the engine's readiness.
+   *
+   * A voice can be chosen in settings seconds after launch, while the engine is still starting -
+   * and setting a voice on an engine that is not ready is silently ignored. So the preference is
+   * remembered and applied again the moment the engine reports in, rather than being applied once
+   * and hoped for.
+   */
+  private var preferredVoiceId: String = ""
+  private var speechRate: Float = VoiceCatalog.DEFAULT_SPEED
+  private var pitch: Float = VoiceCatalog.DEFAULT_SPEED
+
   // Progress callbacks arrive on a binder thread; everything waiting on them is UI state.
   private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -48,6 +61,7 @@ class AssistantSpeaker(context: Context) {
         ready = status == TextToSpeech.SUCCESS
         if (ready) {
           engine?.language = Locale.getDefault()
+          applyPreferencesToEngine()
           engine?.setOnUtteranceProgressListener(
             object : UtteranceProgressListener() {
               override fun onStart(utteranceId: String?) {}
@@ -77,6 +91,45 @@ class AssistantSpeaker(context: Context) {
         }
       }
   }
+
+  /**
+   * Sets the voice replies are read in, and how fast and how high.
+   *
+   * Safe to call before the engine is ready and safe to call repeatedly; the last call wins.
+   */
+  fun applyPreferences(voiceId: String, rate: Float, pitch: Float) {
+    this.preferredVoiceId = voiceId
+    this.speechRate = VoiceCatalog.speedOrDefault(rate)
+    this.pitch = VoiceCatalog.speedOrDefault(pitch)
+    applyPreferencesToEngine()
+  }
+
+  private fun applyPreferencesToEngine() {
+    val currentEngine = engine ?: return
+    if (!ready) return
+    currentEngine.setSpeechRate(speechRate)
+    currentEngine.setPitch(pitch)
+    if (preferredVoiceId.isEmpty()) return
+    // A voice saved on this device can be gone after an engine update or a removed language pack.
+    // Leaving the engine on whatever it defaults to is the right answer then - the alternative is
+    // silence, and the user would have no way to tell why.
+    val match = availableVoices().firstOrNull { it.name == preferredVoiceId }
+    if (match != null) {
+      currentEngine.voice = match
+    } else {
+      Log.d(TAG, "The saved voice is no longer installed; using the engine default")
+    }
+  }
+
+  /** The voices this device can speak in, or empty when the engine is not ready or has none. */
+  fun availableVoices(): List<Voice> =
+    try {
+      engine?.takeIf { ready }?.voices?.toList().orEmpty()
+    } catch (e: Exception) {
+      // Some vendor engines throw rather than return null before they have finished loading.
+      Log.w(TAG, "Could not read the installed voices", e)
+      emptyList()
+    }
 
   /** Called when the current utterance finishes, is cancelled, or fails. Cleared after it runs. */
   private var onFinished: (() -> Unit)? = null

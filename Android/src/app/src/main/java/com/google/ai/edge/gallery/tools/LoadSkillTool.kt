@@ -30,8 +30,23 @@ class LoadSkillTool(private val skillsProvider: SkillsProvider) : ToolDefinition
   override val alwaysAllow: Boolean = true
   override var executionContext: ToolExecutionContext? = null
 
-  /** Loads skill. */
-  @Tool(description = "Loads a skill.")
+  /**
+   * Loads skill.
+   *
+   * The description matters more than it looks. It is the only thing a model sees about this tool
+   * at the point of choosing one, and "Loads a skill" gives it no reason to prefer this over
+   * answering from memory - which is exactly what happened: with the Wikipedia skill installed and
+   * listed, a request to look something up was answered from the model's own training instead.
+   * Naming the kinds of request skills cover, and saying to load before answering, is what puts
+   * this tool in the running at all.
+   */
+  @Tool(
+    description =
+      "Load the instructions for one of the skills listed in your system instructions. Call this " +
+        "BEFORE answering anything a skill covers - looking a fact up, Wikipedia, calendars, " +
+        "email, QR codes, maps, reminders by notification. Pass the skill's exact name from that " +
+        "list."
+  )
   fun loadSkill(
     @ToolParam(description = "The name of the skill to load.") skillName: String
   ): Map<String, String> {

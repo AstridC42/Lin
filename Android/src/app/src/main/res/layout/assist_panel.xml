@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The assistant's pop-up, shown over whatever app is in front when the power button is held.
+
+  Plain views rather than Compose. A voice interaction session is not a lifecycle owner, so a
+  ComposeView here needs a hand-written lifecycle, saved-state and view-model owner shim attached to
+  the root before it will render at all - and if any of that is wrong the failure lands on the one
+  surface that has to work when the phone is locked, in a car mount, or in a pocket. Views need
+  none of it.
+
+  Sits at the bottom of the screen for the same reason a keyboard does: it is where a thumb already
+  is, and it leaves the app underneath visible, which is the whole point of not opening full screen.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#66000000">
+
+    <LinearLayout
+        android:id="@+id/assist_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_margin="12dp"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:background="@drawable/assist_panel_background"
+        android:elevation="8dp">
+
+        <TextView
+            android:id="@+id/assist_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.05"
+            android:textAllCaps="true"
+            android:textColor="?android:attr/textColorSecondary"
+            android:text="@string/assist_panel_listening" />
+
+        <TextView
+            android:id="@+id/assist_heard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textSize="20sp"
+            android:lineSpacingMultiplier="1.15"
+            android:textColor="?android:attr/textColorPrimary"
+            android:text="@string/assist_panel_prompt" />
+
+        <ScrollView
+            android:id="@+id/assist_reply_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:maxHeight="220dp"
+            android:visibility="gone"
+            android:scrollbars="none">
+
+            <TextView
+                android:id="@+id/assist_reply"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:lineSpacingMultiplier="1.2"
+                android:textColor="?android:attr/textColorPrimary" />
+        </ScrollView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <Button
+                android:id="@+id/assist_again"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/assist_panel_again" />
+
+            <Button
+                android:id="@+id/assist_open"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/assist_panel_open" />
+
+            <Button
+                android:id="@+id/assist_close"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/assist_panel_close" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
