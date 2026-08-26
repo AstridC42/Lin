@@ -31,6 +31,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -90,6 +91,7 @@ fun VoiceSettingsDialog(
       )
   }
 
+  var popupEnabled by remember { mutableStateOf(!stored.assistPopupDisabled) }
   var selectedId by remember { mutableStateOf(stored.ttsVoiceName) }
   var rate by remember { mutableFloatStateOf(VoiceCatalog.speedOrDefault(stored.ttsSpeechRate)) }
   var pitch by remember { mutableFloatStateOf(VoiceCatalog.speedOrDefault(stored.ttsPitch)) }
@@ -164,6 +166,27 @@ fun VoiceSettingsDialog(
         TextButton(onClick = { preview() }, modifier = Modifier.fillMaxWidth()) {
           Text(stringResource(R.string.voice_settings_try))
         }
+
+        // Lives here rather than with the wake word because it is about what happens after the
+        // assistant is summoned, not about what summons it.
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(
+              stringResource(R.string.voice_settings_popup),
+              style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+              stringResource(R.string.voice_settings_popup_detail),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(checked = popupEnabled, onCheckedChange = { popupEnabled = it })
+        }
       }
     },
     confirmButton = {
@@ -176,6 +199,7 @@ fun VoiceSettingsDialog(
               .setTtsVoiceName(selectedId)
               .setTtsSpeechRate(rate)
               .setTtsPitch(pitch)
+              .setAssistPopupDisabled(!popupEnabled)
               .build()
           )
           speaker.stop()

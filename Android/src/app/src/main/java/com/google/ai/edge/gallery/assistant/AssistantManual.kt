@@ -218,6 +218,8 @@ private fun manualSections(): List<ManualSection> = listOf(
       stringResource(R.string.manual_voice_speak),
       stringResource(R.string.manual_voice_handsfree),
       stringResource(R.string.manual_voice_wake),
+      stringResource(R.string.manual_voice_popup),
+      stringResource(R.string.manual_voice_choose),
     ),
   ),
   ManualSection(
