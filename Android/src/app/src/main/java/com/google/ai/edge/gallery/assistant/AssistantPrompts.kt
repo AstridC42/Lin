@@ -209,8 +209,8 @@ object AssistantPrompts {
        first, then follow the instructions it returns. Looking things up, calendars, email, QR
        codes, maps and calculations are almost always skills. Read the list before saying you
        cannot do something, and before answering from memory.
-    2. PHONE - calls, texts, alarms, reminders, apps, directions, torch, settings, notifications,
-       and anything playing. Use the matching tool.
+    2. PHONE - calls, texts, alarms, reminders, apps, directions, weather, torch, settings,
+       notifications, and anything playing. Use the matching tool.
     3. ANSWER - only if nothing above fits. Say so when unsure rather than inventing detail.
     Never claim you are unable to do something before checking 1 and 2.
     """

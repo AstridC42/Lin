@@ -458,6 +458,7 @@ private fun AssistantEmptyStateHeadline(
     )
 
     val suggestions = buildList {
+      add(stringResource(R.string.assistant_suggestion_weather))
       add(stringResource(R.string.assistant_suggestion_missed))
       add(stringResource(R.string.assistant_suggestion_lookup))
       add(stringResource(R.string.assistant_suggestion_remind))

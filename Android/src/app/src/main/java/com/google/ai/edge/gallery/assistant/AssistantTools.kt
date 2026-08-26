@@ -30,6 +30,7 @@ import com.google.ai.edge.gallery.tools.NotificationsTool
 import com.google.ai.edge.gallery.tools.RemindersTool
 import com.google.ai.edge.gallery.tools.SmartHomeTool
 import com.google.ai.edge.gallery.tools.ToolDefinition
+import com.google.ai.edge.gallery.tools.WeatherTool
 import com.google.ai.edge.gallery.tools.WebSearchSetupTool
 import com.google.ai.edge.gallery.tools.WebSearchTool
 
@@ -78,6 +79,8 @@ class AssistantTools(
 
   private val smartHomeTool by lazy { SmartHomeTool(client = homeAssistantClient) }
 
+  private val weatherTool by lazy { WeatherTool(context = context) }
+
   private val remindersTool by lazy {
     RemindersTool(context = context, repository = settingsRepository)
   }
@@ -97,6 +100,10 @@ class AssistantTools(
     }
     tools.add(mediaControlTool)
     tools.add(remindersTool)
+    // Needs nothing configured, unlike web search - which is the point of it being here. Before
+    // this, the most-asked question an assistant gets could only be answered on a phone whose
+    // owner had set up a self-hosted metasearch instance.
+    tools.add(weatherTool)
     // One or the other, never both - they answer to the same name. The stand-in exists so that
     // "search the web" reaches something that can explain the missing address, rather than falling
     // through to an answer from memory that looks like a search.

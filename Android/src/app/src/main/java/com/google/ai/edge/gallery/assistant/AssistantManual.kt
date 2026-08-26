@@ -16,14 +16,18 @@
 
 package com.google.ai.edge.gallery.assistant
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -34,11 +38,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,10 +55,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.notifications.StarNotificationListener
 import com.google.ai.edge.gallery.voice.AssistantRole
@@ -93,6 +98,16 @@ fun AssistantManual(
   var notificationsGranted by remember {
     mutableStateOf(StarNotificationListener.isGranted(context))
   }
+  var locationGranted by remember {
+    mutableStateOf(
+      ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
+    )
+  }
+  val locationLauncher =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      locationGranted = granted
+    }
   val lifecycleOwner = LocalLifecycleOwner.current
   DisposableEffect(lifecycleOwner) {
     val observer = LifecycleEventObserver { _, event ->
@@ -152,6 +167,17 @@ fun AssistantManual(
         // Android does not let an app request notification access in a dialog, so the only way
         // to offer it is a button into system settings. Gone once granted, so the panel does not
         // nag about something already done.
+        // A runtime permission, so unlike notification access it can be asked for right here.
+        // Offered rather than demanded: the weather still works for any town named out loud, and
+        // only "what is the weather" with no place needs to know where the phone is.
+        if (!locationGranted) {
+          OutlinedButton(
+            onClick = { locationLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(stringResource(R.string.manual_grant_location))
+          }
+        }
         if (!notificationsGranted) {
           OutlinedButton(
             onClick = {
@@ -248,6 +274,10 @@ private fun manualSections(): List<ManualSection> = listOf(
   ManualSection(
     stringResource(R.string.manual_reminders_title),
     listOf(stringResource(R.string.manual_reminders_body)),
+  ),
+  ManualSection(
+    stringResource(R.string.manual_weather_title),
+    listOf(stringResource(R.string.manual_weather_body)),
   ),
   ManualSection(
     stringResource(R.string.manual_web_title),

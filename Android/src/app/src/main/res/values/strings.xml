@@ -816,6 +816,7 @@
   <!-- Content description of the spoken replies toggle. [CHAR_LIMIT=40] -->
   <string name="cd_assistant_speak_replies" translatable="true" description="Content description of the spoken replies toggle. [CHAR_LIMIT=40]">Read replies out loud</string>
   <!-- Title shown on the empty assistant screen. [CHAR_LIMIT=40] -->
+  <string name="assistant_suggestion_weather" translatable="true" description="Suggested opening question about the weather. [CHAR_LIMIT=40]">What is the weather like?</string>
   <string name="assistant_suggestion_missed" translatable="true" description="Suggested opening question about notifications. [CHAR_LIMIT=40]">What did I miss?</string>
   <string name="assistant_suggestion_remind" translatable="true" description="Suggested opening question setting a reminder. [CHAR_LIMIT=50]">Remind me in 20 minutes to stretch</string>
   <string name="assistant_suggestion_lookup" translatable="true" description="Suggested opening question that uses a skill. [CHAR_LIMIT=50]">Look up the Eiffel Tower on Wikipedia</string>
@@ -945,6 +946,9 @@
   <string name="assistant_speak" translatable="true" description="Chip that toggles spoken replies. [CHAR_LIMIT=15]">Speak</string>
   <string name="assistant_manual" translatable="true" description="Chip that opens the manual on a phone. [CHAR_LIMIT=15]">Guide</string>
   <string name="manual_grant_notifications" translatable="true" description="Button that opens notification access settings. [CHAR_LIMIT=40]">Allow reading notifications</string>
+  <string name="manual_grant_location" translatable="true" description="Button that asks for approximate location. [CHAR_LIMIT=60]">Allow location for weather</string>
+  <string name="manual_weather_title" translatable="true" description="Manual section title for weather. [CHAR_LIMIT=30]">Weather</string>
+  <string name="manual_weather_body" translatable="true" description="Manual section body for weather. [CHAR_LIMIT=300]">Ask what the weather is doing, whether it will rain, or what the week looks like. Name a town for anywhere else. It needs nothing set up: forecasts come from Open-Meteo, which asks for no account and no key. Allowing approximate location lets you leave the town out.</string>
   <string name="manual_notifications_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Notifications and media</string>
   <string name="manual_notifications_body" translatable="true" description="Explains notification access. [CHAR_LIMIT=400]">Ask what you missed, have messages read out, reply, dismiss. Needs notification access, which Android only grants from system settings \u2014 and which lets it see every notification on the phone.</string>
   <string name="manual_media_body" translatable="true" description="Explains media control. [CHAR_LIMIT=250]">Play, pause, skip and volume for whatever is playing. Android puts this behind the same notification access.</string>
