@@ -28,6 +28,7 @@ import com.google.ai.edge.gallery.tools.NotificationsTool
 import com.google.ai.edge.gallery.tools.RemindersTool
 import com.google.ai.edge.gallery.tools.SmartHomeTool
 import com.google.ai.edge.gallery.tools.ToolDefinition
+import com.google.ai.edge.gallery.tools.WebSearchSetupTool
 import com.google.ai.edge.gallery.tools.WebSearchTool
 
 /**
@@ -58,6 +59,8 @@ class AssistantTools(
     )
   }
 
+  private val webSearchSetupTool by lazy { WebSearchSetupTool() }
+
   private val deviceActionsTool by lazy {
     DeviceActionsTool(
       context = context,
@@ -85,8 +88,13 @@ class AssistantTools(
     tools.add(notificationsTool)
     tools.add(mediaControlTool)
     tools.add(remindersTool)
+    // One or the other, never both - they answer to the same name. The stand-in exists so that
+    // "search the web" reaches something that can explain the missing address, rather than falling
+    // through to an answer from memory that looks like a search.
     if (searxngClient.isConfigured()) {
       tools.add(webSearchTool)
+    } else {
+      tools.add(webSearchSetupTool)
     }
     // Only when an instance is set up, for the same reason as web search: a model told about a
     // tool that can only fail will keep reaching for it and reporting the failure as a result.
