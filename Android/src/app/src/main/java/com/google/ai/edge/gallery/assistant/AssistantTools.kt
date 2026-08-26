@@ -20,6 +20,8 @@ import com.google.ai.edge.gallery.customtasks.agentchat.AgentToolsImpl
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
+import com.google.ai.edge.gallery.tools.CallJsSkillResultImage
+import com.google.ai.edge.gallery.tools.CallJsSkillResultWebview
 import com.google.ai.edge.gallery.tools.DeviceActionsTool
 import com.google.ai.edge.gallery.tools.MediaControlTool
 import com.google.ai.edge.gallery.tools.NotificationsTool
@@ -45,7 +47,16 @@ class AssistantTools(
   private val settingsRepository: DataStoreRepository,
 ) : AgentToolsImpl() {
 
-  private val webSearchTool by lazy { WebSearchTool(searxngClient = searxngClient) }
+  private val webSearchTool by lazy {
+    WebSearchTool(
+      searxngClient = searxngClient,
+      showImageInChat = { base64 -> resultImageToShow = CallJsSkillResultImage(base64 = base64) },
+      showPageInChat = { url ->
+        resultWebviewToShow =
+          CallJsSkillResultWebview(url = url, iframe = false, aspectRatio = DEFAULT_PAGE_ASPECT)
+      },
+    )
+  }
 
   private val deviceActionsTool by lazy {
     DeviceActionsTool(
@@ -83,5 +94,10 @@ class AssistantTools(
       tools.add(smartHomeTool)
     }
     return tools
+  }
+
+  private companion object {
+    /** Taller than wide: a page read inside a chat bubble is mostly text running downwards. */
+    const val DEFAULT_PAGE_ASPECT = 0.75f
   }
 }
