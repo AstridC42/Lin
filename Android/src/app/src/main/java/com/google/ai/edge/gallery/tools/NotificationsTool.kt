@@ -45,9 +45,7 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
 
   @Tool(
     description =
-      "Read the notifications currently in the phone's notification shade. Use this for " +
-        "\"what did I miss\", \"any messages\", \"read my notifications\", or before replying to " +
-        "or dismissing one."
+      "Read the phone's notifications. Use for \"what did I miss\", \"any messages\", and before replying to or dismissing one."
   )
   fun readNotifications(
     @ToolParam(
@@ -95,9 +93,7 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
 
   @Tool(
     description =
-      "Send a reply to a notification that supports replying, such as a message. This SENDS the " +
-        "message immediately - there is no composer to review it in, so read the wording back to " +
-        "the user and get their agreement before calling this."
+      "Reply to a message notification. SENDS immediately with no composer, so read the wording back and get agreement first."
   )
   fun replyToNotification(
     @ToolParam(description = "The notification id from readNotifications.") id: String,
@@ -155,7 +151,7 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
 
   @Tool(
     description =
-      "Press one of a notification's buttons by its label, for example 'Mark as read' or 'Snooze'."
+      "Press a notification button by its label, e.g. Snooze."
   )
   fun pressNotificationButton(
     @ToolParam(description = "The notification id from readNotifications.") id: String,
@@ -224,16 +220,25 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
 
   companion object {
     /** Enough to answer "what did I miss" without burying the model in a hundred rows. */
-    private const val MAX_NOTIFICATIONS = 25
+    private const val MAX_NOTIFICATIONS = 8
 
     private val TIME_FORMAT = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+    /**
+     * How much of one notification's body is worth handing to the model.
+     *
+     * An expanded message, an email or a news notification can run to hundreds of words. Eight of
+     * those at full length is more than the whole token budget, and the answer the user wants -
+     * who it is from and roughly what it says - needs only the opening.
+     */
+    private const val MAX_TEXT_CHARS = 240
 
     internal fun NotificationSummary.toMap(): Map<String, Any> =
       mapOf(
         "id" to key,
         "app" to appName,
-        "title" to title,
-        "text" to text,
+        "title" to title.take(MAX_TEXT_CHARS),
+        "text" to text.take(MAX_TEXT_CHARS),
         "time" to TIME_FORMAT.format(Date(postedAtMillis)),
         "can_reply" to canReply,
         "can_dismiss" to isClearable,
