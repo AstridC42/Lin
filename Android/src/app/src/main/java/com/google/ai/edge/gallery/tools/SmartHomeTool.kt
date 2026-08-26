@@ -42,9 +42,7 @@ class SmartHomeTool(private val client: HomeAssistantClient) : ToolDefinition {
 
   @Tool(
     description =
-      "List the smart home devices that can be controlled - lights, switches, locks, blinds, " +
-        "thermostats, scenes. Call this before turning anything on or off, to get the exact " +
-        "device id."
+      "List controllable smart home devices. Call first to get exact device ids."
   )
   fun listSmartHomeDevices(
     @ToolParam(description = "Optional name to filter by, for example 'kitchen'. Empty for all.")
@@ -88,8 +86,7 @@ class SmartHomeTool(private val client: HomeAssistantClient) : ToolDefinition {
 
   @Tool(
     description =
-      "Turn a smart home device on or off, or open and close it. Works for lights, switches, " +
-        "fans, blinds, locks, scenes and scripts."
+      "Turn a smart home device on or off, or open/close it."
   )
   fun setSmartHomeDevice(
     @ToolParam(description = "The device id from listSmartHomeDevices, for example light.kitchen.")
@@ -116,8 +113,7 @@ class SmartHomeTool(private val client: HomeAssistantClient) : ToolDefinition {
 
   @Tool(
     description =
-      "Set a light's brightness, or a thermostat's target temperature. Use listSmartHomeDevices " +
-        "first to get the device id."
+      "Set a light brightness, fan speed, blind position or target temperature."
   )
   fun setSmartHomeLevel(
     @ToolParam(description = "The device id, for example light.kitchen.") deviceId: String,
@@ -175,6 +171,6 @@ class SmartHomeTool(private val client: HomeAssistantClient) : ToolDefinition {
 
   companion object {
     /** Enough for a large house without flooding the model's context. */
-    private const val MAX_DEVICES = 60
+    private const val MAX_DEVICES = 25
   }
 }
