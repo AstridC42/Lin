@@ -169,6 +169,30 @@ message AssistantSettings {
 
   // The phrase that summons the assistant. Empty means the default.
   string wake_word_phrase = 8;
+
+  // Name of the text-to-speech voice replies are read in, as reported by the
+  // platform engine. Empty means whatever the engine picks for the current
+  // language, which is what happened before a voice could be chosen.
+  //
+  // Stored by name rather than by index: the list a device reports is not
+  // stable across engine updates or a change of installed language packs, so
+  // an index saved today can be a different voice tomorrow.
+  string tts_voice_name = 9;
+
+  // Speaking rate, as a multiplier. 0 means the engine default (1.0).
+  float tts_speech_rate = 10;
+
+  // Pitch, as a multiplier. 0 means the engine default (1.0).
+  float tts_pitch = 11;
+
+  // When set, holding the power button opens the full chat screen instead of
+  // the pop-up panel.
+  //
+  // Phrased as the negative so that the default - an unset proto bool, which
+  // is false - is the pop-up. Someone who has just made this their assistant
+  // expects it to behave like the one it replaced, and taking over the whole
+  // screen to answer "what time is it" is the thing that behaviour is not.
+  bool assist_popup_disabled = 12;
 }
 
 // A reminder the assistant will deliver at a set time.

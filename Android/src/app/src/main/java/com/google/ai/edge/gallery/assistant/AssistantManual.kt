@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -80,6 +82,7 @@ fun AssistantManual(
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
   onOpenSmartHomeSettings: () -> Unit,
+  onOpenVoiceSettings: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
@@ -159,7 +162,12 @@ fun AssistantManual(
             Text(stringResource(R.string.manual_grant_notifications))
           }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Wraps rather than scrolls: on a phone in portrait these do not fit on one line, and a
+        // settings button that is simply off the edge of the panel is a setting nobody finds.
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
           OutlinedButton(onClick = onOpenWebSearchSettings) {
             Text(stringResource(R.string.web_search_settings_title))
           }
@@ -168,6 +176,9 @@ fun AssistantManual(
           }
           OutlinedButton(onClick = onOpenSmartHomeSettings) {
             Text(stringResource(R.string.smart_home_short))
+          }
+          OutlinedButton(onClick = onOpenVoiceSettings) {
+            Text(stringResource(R.string.voice_settings_title))
           }
         }
       }
@@ -207,6 +218,8 @@ private fun manualSections(): List<ManualSection> = listOf(
       stringResource(R.string.manual_voice_speak),
       stringResource(R.string.manual_voice_handsfree),
       stringResource(R.string.manual_voice_wake),
+      stringResource(R.string.manual_voice_popup),
+      stringResource(R.string.manual_voice_choose),
     ),
   ),
   ManualSection(
@@ -253,6 +266,7 @@ fun AssistantManualPane(
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
   onOpenSmartHomeSettings: () -> Unit,
+  onOpenVoiceSettings: () -> Unit,
 ) {
   Surface(
     modifier = Modifier.width(MANUAL_PANEL_WIDTH).fillMaxHeight(),
@@ -263,6 +277,7 @@ fun AssistantManualPane(
       onOpenWebSearchSettings = onOpenWebSearchSettings,
       onOpenWakeWordSettings = onOpenWakeWordSettings,
       onOpenSmartHomeSettings = onOpenSmartHomeSettings,
+      onOpenVoiceSettings = onOpenVoiceSettings,
       modifier = Modifier.fillMaxHeight(),
     )
   }
@@ -301,6 +316,7 @@ fun AssistantManualSheet(
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
   onOpenSmartHomeSettings: () -> Unit,
+  onOpenVoiceSettings: () -> Unit,
   onDismiss: () -> Unit,
 ) {
   ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -309,6 +325,7 @@ fun AssistantManualSheet(
       onOpenWebSearchSettings = onOpenWebSearchSettings,
       onOpenWakeWordSettings = onOpenWakeWordSettings,
       onOpenSmartHomeSettings = onOpenSmartHomeSettings,
+      onOpenVoiceSettings = onOpenVoiceSettings,
     )
   }
 }

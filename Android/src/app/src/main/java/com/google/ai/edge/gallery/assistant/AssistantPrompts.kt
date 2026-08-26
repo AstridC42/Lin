@@ -152,6 +152,11 @@ object AssistantPrompts {
     appendLine()
     appendLine(ROUTING.trimIndent())
     appendLine()
+    // Directly under the routing step that names it. A small model reads the top of its prompt and
+    // acts; a skill list three sections further down is a list it has stopped looking for.
+    appendLine(SKILLS_HEADING)
+    appendLine(SKILLS_PLACEHOLDER)
+    appendLine()
     if (webSearchEnabled) {
       appendLine(
         "WEB: webSearch(query), then openWebPage(url) for detail, via ${
@@ -170,9 +175,6 @@ object AssistantPrompts {
       )
       appendLine()
     }
-    appendLine(SKILLS_HEADING)
-    appendLine(SKILLS_PLACEHOLDER)
-    appendLine()
     if (hasMcpTools) {
       appendLine("MCP TOOLS: call with runMcpTool(toolName, input), using the exact name.")
       appendLine(TOOLS_PLACEHOLDER)
@@ -203,9 +205,10 @@ object AssistantPrompts {
   private const val ROUTING =
     """
     For EVERY request, take the first of these that applies, silently:
-    1. SKILL - if anything in the SKILLS list covers it, call load_skill(name) and follow it.
-       Looking things up, calendars, email, QR codes, maps and calculations are almost always
-       skills. Check the list before saying you cannot do something.
+    1. SKILL - if anything in the SKILLS list below covers it, make that exact load_skill call
+       first, then follow the instructions it returns. Looking things up, calendars, email, QR
+       codes, maps and calculations are almost always skills. Read the list before saying you
+       cannot do something, and before answering from memory.
     2. PHONE - calls, texts, alarms, reminders, apps, directions, torch, settings, notifications,
        and anything playing. Use the matching tool.
     3. ANSWER - only if nothing above fits. Say so when unsure rather than inventing detail.
@@ -213,7 +216,7 @@ object AssistantPrompts {
     """
 
   private const val SKILLS_HEADING =
-    "SKILLS - load with load_skill(name), then follow the instructions exactly:"
+    "SKILLS - make the call shown, then follow the instructions it returns exactly:"
 
   private const val HOUSE_RULES =
     """
