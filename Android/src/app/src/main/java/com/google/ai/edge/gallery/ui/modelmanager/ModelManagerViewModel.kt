@@ -106,6 +106,40 @@ private const val BUNDLED_MODEL_ALLOWLIST_ASSET = "model_allowlist.json"
 
 private const val TEST_MODEL_ALLOW_LIST = ""
 
+/**
+ * Smallest file that could plausibly be a model.
+ *
+ * A gated download whose token has expired saves the HTML error page under the model's own
+ * filename, and an interrupted one leaves a fragment. Both are kilobytes; every model this app
+ * runs is hundreds of megabytes.
+ */
+private const val MIN_PLAUSIBLE_MODEL_BYTES = 1_000_000L
+
+/**
+ * How much of the stated size has to be present.
+ *
+ * Tolerant on purpose: the allowlist's size can lag the file it describes, and a complete model
+ * wrongly judged incomplete would be downloaded again forever - a worse failure than the one being
+ * prevented.
+ */
+private const val MIN_COMPLETE_FRACTION = 0.9
+
+/**
+ * Whether a file of [actualBytes] is plausibly a complete model of [expectedBytes].
+ *
+ * Both directions of error matter and they are not symmetric. Accepting a bad file hands the
+ * engine something it cannot parse - "Failed to load model from buffer", with no way for the user
+ * to know that re-downloading is the answer. Rejecting a good one deletes and re-downloads
+ * gigabytes, over and over. So the bar is low: reject only what obviously cannot be a model.
+ *
+ * An [expectedBytes] of zero or less means the allowlist did not say, and only the floor applies.
+ */
+internal fun modelFileLooksComplete(actualBytes: Long, expectedBytes: Long): Boolean {
+  if (actualBytes < MIN_PLAUSIBLE_MODEL_BYTES) return false
+  if (expectedBytes <= 0L) return true
+  return actualBytes >= expectedBytes * MIN_COMPLETE_FRACTION
+}
+
 data class ModelInitializationStatus(
   val status: ModelInitializationStatusType,
   var error: String = "",
@@ -1504,6 +1538,34 @@ constructor(
     )
   }
 
+  /**
+   * Whether a present file is plausibly the whole model.
+   *
+   * Deliberately tolerant. The expected size comes from the allowlist, which can lag behind the
+   * file it describes, and a model wrongly judged incomplete would be deleted and downloaded again
+   * forever - which is worse than the problem being solved. So this only rejects a file that is
+   * *obviously* not a model: far below the stated size, or small enough that it cannot be one at
+   * all.
+   */
+  private fun fileLooksComplete(file: File, model: Model): Boolean {
+    val actual = try {
+      file.length()
+    } catch (e: Exception) {
+      Log.w(TAG, "Could not measure ${file.name}", e)
+      return true
+    }
+
+    val complete = modelFileLooksComplete(actualBytes = actual, expectedBytes = model.totalBytes)
+    if (!complete) {
+      Log.w(
+        TAG,
+        "${model.name}: ${file.name} is $actual bytes of an expected ${model.totalBytes}; " +
+          "treating as not downloaded",
+      )
+    }
+    return complete
+  }
+
   private fun isFileInExternalFilesDir(fileName: String): Boolean {
     if (externalFilesDir != null) {
       val file = File(externalFilesDir, fileName)
@@ -1607,10 +1669,19 @@ constructor(
       } else {
         listOf(model.normalizedName, version, fileName).joinToString(File.separator)
       }
+    // A file that is present but far smaller than it should be is not a downloaded model. An
+    // interrupted download leaves a truncated file, and a gated model whose token has gone leaves
+    // an HTML error page saved under the model's own name - both of which existed, so both counted
+    // as downloaded, and the engine was handed them and reported
+    // "Failed to load model from buffer" with nothing to act on.
+    //
+    // Treating those as not-downloaded is what turns an unusable app into an offer to download
+    // again.
     val downloadedFileExists =
       fileName.isNotEmpty() &&
         ((model.localModelFilePathOverride.isEmpty() &&
-          isFileInExternalFilesDir(modelRelativePath)) ||
+          isFileInExternalFilesDir(modelRelativePath) &&
+          fileLooksComplete(File(externalFilesDir, modelRelativePath), model)) ||
           (model.localModelFilePathOverride.isNotEmpty() &&
             File(model.localModelFilePathOverride).exists()))
 
