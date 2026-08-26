@@ -35,10 +35,12 @@ class AssistantPromptsTest {
     assertTrue(withSearch.contains("searx.example.org"))
     assertTrue(withSearch.contains("webSearch(query"))
 
+    // With no instance the section is left out entirely rather than described and disclaimed.
+    // Explaining a tool the model cannot call costs tokens the session does not have to spare.
     val withoutSearch =
       AssistantPrompts.build(mode = AssistantMode.AUTO, hasMcpTools = false, webSearchEnabled = false)
-    assertTrue(withoutSearch.contains("Web search is not set up"))
     assertFalse(withoutSearch.contains("webSearch(query"))
+    assertFalse(withoutSearch.contains("searx.example.org"))
   }
 
   @Test
@@ -192,22 +194,19 @@ class AssistantPromptsTest {
         webSearchEnabled = false,
       )
 
-    val routing = prompt.indexOf("WHAT TO DO WITH EVERY MESSAGE")
-    val skills = prompt.indexOf("SKILLS")
+    val routing = prompt.indexOf("For EVERY request")
+    val skills = prompt.indexOf(AssistantPrompts.SKILLS_PLACEHOLDER)
     assertTrue("the routing procedure must be present", routing >= 0)
     assertTrue("the skills list must be present", skills >= 0)
 
-    // The routing procedure comes before the capability descriptions.
-    assertTrue(
-      "routing must come before the capability list",
-      routing < prompt.indexOf("=== WHAT YOU CAN DO ==="),
-    )
+    // The routing procedure comes before the skill list it refers to.
+    assertTrue("routing must come before the skills list", routing < skills)
 
     // Within the routing procedure, loading a skill is ordered before answering from memory.
     val loadSkill = prompt.indexOf("load_skill", routing)
-    val answerDirectly = prompt.indexOf("ANSWER DIRECTLY", routing)
+    val answerDirectly = prompt.indexOf("3. ANSWER", routing)
     assertTrue("load_skill must be mentioned in the routing procedure", loadSkill >= 0)
-    assertTrue("answering directly must be the last step", answerDirectly > loadSkill)
+    assertTrue("answering from memory must be the last step", answerDirectly > loadSkill)
   }
 
   /** The mode block is appended last, so it must not reopen what the routing closed. */

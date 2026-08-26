@@ -93,63 +93,12 @@ object AssistantPrompts {
     return "$MARKER_PREFIX${fingerprintOf(body)}$MARKER_SUFFIX\n$body"
   }
 
-  private fun buildBody(
-    mode: AssistantMode,
-    hasMcpTools: Boolean,
-    webSearchEnabled: Boolean,
-    webSearchInstance: String,
-    smartHomeEnabled: Boolean,
-  ): String = buildString {
-    appendLine(PERSONA.trimIndent())
-    appendLine()
-    appendLine(ROUTING.trimIndent())
-    appendLine()
-    appendLine("=== WHAT YOU CAN DO ===")
-    appendLine()
-    appendLine(CAPABILITY_MEDIA.trimIndent())
-    appendLine()
-    if (webSearchEnabled) {
-      appendLine(
-        CAPABILITY_WEB.trimIndent()
-          .replace(
-            "___INSTANCE___",
-            webSearchInstance.ifBlank { "the instance configured by the user" },
-          )
-      )
-    } else {
-      appendLine(CAPABILITY_WEB_DISABLED.trimIndent())
-    }
-    appendLine()
-    appendLine(CAPABILITY_DEVICE.trimIndent())
-    appendLine()
-    appendLine(CAPABILITY_NOTIFICATIONS.trimIndent())
-    appendLine()
-    if (smartHomeEnabled) {
-      appendLine(CAPABILITY_SMART_HOME.trimIndent())
-      appendLine()
-    }
-    appendLine(CAPABILITY_SKILLS.trimIndent())
-    appendLine(SKILLS_PLACEHOLDER)
-    appendLine()
-    if (hasMcpTools) {
-      appendLine(CAPABILITY_MCP.trimIndent())
-      appendLine(TOOLS_PLACEHOLDER)
-      appendLine()
-    }
-    appendLine("=== HOUSE RULES ===")
-    appendLine()
-    appendLine(HOUSE_RULES.trimIndent())
-    appendLine()
-    appendLine(MODE_HEADING)
-    appendLine()
-    append(mode.promptFragment.trimIndent())
-  }
-
   /**
    * Returns the prompt to actually use.
    *
-   * A prompt the user edited by hand wins over the generated one; the mode block is still appended
-   * so switching modes keeps working on a customised prompt.
+   * A prompt the user has edited by hand is theirs: only the mode block at the end is replaced, so
+   * switching mode does not throw away their wording. A generated one is rebuilt from scratch, so
+   * turning web search or smart home on adds its section.
    */
   fun resolve(
     currentPrompt: String,
@@ -180,158 +129,100 @@ object AssistantPrompts {
       }
     }
 
+  /**
+   * The prompt body.
+   *
+   * Kept short on purpose, and measured. An earlier version ran to roughly 1,800 tokens before the
+   * skill list was even substituted in. With ~1,300 tokens of tool descriptions alongside it, a
+   * model whose whole budget is 4,000 had almost nothing left for the conversation, and the first
+   * tool result that returned a list pushed it over - which is what "problem with the default max
+   * tokens" and the crash on any phone action were.
+   *
+   * So every section here earns its place, and a section for a capability that is switched off is
+   * left out entirely rather than described and then disclaimed.
+   */
+  private fun buildBody(
+    mode: AssistantMode,
+    hasMcpTools: Boolean,
+    webSearchEnabled: Boolean,
+    webSearchInstance: String,
+    smartHomeEnabled: Boolean,
+  ): String = buildString {
+    appendLine(PERSONA.trimIndent())
+    appendLine()
+    appendLine(ROUTING.trimIndent())
+    appendLine()
+    if (webSearchEnabled) {
+      appendLine(
+        "WEB: webSearch(query) then openWebPage(url) for detail, via ${
+          webSearchInstance.ifBlank { "the user's SearXNG instance" }
+        }. Cite the URLs used. Never present a guess as a search result."
+      )
+      appendLine()
+    }
+    if (smartHomeEnabled) {
+      appendLine(
+        "HOME: listSmartHomeDevices(filter) for exact ids, then setSmartHomeDevice(id, on) or " +
+          "setSmartHomeLevel(id, level). Ask which one if a name is ambiguous - turning off the " +
+          "wrong thing in someone's house is not a small mistake."
+      )
+      appendLine()
+    }
+    appendLine(SKILLS_HEADING)
+    appendLine(SKILLS_PLACEHOLDER)
+    appendLine()
+    if (hasMcpTools) {
+      appendLine("MCP TOOLS: call with runMcpTool(toolName, input), using the exact name.")
+      appendLine(TOOLS_PLACEHOLDER)
+      appendLine()
+    }
+    appendLine(HOUSE_RULES.trimIndent())
+    appendLine()
+    appendLine(MODE_HEADING)
+    appendLine()
+    append(mode.promptFragment.trimIndent())
+  }
+
   private const val PERSONA =
     """
-    You are Star Storyteller, the user's personal assistant. You run entirely on their phone, so
-    everything they say to you stays on the device unless a tool you call has to reach the network.
-
-    You are their day-to-day assistant, not a demo: you answer questions, look at what they send
-    you, and get things done on the phone. Be brief and concrete. Two or three sentences is usually
-    the right length for a spoken-style answer; use a short list only when the content is a list.
+    You are Star Storyteller, the user's assistant. You run on their phone. Be brief and concrete -
+    two or three sentences unless the answer is genuinely a list.
     """
 
   /**
-   * The routing procedure, and the reason it is written the way it is.
+   * The routing procedure.
    *
-   * This has to come before anything else in the prompt, in this imperative numbered form, because
-   * a 2B model follows the top of its prompt and stops reading for intent. An earlier version led
-   * with "answer directly from what you know; say so when you are not sure", and the model obeyed
-   * it perfectly: asked to check Wikipedia, with a query-wikipedia skill loaded and its tools
-   * registered, it replied that it could not check Wikipedia. Nothing was wrong with the wiring.
-   * It had been told to answer from memory and to admit ignorance, so it did.
-   *
-   * Upstream's agent prompt is this blunt for the same reason. Answering from memory is the last
-   * step here, not the first.
+   * Written as an ordered list of imperatives because a small model follows the top of its prompt
+   * and stops reading for intent. An earlier version led with "answer from what you know", and the
+   * model did exactly that: asked to check Wikipedia, with the skill installed and its tools
+   * registered, it answered that it could not. Answering from memory is the last step, not the
+   * first.
    */
   private const val ROUTING =
     """
-    === WHAT TO DO WITH EVERY MESSAGE ===
-
-    For EVERY request, work through these in order and stop at the first one that applies. Do this
-    silently: no commentary about which step you are on.
-
-    1. SKILL. Look at the SKILLS list below. If any skill covers the request, call
-       load_skill with its name and follow its instructions exactly. Anything involving looking
-       something up, a calculation, a calendar, email, QR codes or maps is very likely a skill.
-       Check the list before you decide you cannot do something.
-    2. MCP TOOL. If an MCP TOOLS list is present and one of those tools fits, call it with
-       runMcpTool.
-    3. DEVICE ACTION. If the request is about the phone itself - calling, texting, alarms, timers,
-       opening an app, directions, the torch, settings - use the matching device action below.
-       Notifications ("what did I miss", "read my messages", "reply to...") and anything playing
-       ("pause", "next track", "what song is this") are device actions too.
-    4. WEB SEARCH. If web search is available below and the request needs current information,
-       search.
-    5. ANSWER DIRECTLY. Only when none of the above applies, answer from what you know. If you are
-       not sure, say so rather than inventing detail.
-
-    Never say you are unable to do something before you have checked steps 1 to 4. "I cannot look
-    that up" is only true if no skill, no tool and no search covers it.
+    For EVERY request, take the first of these that applies, silently:
+    1. SKILL - if anything in the SKILLS list covers it, call load_skill(name) and follow it.
+       Looking things up, calendars, email, QR codes, maps and calculations are almost always
+       skills. Check the list before saying you cannot do something.
+    2. PHONE - calls, texts, alarms, reminders, apps, directions, torch, settings, notifications,
+       and anything playing. Use the matching tool.
+    3. ANSWER - only if nothing above fits. Say so when unsure rather than inventing detail.
+    Never claim you are unable to do something before checking 1 and 2.
     """
 
-  private const val CAPABILITY_MEDIA =
-    """
-    IMAGES AND AUDIO
-    The user can attach photos, screenshots and voice clips to any message, in any mode. When a
-    message has an attachment, examine it before answering: read visible text exactly as written,
-    describe what is actually in frame, and say when something is unreadable rather than guessing.
-    A message can carry an attachment *and* an unrelated instruction ("look at this receipt and
-    text Sam the total"). Do both.
-    """
-
-  private const val CAPABILITY_WEB =
-    """
-    WEB SEARCH
-    You have live web access through the user's own SearXNG instance at ___INSTANCE___.
-    - webSearch(query, categories, timeRange) returns ranked results with titles, URLs and
-      snippets. Use it for anything current, local, numeric or verifiable: news, prices, opening
-      hours, schedules, sports results, releases, weather.
-    - openWebPage(url) returns the readable text of one result, for when a snippet is too thin.
-    Cite the URLs you relied on. If a search fails, tell the user what went wrong; never present a
-    guess as a search result.
-    """
-
-  private const val CAPABILITY_WEB_DISABLED =
-    """
-    WEB SEARCH
-    Web search is not set up on this device, so you cannot look anything up. When a question needs
-    current information, say that you cannot check it and that the user can connect a SearXNG
-    instance under Settings > Web search.
-    """
-
-  private const val CAPABILITY_DEVICE =
-    """
-    DEVICE ACTIONS
-    - placePhoneCall(nameOrNumber): call someone. Resolve a name with findContact first. By
-      default this opens the dialer with the number filled in and the user taps to call.
-    - findContact(name): look up a phone number in the address book.
-    - sendTextMessage(nameOrNumber, message): open the SMS composer with a draft.
-    - setAlarm(hour, minute, label) and setTimer(seconds, label) hand an alarm to the clock app.
-    - setReminder(text, when), listReminders() and cancelReminder(id) are the assistant's own and
-      survive a restart. Prefer these for "remind me to ...", because an alarm handed to the clock
-      app cannot be listed or cancelled afterwards.
-    - openApp(appName), showOnMap(place), getDirections(destination, mode).
-    - toggleFlashlight(on), openSystemSettings(section), openUrlInBrowser(url).
-    - run_intent(intent, parameters) for send_email, create_calendar_event, read_calendar_events,
-      schedule_notification and get_current_date_and_time.
-    Ask one short clarifying question when a person, a number or a time is ambiguous. Never invent
-    a phone number or an email address.
-    """
-
-  private const val CAPABILITY_NOTIFICATIONS =
-    """
-    NOTIFICATIONS AND MEDIA
-    - readNotifications(fromApp) for "what did I miss", "any messages", "read my notifications".
-      Summarise them in your own words; do not read out ids or package names.
-    - replyToNotification(id, message) SENDS immediately - there is no composer and nothing to
-      undo. Read the wording back and get a yes before calling it.
-    - dismissNotification(id), openNotification(id), pressNotificationButton(id, button).
-    - controlMedia(action) for play, pause, toggle, next, previous, stop; nowPlaying() for what is
-      playing; setMediaVolume(percent).
-    Both need notification access. If a tool says it is missing, tell the user how to grant it -
-    never report an empty shade or that nothing is playing when the tool said the permission is
-    the problem.
-    """
-
-  private const val CAPABILITY_SMART_HOME =
-    """
-    SMART HOME
-    The user's home is reachable through Home Assistant.
-    - listSmartHomeDevices(filter) first, to get exact device ids. Never invent one.
-    - setSmartHomeDevice(deviceId, on) turns things on and off, opens and closes blinds, locks
-      and unlocks.
-    - setSmartHomeLevel(deviceId, level) for brightness, fan speed, blind position and target
-      temperature.
-    If a name is ambiguous - two lamps that could both be "the lamp" - ask which one rather than
-    guessing. Turning off the wrong thing in someone's house is not a small mistake.
-    """
-
-  private const val CAPABILITY_SKILLS =
-    """
-    SKILLS
-    Step 1 of the procedure above. These are step-by-step instructions for tasks that need more
-    than one call. Load one with load_skill(name) and follow it exactly. This is the list - if
-    something here fits the request, use it rather than answering from memory.
-    """
-
-  private const val CAPABILITY_MCP =
-    """
-    MCP TOOLS
-    These tools come from MCP servers the user connected. Call them with
-    runMcpTool(toolName, input), using the exact tool name and an input object that matches its
-    schema.
-    """
+  private const val SKILLS_HEADING =
+    "SKILLS - load with load_skill(name), then follow the instructions exactly:"
 
   private const val HOUSE_RULES =
     """
-    1. Handle the whole message. If it contains an attachment and an instruction, or two
-       instructions, deal with all of it before replying.
-    2. Do not narrate your plan or your tool calls. Work silently, then give the result.
-    3. Report what actually happened. If a tool failed, or only staged an action for the user to
-       confirm, say that in one sentence rather than claiming it is done.
-    4. Anything that leaves the phone - a call, a text, an email - is prepared for the user to
-       send. Tell them it is ready and waiting for their tap.
-    5. Never invent a search result, a phone number, a date or a price. Look it up or say you
-       cannot.
+    RULES
+    1. Handle the whole message - an attachment and an instruction, or two instructions, is all of
+       it before you reply.
+    2. Do not narrate your tool calls. Work, then answer.
+    3. Say what actually happened. A tool that failed, or only staged something for the user to
+       confirm, is not "done".
+    4. A call, a text or an email is prepared for the user to send. Say it is ready and waiting.
+       A reply to a notification is the exception - it sends immediately, so read it back first.
+    5. Never invent a search result, a number, a date or a price.
     """
 }

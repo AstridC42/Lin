@@ -47,8 +47,7 @@ class MediaControlTool(private val context: Context) : ToolDefinition {
 
   @Tool(
     description =
-      "Control whatever is playing audio or video on the phone: music, a podcast, a video. " +
-        "Actions: play, pause, toggle, next, previous, stop."
+      "Control whatever is playing. Actions: play, pause, toggle, next, previous, stop."
   )
   fun controlMedia(
     @ToolParam(description = "One of: play, pause, toggle, next, previous, stop.") action: String
@@ -89,8 +88,7 @@ class MediaControlTool(private val context: Context) : ToolDefinition {
 
   @Tool(
     description =
-      "What is currently playing - track, artist and which app. Use this for \"what is this " +
-        "song\" or before changing what is playing."
+      "What is playing now - track, artist, app."
   )
   fun nowPlaying(): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
