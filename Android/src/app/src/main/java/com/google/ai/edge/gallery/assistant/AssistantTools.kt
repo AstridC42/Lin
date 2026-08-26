@@ -24,10 +24,13 @@ import com.google.ai.edge.gallery.tools.CallJsSkillResultImage
 import com.google.ai.edge.gallery.tools.CallJsSkillResultWebview
 import com.google.ai.edge.gallery.tools.DeviceActionsTool
 import com.google.ai.edge.gallery.tools.MediaControlTool
+import com.google.ai.edge.gallery.notifications.StarNotificationListener
+import com.google.ai.edge.gallery.tools.NotificationAccessSetupTool
 import com.google.ai.edge.gallery.tools.NotificationsTool
 import com.google.ai.edge.gallery.tools.RemindersTool
 import com.google.ai.edge.gallery.tools.SmartHomeTool
 import com.google.ai.edge.gallery.tools.ToolDefinition
+import com.google.ai.edge.gallery.tools.WeatherTool
 import com.google.ai.edge.gallery.tools.WebSearchSetupTool
 import com.google.ai.edge.gallery.tools.WebSearchTool
 
@@ -70,9 +73,13 @@ class AssistantTools(
 
   private val notificationsTool by lazy { NotificationsTool(context = context) }
 
+  private val notificationSetupTool by lazy { NotificationAccessSetupTool() }
+
   private val mediaControlTool by lazy { MediaControlTool(context = context) }
 
   private val smartHomeTool by lazy { SmartHomeTool(client = homeAssistantClient) }
+
+  private val weatherTool by lazy { WeatherTool(context = context) }
 
   private val remindersTool by lazy {
     RemindersTool(context = context, repository = settingsRepository)
@@ -82,12 +89,21 @@ class AssistantTools(
     val tools = mutableListOf<ToolDefinition>()
     tools.addAll(super.getAvailableTools())
     tools.add(deviceActionsTool)
-    // Offered whether or not notification access has been granted, unlike web search. A tool that
-    // is absent leaves the model saying it cannot read notifications at all; one that is present
-    // and reports the missing permission lets it tell the user how to fix it.
-    tools.add(notificationsTool)
+    // Present whether or not notification access has been granted: a tool that is absent leaves
+    // the model saying there are no notifications, which is indistinguishable from an empty shade.
+    // Until it is granted, though, one tool says that as well as five do, and the four it replaces
+    // cost tokens the conversation needs.
+    if (StarNotificationListener.isGranted(context)) {
+      tools.add(notificationsTool)
+    } else {
+      tools.add(notificationSetupTool)
+    }
     tools.add(mediaControlTool)
     tools.add(remindersTool)
+    // Needs nothing configured, unlike web search - which is the point of it being here. Before
+    // this, the most-asked question an assistant gets could only be answered on a phone whose
+    // owner had set up a self-hosted metasearch instance.
+    tools.add(weatherTool)
     // One or the other, never both - they answer to the same name. The stand-in exists so that
     // "search the web" reaches something that can explain the missing address, rather than falling
     // through to an answer from memory that looks like a search.
