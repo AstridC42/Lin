@@ -816,6 +816,12 @@
   <!-- Content description of the spoken replies toggle. [CHAR_LIMIT=40] -->
   <string name="cd_assistant_speak_replies" translatable="true" description="Content description of the spoken replies toggle. [CHAR_LIMIT=40]">Read replies out loud</string>
   <!-- Title shown on the empty assistant screen. [CHAR_LIMIT=40] -->
+  <string name="assistant_suggestion_missed" translatable="true" description="Suggested opening question about notifications. [CHAR_LIMIT=40]">What did I miss?</string>
+  <string name="assistant_suggestion_remind" translatable="true" description="Suggested opening question setting a reminder. [CHAR_LIMIT=50]">Remind me in 20 minutes to stretch</string>
+  <string name="assistant_suggestion_lookup" translatable="true" description="Suggested opening question that uses a skill. [CHAR_LIMIT=50]">Look up the Eiffel Tower on Wikipedia</string>
+  <string name="assistant_suggestion_playing" translatable="true" description="Suggested opening question about media. [CHAR_LIMIT=40]">What is playing?</string>
+  <string name="assistant_suggestion_search" translatable="true" description="Suggested opening question that searches the web. [CHAR_LIMIT=50]">Search the web for today\'s headlines</string>
+  <string name="assistant_suggestion_lights" translatable="true" description="Suggested opening question about smart home devices. [CHAR_LIMIT=40]">Which lights are on?</string>
   <string name="assistant_emptystate_title" translatable="true" description="Title shown on the empty assistant screen. [CHAR_LIMIT=40]">What can I do for you?</string>
   <!-- Body shown on the empty assistant screen. [CHAR_LIMIT=220] -->
   <string name="assistant_emptystate_content" translatable="true" description="Body shown on the empty assistant screen. [CHAR_LIMIT=220]">Ask a question, attach a photo to look at, or tell me to call someone, set a timer or search the web. It all runs on this device.</string>

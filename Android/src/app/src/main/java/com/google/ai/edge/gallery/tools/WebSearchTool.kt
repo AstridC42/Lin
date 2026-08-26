@@ -67,17 +67,12 @@ class WebSearchTool(
   fun webSearch(
     @ToolParam(description = "What to search for, phrased as a normal search query.")
     query: String,
-    @ToolParam(
-      description =
-        "Optional SearXNG categories, comma separated. One or more of: general, news, images, " +
-          "videos, map, music, it, science, files, social media. Leave empty for general."
-    )
+    // Both optional and both rarely wanted, so both are described in as few words as will still
+    // produce a valid value. Every character of every tool schema is charged against the same
+    // budget as the conversation, and a list of ten category names is not what makes a search work.
+    @ToolParam(description = "Optional: news, images, videos, map, music, science or it.")
     categories: String = "",
-    @ToolParam(
-      description =
-        "Optional recency filter. One of: day, week, month, year. Leave empty for no filter."
-    )
-    timeRange: String = "",
+    @ToolParam(description = "Optional recency: day, week, month or year.") timeRange: String = "",
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
       Log.d(TAG, "webSearch(query='$query', categories='$categories', timeRange='$timeRange')")
