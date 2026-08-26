@@ -329,6 +329,22 @@ jobs:
             echo "dev now points at ${GITHUB_SHA}"
           fi
 
+      # Every push replaces this one rolling release, so the files already attached to it are not
+      # history - they are the previous build. Left alone they accumulate: seventy near-identical
+      # APKs across eighteen versions, several gigabytes, with the one someone actually wants
+      # somewhere in the middle of an alphabetical list. On a phone that is unusable, which is the
+      # device this release exists to be installed from.
+      - name: Clear the previous build's files
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ids=$(gh api "repos/${{ github.repository }}/releases/tags/dev" --jq '.assets[].id' 2>/dev/null || true)
+          for id in $ids; do
+            echo "Removing asset $id"
+            gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" || true
+          done
+
       - name: Publish the test build
         uses: softprops/action-gh-release@v2
         with:
