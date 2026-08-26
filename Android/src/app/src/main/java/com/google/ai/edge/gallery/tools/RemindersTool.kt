@@ -48,8 +48,7 @@ class RemindersTool(
 
   @Tool(
     description =
-      "Set a reminder that the assistant itself will deliver. Use this for \"remind me to...\" " +
-        "rather than setAlarm, because these can be listed and cancelled later."
+      "Set a reminder the assistant delivers. Prefer this over setAlarm for \"remind me to...\"."
   )
   fun setReminder(
     @ToolParam(description = "What to remind the user about, in their own words.") text: String,
