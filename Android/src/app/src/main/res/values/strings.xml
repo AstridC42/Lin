@@ -879,6 +879,17 @@
   <string name="wake_word_notification_text" translatable="true" description="Ongoing notification body. [CHAR_LIMIT=120]">The microphone stays on. This uses more battery than normal.</string>
   <string name="wake_word_stop" translatable="true" description="Notification action that stops listening. [CHAR_LIMIT=15]">Stop</string>
   <string name="wake_word_tile_label" translatable="true" description="Quick settings tile label. [CHAR_LIMIT=20]">Wake word</string>
+  <string name="voice_settings_title" translatable="true" description="Title of the assistant voice settings dialog. [CHAR_LIMIT=40]">Assistant voice</string>
+  <string name="voice_settings_sample" translatable="true" description="Line spoken when previewing a voice. [CHAR_LIMIT=120]">This is how I will sound when I answer you.</string>
+  <string name="voice_settings_none" translatable="true" description="Shown when the device speech engine offers no voices. [CHAR_LIMIT=300]">This phone\'s speech engine has not reported any voices. Install or update a text-to-speech engine in Android settings, then open this again.</string>
+  <string name="voice_settings_engine_default" translatable="true" description="Option to use whichever voice the speech engine picks. [CHAR_LIMIT=40]">Engine default</string>
+  <string name="voice_settings_engine_default_detail" translatable="true" description="Explains the engine default voice option. [CHAR_LIMIT=80]">Follows your phone\'s language</string>
+  <string name="voice_settings_online_voice" translatable="true" description="Marks a voice that needs a network connection. [CHAR_LIMIT=60]">%1$s · needs internet</string>
+  <string name="voice_settings_speed" translatable="true" description="Label of the speaking speed slider. [CHAR_LIMIT=30]">Speed</string>
+  <string name="voice_settings_pitch" translatable="true" description="Label of the voice pitch slider. [CHAR_LIMIT=30]">Pitch</string>
+  <string name="voice_settings_try" translatable="true" description="Button that speaks a sample line. [CHAR_LIMIT=30]">Hear it</string>
+  <string name="voice_settings_manual_title" translatable="true" description="Manual entry for the voice settings. [CHAR_LIMIT=40]">Assistant voice</string>
+  <string name="voice_settings_manual_body" translatable="true" description="Manual entry describing voice settings. [CHAR_LIMIT=200]">Pick which voice reads replies out loud, and how fast and how high it speaks. Long-press Speak on the chat screen to get here quickly.</string>
   <string name="wake_word_settings_title" translatable="true" description="Title of the wake word settings dialog. [CHAR_LIMIT=40]">Wake word</string>
   <string name="wake_word_enable" translatable="true" description="Label of the switch that enables continuous listening. [CHAR_LIMIT=40]">Listen for the wake word</string>
   <string name="wake_word_phrase_label" translatable="true" description="Label of the field holding the wake phrase. [CHAR_LIMIT=30]">Phrase</string>
