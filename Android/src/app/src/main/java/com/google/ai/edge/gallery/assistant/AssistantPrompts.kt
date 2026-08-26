@@ -154,9 +154,11 @@ object AssistantPrompts {
     appendLine()
     if (webSearchEnabled) {
       appendLine(
-        "WEB: webSearch(query) then openWebPage(url) for detail, via ${
+        "WEB: webSearch(query), then openWebPage(url) for detail, via ${
           webSearchInstance.ifBlank { "the user's SearXNG instance" }
-        }. Cite the URLs used. Never present a guess as a search result."
+        }. showImageFromWeb(query) puts a picture in the chat; showWebPageInChat(url) puts a " +
+          "page there to read. Both display it already - say one line about it, do not describe " +
+          "it at length or repeat the URL. Cite sources. Never present a guess as a result."
       )
       appendLine()
     }
