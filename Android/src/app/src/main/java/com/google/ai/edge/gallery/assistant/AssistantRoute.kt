@@ -16,14 +16,15 @@
 
 package com.google.ai.edge.gallery.assistant
 
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -38,8 +39,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -347,8 +350,18 @@ private fun AssistantCrashState(report: String, onDismiss: () -> Unit) {
         modifier = Modifier.verticalScroll(rememberScrollState()),
       )
     }
-    Button(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-      Text(stringResource(R.string.assistant_crash_continue))
+    Row(
+      modifier = Modifier.align(Alignment.End),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      // Selecting sixteen thousand characters of stack trace by dragging on a phone is not a
+      // realistic way to report anything, and this report is the only account of what happened -
+      // there is no computer attached to run logcat on.
+      val clipboard = LocalClipboardManager.current
+      TextButton(onClick = { clipboard.setText(AnnotatedString(report)) }) {
+        Text(stringResource(R.string.assistant_crash_copy))
+      }
+      Button(onClick = onDismiss) { Text(stringResource(R.string.assistant_crash_continue)) }
     }
   }
 }

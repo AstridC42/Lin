@@ -122,18 +122,18 @@ fun AssistantScreen(
   val context = LocalContext.current
   val speaker = rememberAssistantSpeaker()
 
+  val storedSettings = remember { dataStoreRepository.readAssistantSettings() }
+
   // The engine starts on whatever the phone defaults to, so the saved choice has to be handed to
   // it every time the screen appears - not only when it is changed in the dialog.
   LaunchedEffect(speaker) {
-    val saved = dataStoreRepository.readAssistantSettings()
     speaker.applyPreferences(
-      voiceId = saved.ttsVoiceName,
-      rate = saved.ttsSpeechRate,
-      pitch = saved.ttsPitch,
+      voiceId = storedSettings.ttsVoiceName,
+      rate = storedSettings.ttsSpeechRate,
+      pitch = storedSettings.ttsPitch,
     )
   }
 
-  val storedSettings = remember { dataStoreRepository.readAssistantSettings() }
   var mode by remember { mutableStateOf(AssistantMode.fromId(storedSettings.modeId)) }
   var speakReplies by remember { mutableStateOf(storedSettings.speakReplies) }
   var showModeSheet by remember { mutableStateOf(false) }
