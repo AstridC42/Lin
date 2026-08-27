@@ -193,6 +193,14 @@ message AssistantSettings {
   // expects it to behave like the one it replaced, and taking over the whole
   // screen to answer "what time is it" is the thing that behaviour is not.
   bool assist_popup_disabled = 12;
+
+  // Package name of the app "play some music" is sent to.
+  //
+  // Android has no default-music-app setting for an app to read; what exists
+  // is a search-and-play intent that several apps answer, which means a
+  // chooser every single time unless one is picked here. Empty leaves the
+  // choice to the phone.
+  string preferred_music_app = 13;
 }
 
 // A reminder the assistant will deliver at a set time.
