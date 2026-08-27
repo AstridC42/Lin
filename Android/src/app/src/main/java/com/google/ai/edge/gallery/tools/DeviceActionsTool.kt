@@ -22,14 +22,20 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraManager
+import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.ContactsContract
 import android.provider.Settings
+import android.telephony.PhoneNumberUtils
+import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import com.google.ai.edge.gallery.messaging.MessagingApp
+import com.google.ai.edge.gallery.messaging.MessagingApps
 import com.google.ai.edge.litertlm.Tool
 import com.google.ai.edge.litertlm.ToolParam
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
@@ -161,14 +167,23 @@ class DeviceActionsTool(
 
   @Tool(
     description =
-      "Open the SMS composer with a message ready to send. Accepts a contact name or a phone " +
-        "number. The user presses send."
+      "Write a message to someone by text, WhatsApp or Telegram. Opens it ready to send; the " +
+        "user presses send."
   )
   fun sendTextMessage(
-    @ToolParam(description = "The contact name or phone number to text.") nameOrNumber: String,
+    @ToolParam(description = "The contact name or phone number to write to.") nameOrNumber: String,
     @ToolParam(description = "The message body.") message: String,
+    @ToolParam(description = "Which app: whatsapp, telegram, or empty for the phone's messages.")
+    app: String = "",
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
+      val chosen =
+        MessagingApps.fromSpokenName(app)
+          ?: return@runBlocking failure(
+            "\"$app\" is not an app I can write in. Use WhatsApp, Telegram, or leave it out for " +
+              "a text message."
+          )
+
       val resolved =
         resolveNumber(nameOrNumber) ?: return@runBlocking failure(
           "Could not find a phone number for \"$nameOrNumber\"."
@@ -180,29 +195,123 @@ class DeviceActionsTool(
             resolved.ambiguousMatches.map {
               mapOf("name" to it.name, "phone_number" to it.number)
             },
-          "hint" to "Ask the user which contact to text, then call this tool again.",
+          "hint" to "Ask the user which contact to write to, then call this tool again.",
         )
       }
+
       val intent =
-        Intent(Intent.ACTION_SENDTO, "smsto:${resolved.number.telUriEncode()}".toUri()).apply {
-          putExtra("sms_body", message)
+        when (chosen) {
+          MessagingApp.SMS -> smsIntent(resolved.number, message)
+          MessagingApp.WHATSAPP ->
+            whatsAppIntent(resolved.number, message)
+              ?: return@runBlocking failure(
+                "WhatsApp needs ${resolved.displayName}'s number with its country code, and the " +
+                  "one saved is local. Ask the user for the full number, or send a text instead."
+              )
+          MessagingApp.TELEGRAM ->
+            telegramIntent(message)
+              ?: return@runBlocking failure(
+                "Telegram is not installed on this phone. Offer to send a text instead."
+              )
         }
+
       if (!startActivity(intent)) {
-        return@runBlocking failure("This device has no messaging app.")
+        return@runBlocking failure(
+          when (chosen) {
+            MessagingApp.SMS -> "This device has no messaging app."
+            MessagingApp.WHATSAPP -> "WhatsApp is not installed on this phone."
+            MessagingApp.TELEGRAM -> "Telegram would not open."
+          }
+        )
       }
+
+      val appName =
+        when (chosen) {
+          MessagingApp.SMS -> "text"
+          MessagingApp.WHATSAPP -> "WhatsApp"
+          MessagingApp.TELEGRAM -> "Telegram"
+        }
       sendProgress(
-        "Drafting a text to ${resolved.displayName}",
+        "Drafting a $appName to ${resolved.displayName}",
         inProgress = false,
-        itemTitle = "Text message",
-        itemDescription = "- To: ${resolved.displayName}\n- Body: $message",
+        itemTitle = "Message",
+        itemDescription = "- To: ${resolved.displayName}\n- Via: $appName\n- Body: $message",
       )
       mapOf(
         "status" to "succeeded",
         "contact" to resolved.displayName,
-        "result" to "The messaging app is open with the draft; the user presses send.",
+        "app" to appName,
+        "result" to
+          if (chosen == MessagingApp.TELEGRAM) {
+            "Telegram is open with the message written; the user picks the chat and sends."
+          } else {
+            "The conversation is open with the draft; the user presses send."
+          },
       )
     }
   }
+
+  /**
+   * The phone's own messaging app, with the draft written.
+   *
+   * This is also how a message goes out over RCS. RCS is not a protocol an app selects - it is what
+   * the default messaging app upgrades a conversation to when both ends support it, so handing the
+   * draft over is the whole of the integration.
+   */
+  private fun smsIntent(number: String, message: String): Intent =
+    Intent(Intent.ACTION_SENDTO, "smsto:${number.telUriEncode()}".toUri()).apply {
+      putExtra("sms_body", message)
+    }
+
+  /**
+   * A WhatsApp conversation with the message written, or null when the number cannot be trusted.
+   *
+   * wa.me has no notion of a local number: given one it opens a conversation with whatever that
+   * turns out to be in some other country, which is a message written to a stranger. So a number
+   * that is not already international, and cannot be made international from the SIM's country, is
+   * refused rather than guessed at.
+   */
+  private fun whatsAppIntent(number: String, message: String): Intent? {
+    val international =
+      MessagingApps.whatsAppNumber(number)
+        ?: MessagingApps.whatsAppNumber(toE164(number).orEmpty())
+        ?: return null
+    val url = "https://wa.me/$international?text=${Uri.encode(message)}"
+    return Intent(Intent.ACTION_VIEW, url.toUri())
+  }
+
+  /**
+   * Telegram, with the message written and the chat left to the user.
+   *
+   * Telegram publishes no way to address a conversation by phone number from outside the app, so
+   * unlike the other two this cannot preselect who it goes to. Saying so in the result matters:
+   * otherwise the assistant reports that it wrote to Sam when what it did was open a chat picker.
+   */
+  private fun telegramIntent(message: String): Intent? {
+    val share =
+      Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, message)
+      }
+    val installed =
+      MessagingApps.TELEGRAM_PACKAGES.firstOrNull { candidate ->
+        Intent(share).setPackage(candidate).resolveActivity(context.packageManager) != null
+      } ?: return null
+    return Intent(share).setPackage(installed)
+  }
+
+  /** [number] in international form using the SIM's country, or null when that cannot be done. */
+  private fun toE164(number: String): String? =
+    try {
+      val telephony = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+      val country =
+        telephony?.simCountryIso?.takeIf { it.isNotBlank() }
+          ?: Locale.getDefault().country.takeIf { it.isNotBlank() }
+          ?: return null
+      PhoneNumberUtils.formatNumberToE164(number, country.uppercase(Locale.US))
+    } catch (e: Exception) {
+      null
+    }
 
   @Tool(description = "Set an alarm on the device's clock app.")
   fun setAlarm(

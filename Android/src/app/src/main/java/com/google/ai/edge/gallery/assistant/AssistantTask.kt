@@ -99,7 +99,7 @@ class AssistantTask(
         buildSystemPrompt(
           currentPrompt = systemInstruction?.toString().orEmpty(),
           toolsPrompt = toolsPrompt,
-          availableSkills = formatSelectedSkills(skillsProvider.getAvailableSkills()),
+          availableSkills = formatSelectedSkills(assistantSkills()),
         )
 
       val config =
@@ -178,7 +178,25 @@ class AssistantTask(
       )
   }
 
+  /**
+   * The skills worth offering alongside the assistant's own tools.
+   *
+   * Two of the built-in skills cover ground the assistant now has native tools for, and listing
+   * both is worse than listing either. The skill opens the calendar app's editor with the fields
+   * filled in and stops there; the tool writes to the calendar and can also read it back, move an
+   * appointment and cancel one. Offered together, a model picks whichever it reads first and the
+   * request lands on the weaker of the two about half the time - and both cost prompt either way.
+   *
+   * They are only hidden from this screen. The Agent Skills screen still has them, and a user who
+   * wants the calendar app's own editor can reach them there.
+   */
+  private suspend fun assistantSkills() =
+    skillsProvider.getAvailableSkills().filterNot { it.name in SUPERSEDED_BY_TOOLS }
+
   companion object {
+    /** Built-in skills the assistant's own tools do better. */
+    private val SUPERSEDED_BY_TOOLS = setOf("create-calendar-event", "read-calendar-events")
+
     /** The host of [url], or the url itself when it cannot be parsed. */
     fun hostOf(url: String): String =
       try {

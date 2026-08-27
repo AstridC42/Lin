@@ -24,6 +24,7 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.util.Log
 import com.google.ai.edge.gallery.notifications.StarNotificationListener
+import com.google.ai.edge.gallery.media.MusicApps
 import com.google.ai.edge.litertlm.Tool
 import com.google.ai.edge.litertlm.ToolParam
 import kotlinx.coroutines.Dispatchers
@@ -41,9 +42,56 @@ private const val TAG = "AGMediaControlTool"
  * *notification access* - the same grant the notification tools need, for a different reason. One
  * grant covers both, which is worth saying to the user rather than asking them twice.
  */
-class MediaControlTool(private val context: Context) : ToolDefinition {
+class MediaControlTool(
+  private val context: Context,
+  /** The app music is sent to, read fresh so a change in settings applies without a restart. */
+  private val preferredMusicApp: () -> String = { "" },
+) : ToolDefinition {
   override val alwaysAllow: Boolean = true
   override var executionContext: ToolExecutionContext? = null
+
+  @Tool(
+    description =
+      "Start playing music by name - a song, artist, album or playlist. Use for \"play ...\". " +
+        "For pausing or skipping what is already playing, use controlMedia."
+  )
+  fun playMusic(
+    @ToolParam(description = "What to play, for example 'Radiohead' or 'my liked songs'.")
+    query: String
+  ): Map<String, Any> {
+    return runBlocking(Dispatchers.Default) {
+      if (query.isBlank()) {
+        return@runBlocking mapOf(
+          "status" to "failed",
+          "error" to "Nothing was named to play. Ask the user what they want to hear.",
+        )
+      }
+      val intent =
+        MusicApps.playIntent(context, query.trim(), preferredMusicApp())
+          ?: return@runBlocking mapOf(
+            "status" to "failed",
+            "error" to
+              "No app on this phone can play music by name. Tell the user to install a music app.",
+          )
+      try {
+        context.startActivity(intent)
+      } catch (e: Exception) {
+        Log.w(TAG, "Could not start playback", e)
+        return@runBlocking mapOf(
+          "status" to "failed",
+          "error" to "The music app would not open.",
+        )
+      }
+      sendProgress("Playing \"$query\"", inProgress = false)
+      mapOf(
+        "status" to "succeeded",
+        "playing" to query.trim(),
+        "hint" to
+          "The music app was asked to play this. Say one short line; do not claim to know the " +
+            "track that started.",
+      )
+    }
+  }
 
   @Tool(
     description =

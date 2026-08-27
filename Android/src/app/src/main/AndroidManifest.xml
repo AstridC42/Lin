@@ -29,6 +29,12 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!--
+      Star Storyteller: so the assistant can move and cancel appointments, not only add them. An
+      intent to the calendar app can open its editor for a new event and nothing else - there is no
+      intent for changing one, and none for reading the diary back.
+    -->
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <!-- Star Storyteller: needed to resolve "call Sam" to a phone number. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!--
@@ -122,6 +128,17 @@
           report it missing on a phone that has it.
         -->
         <package android:name="com.google.android.projection.gearhead" />
+        <!--
+          Star Storyteller: the messaging apps the assistant can write a draft into. Without these
+          the packages are invisible on Android 11+, so "message Sam on WhatsApp" would report the
+          app as missing on a phone that has it.
+        -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="org.telegram.messenger.web" />
+        <package android:name="org.telegram.plus" />
+        <package android:name="org.thunderdog.challegram" />
     </queries>
 
     <uses-feature
