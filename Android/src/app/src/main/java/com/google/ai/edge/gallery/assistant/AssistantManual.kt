@@ -60,6 +60,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ai.edge.gallery.R
+import com.google.ai.edge.gallery.car.AndroidAutoStatus
 import com.google.ai.edge.gallery.notifications.StarNotificationListener
 import com.google.ai.edge.gallery.voice.AssistantRole
 
@@ -104,6 +105,7 @@ fun AssistantManual(
         PackageManager.PERMISSION_GRANTED
     )
   }
+  val androidAutoInstalled = remember { AndroidAutoStatus.isInstalled(context) }
   val locationLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
       locationGranted = granted
@@ -170,6 +172,28 @@ fun AssistantManual(
         // A runtime permission, so unlike notification access it can be asked for right here.
         // Offered rather than demanded: the weather still works for any town named out loud, and
         // only "what is the weather" with no place needs to know where the phone is.
+        // Nothing here can tell whether Android Auto will show the app - that is decided in
+        // another process from settings this one cannot read. What it can do is say whether
+        // Android Auto is installed and put the steps one tap away, which beats an app that is
+        // simply absent from the car with no explanation anywhere.
+        if (!androidAutoInstalled) {
+          Text(
+            stringResource(R.string.manual_car_missing),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        } else {
+          OutlinedButton(
+            onClick = {
+              AndroidAutoStatus.settingsIntent(context)?.let { intent ->
+                runCatching { context.startActivity(intent) }
+              }
+            },
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(stringResource(R.string.manual_car_open_settings))
+          }
+        }
         if (!locationGranted) {
           OutlinedButton(
             onClick = { locationLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
@@ -285,7 +309,7 @@ private fun manualSections(): List<ManualSection> = listOf(
   ),
   ManualSection(
     stringResource(R.string.manual_car_title),
-    listOf(stringResource(R.string.manual_car_body)),
+    listOf(stringResource(R.string.manual_car_body), stringResource(R.string.manual_car_steps)),
   ),
 )
 

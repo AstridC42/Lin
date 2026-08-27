@@ -501,45 +501,54 @@ class DefaultDataStoreRepository(
     }
   }
 
-  override fun readWebSearchSettings(): WebSearchSettings {
-    return runBlocking { dataStore.data.first().webSearchSettings }
+  /**
+   * The last settings read from disk, kept so the four readers below do not go back for it.
+   *
+   * The rest of this class reads through to the store on every call, which is fine for settings
+   * that are read once at startup. These four are not: the assistant screen reads its preferences
+   * several times while composing, `isConfigured()` is asked on every tool call and again on every
+   * turn while the system prompt is rebuilt, and each of those is `runBlocking` around a disk read
+   * on whichever thread asked - the main thread during composition, the inference thread during a
+   * turn. That is the shape of a stutter at launch and, on a slow filesystem, of an ANR.
+   *
+   * Correctness rests on one thing: nothing outside this class writes these four fields, and the
+   * four writers below all refresh this from what the store returns. A write to some other field
+   * of the same proto does not invalidate it, because `updateData` always starts from the real
+   * current value on disk rather than from anything cached here.
+   */
+  @Volatile private var settingsSnapshot: Settings? = null
+
+  private fun settings(): Settings =
+    settingsSnapshot ?: runBlocking { dataStore.data.first() }.also { settingsSnapshot = it }
+
+  /** Applies [change] to the stored settings and keeps the snapshot in step with the result. */
+  private fun updateSettings(change: (Settings.Builder) -> Settings.Builder) {
+    runBlocking {
+      settingsSnapshot = dataStore.updateData { current -> change(current.toBuilder()).build() }
+    }
   }
+
+  override fun readWebSearchSettings(): WebSearchSettings = settings().webSearchSettings
 
   override fun saveWebSearchSettings(settings: WebSearchSettings) {
-    runBlocking {
-      dataStore.updateData { current -> current.toBuilder().setWebSearchSettings(settings).build() }
-    }
+    updateSettings { it.setWebSearchSettings(settings) }
   }
 
-  override fun readAssistantSettings(): AssistantSettings {
-    return runBlocking { dataStore.data.first().assistantSettings }
-  }
+  override fun readAssistantSettings(): AssistantSettings = settings().assistantSettings
 
   override fun saveAssistantSettings(settings: AssistantSettings) {
-    runBlocking {
-      dataStore.updateData { current -> current.toBuilder().setAssistantSettings(settings).build() }
-    }
+    updateSettings { it.setAssistantSettings(settings) }
   }
 
-  override fun readReminders(): Reminders {
-    return runBlocking { dataStore.data.first().reminders }
-  }
+  override fun readReminders(): Reminders = settings().reminders
 
   override fun saveReminders(reminders: Reminders) {
-    runBlocking {
-      dataStore.updateData { current -> current.toBuilder().setReminders(reminders).build() }
-    }
+    updateSettings { it.setReminders(reminders) }
   }
 
-  override fun readSmartHomeSettings(): SmartHomeSettings {
-    return runBlocking { dataStore.data.first().smartHomeSettings }
-  }
+  override fun readSmartHomeSettings(): SmartHomeSettings = settings().smartHomeSettings
 
   override fun saveSmartHomeSettings(settings: SmartHomeSettings) {
-    runBlocking {
-      dataStore.updateData { current ->
-        current.toBuilder().setSmartHomeSettings(settings).build()
-      }
-    }
+    updateSettings { it.setSmartHomeSettings(settings) }
   }
 }

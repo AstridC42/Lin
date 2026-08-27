@@ -877,6 +877,7 @@
   <string name="assistant_crash_title" translatable="true" description="Title shown when the previous run crashed. [CHAR_LIMIT=60]">Star Storyteller stopped unexpectedly</string>
   <string name="assistant_crash_content" translatable="true" description="Explains the crash report below and asks for it to be reported. [CHAR_LIMIT=200]">This is what went wrong last time. Press and hold to copy it if you are reporting the problem.</string>
   <string name="assistant_crash_continue" translatable="true" description="Label of the button that dismisses the crash report. [CHAR_LIMIT=15]">Continue</string>
+  <string name="assistant_crash_copy" translatable="true" description="Button that copies the crash report. [CHAR_LIMIT=30]">Copy report</string>
   <string name="assistant_listening_title" translatable="true" description="Title of the dialog shown while the assistant is listening. [CHAR_LIMIT=40]">Listening</string>
   <string name="assistant_listening_hint" translatable="true" description="Placeholder shown before anything has been heard. [CHAR_LIMIT=60]">Go ahead \u2014 say what you need.</string>
   <string name="assistant_listening_stop" translatable="true" description="Label of the button that stops listening. [CHAR_LIMIT=15]">Stop</string>
@@ -893,6 +894,7 @@
   <string name="assist_panel_again" translatable="true" description="Button that listens again. [CHAR_LIMIT=20]">Again</string>
   <string name="assist_panel_open" translatable="true" description="Button that opens the full chat screen. [CHAR_LIMIT=20]">Open chat</string>
   <string name="assist_panel_close" translatable="true" description="Button that dismisses the pop-up. [CHAR_LIMIT=20]">Close</string>
+  <string name="assist_panel_still_there" translatable="true" description="Shown when the pop-up listened again after answering and heard nothing. [CHAR_LIMIT=80]">Say \"again\" if you need anything else.</string>
   <string name="assist_panel_no_speech" translatable="true" description="Shown when nothing was heard. [CHAR_LIMIT=100]">I did not catch that.</string>
   <string name="assist_panel_no_microphone" translatable="true" description="Shown when the microphone permission has not been granted. [CHAR_LIMIT=200]">Star Storyteller needs the microphone to listen. Open the chat and allow it once.</string>
   <string name="assist_panel_opening" translatable="true" description="Shown when the pop-up hands the question to the full app. [CHAR_LIMIT=120]">Opening the chat to answer that\u2026</string>
@@ -946,6 +948,9 @@
   <string name="assistant_speak" translatable="true" description="Chip that toggles spoken replies. [CHAR_LIMIT=15]">Speak</string>
   <string name="assistant_manual" translatable="true" description="Chip that opens the manual on a phone. [CHAR_LIMIT=15]">Guide</string>
   <string name="manual_grant_notifications" translatable="true" description="Button that opens notification access settings. [CHAR_LIMIT=40]">Allow reading notifications</string>
+  <string name="manual_car_open_settings" translatable="true" description="Button that opens Android Auto settings. [CHAR_LIMIT=60]">Open Android Auto settings</string>
+  <string name="manual_car_missing" translatable="true" description="Shown when Android Auto is not on the phone. [CHAR_LIMIT=200]">Android Auto is not installed on this phone, so nothing can appear on a car screen until it is. Install it from the Play Store.</string>
+  <string name="manual_car_steps" translatable="true" description="The steps needed to see a sideloaded app in Android Auto. [CHAR_LIMIT=600]">Android Auto hides apps that did not come from the Play Store, and gives no error when it does. To see Star Storyteller in the car: open Android Auto settings, scroll to the bottom and tap Version ten times to turn on developer mode, then open the three-dot menu, choose Developer settings and switch on Unknown sources. Reconnect the phone to the car afterwards. Star Storyteller is a parked app, so it appears in the car\'s app list when the car is stopped, not while driving.</string>
   <string name="manual_grant_location" translatable="true" description="Button that asks for approximate location. [CHAR_LIMIT=60]">Allow location for weather</string>
   <string name="manual_weather_title" translatable="true" description="Manual section title for weather. [CHAR_LIMIT=30]">Weather</string>
   <string name="manual_weather_body" translatable="true" description="Manual section body for weather. [CHAR_LIMIT=300]">Ask what the weather is doing, whether it will rain, or what the week looks like. Name a town for anywhere else. It needs nothing set up: forecasts come from Open-Meteo, which asks for no account and no key. Allowing approximate location lets you leave the town out.</string>
