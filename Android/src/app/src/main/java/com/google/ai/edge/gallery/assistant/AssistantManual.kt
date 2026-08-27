@@ -89,6 +89,7 @@ fun AssistantManual(
   onOpenWakeWordSettings: () -> Unit,
   onOpenSmartHomeSettings: () -> Unit,
   onOpenVoiceSettings: () -> Unit,
+  onOpenMusicApp: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
@@ -105,6 +106,17 @@ fun AssistantManual(
         PackageManager.PERMISSION_GRANTED
     )
   }
+  var calendarGranted by remember {
+    mutableStateOf(
+      ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) ==
+        PackageManager.PERMISSION_GRANTED
+    )
+  }
+  val calendarLauncher =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+      granted ->
+      calendarGranted = granted.values.all { it }
+    }
   val androidAutoInstalled = remember { AndroidAutoStatus.isInstalled(context) }
   val locationLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -194,6 +206,18 @@ fun AssistantManual(
             Text(stringResource(R.string.manual_car_open_settings))
           }
         }
+        if (!calendarGranted) {
+          OutlinedButton(
+            onClick = {
+              calendarLauncher.launch(
+                arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+              )
+            },
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(stringResource(R.string.manual_grant_calendar))
+          }
+        }
         if (!locationGranted) {
           OutlinedButton(
             onClick = { locationLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
@@ -229,6 +253,9 @@ fun AssistantManual(
           }
           OutlinedButton(onClick = onOpenVoiceSettings) {
             Text(stringResource(R.string.voice_settings_title))
+          }
+          OutlinedButton(onClick = onOpenMusicApp) {
+            Text(stringResource(R.string.manual_music_app_button))
           }
         }
       }
@@ -281,10 +308,19 @@ private fun manualSections(): List<ManualSection> = listOf(
     listOf(stringResource(R.string.manual_device_body)),
   ),
   ManualSection(
+    stringResource(R.string.manual_messaging_title),
+    listOf(stringResource(R.string.manual_messaging_body)),
+  ),
+  ManualSection(
+    stringResource(R.string.manual_calendar_title),
+    listOf(stringResource(R.string.manual_calendar_body)),
+  ),
+  ManualSection(
     stringResource(R.string.manual_notifications_title),
     listOf(
       stringResource(R.string.manual_notifications_body),
       stringResource(R.string.manual_media_body),
+      stringResource(R.string.manual_music_body),
     ),
   ),
   ManualSection(
@@ -321,6 +357,7 @@ fun AssistantManualPane(
   onOpenWakeWordSettings: () -> Unit,
   onOpenSmartHomeSettings: () -> Unit,
   onOpenVoiceSettings: () -> Unit,
+  onOpenMusicApp: () -> Unit,
 ) {
   Surface(
     modifier = Modifier.width(MANUAL_PANEL_WIDTH).fillMaxHeight(),
@@ -332,6 +369,7 @@ fun AssistantManualPane(
       onOpenWakeWordSettings = onOpenWakeWordSettings,
       onOpenSmartHomeSettings = onOpenSmartHomeSettings,
       onOpenVoiceSettings = onOpenVoiceSettings,
+      onOpenMusicApp = onOpenMusicApp,
       modifier = Modifier.fillMaxHeight(),
     )
   }
@@ -371,6 +409,7 @@ fun AssistantManualSheet(
   onOpenWakeWordSettings: () -> Unit,
   onOpenSmartHomeSettings: () -> Unit,
   onOpenVoiceSettings: () -> Unit,
+  onOpenMusicApp: () -> Unit,
   onDismiss: () -> Unit,
 ) {
   ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -380,6 +419,7 @@ fun AssistantManualSheet(
       onOpenWakeWordSettings = onOpenWakeWordSettings,
       onOpenSmartHomeSettings = onOpenSmartHomeSettings,
       onOpenVoiceSettings = onOpenVoiceSettings,
+      onOpenMusicApp = onOpenMusicApp,
     )
   }
 }

@@ -139,6 +139,7 @@ fun AssistantScreen(
   var showModeSheet by remember { mutableStateOf(false) }
   var showWebSearchSettings by remember { mutableStateOf(false) }
   var showVoiceSettings by remember { mutableStateOf(false) }
+  var showMusicApp by remember { mutableStateOf(false) }
   var showWakeWordSettings by remember { mutableStateOf(false) }
   var showSmartHomeSettings by remember { mutableStateOf(false) }
 
@@ -254,6 +255,7 @@ fun AssistantScreen(
         onOpenWakeWordSettings = { showWakeWordSettings = true },
         onOpenSmartHomeSettings = { showSmartHomeSettings = true },
         onOpenVoiceSettings = { showVoiceSettings = true },
+        onOpenMusicApp = { showMusicApp = true },
       )
     },
   ) {
@@ -371,6 +373,10 @@ fun AssistantScreen(
         showManual = false
         showVoiceSettings = true
       },
+      onOpenMusicApp = {
+        showManual = false
+        showMusicApp = true
+      },
       onDismiss = { showManual = false },
     )
   }
@@ -385,6 +391,13 @@ fun AssistantScreen(
         // derived values above recompute from it.
         webSearchRevision++
       },
+    )
+  }
+
+  if (showMusicApp) {
+    MusicAppDialog(
+      dataStoreRepository = dataStoreRepository,
+      onDismiss = { showMusicApp = false },
     )
   }
 
