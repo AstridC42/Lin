@@ -27,6 +27,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
@@ -83,6 +84,14 @@ object AssistAnswering {
       Log.d(TAG, "No assistant session is live, so the pop-up cannot answer here")
       return null
     }
+    // One at a time. There is a single conversation behind the engine, shared with the chat
+    // screen, and starting a second turn into it while the first is still running is not something
+    // the runtime is asked to survive. Falling back to opening the chat is the same answer this
+    // gives whenever it cannot answer in place.
+    if (!inFlight.compareAndSet(false, true)) {
+      Log.d(TAG, "A turn is already running, so the pop-up hands this one to the chat")
+      return null
+    }
     return try {
       val response =
         withTimeout(ANSWER_TIMEOUT_MILLIS) {
@@ -100,6 +109,11 @@ object AssistAnswering {
       // error rather than anything the user did.
       Log.w(TAG, "Could not answer in the pop-up", e)
       null
+    } finally {
+      inFlight.set(false)
     }
   }
+
+  /** Whether a pop-up turn is already running. */
+  private val inFlight = AtomicBoolean(false)
 }

@@ -22,6 +22,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.service.voice.VoiceInteractionSession
 import android.util.Log
 import android.view.View
@@ -76,8 +78,17 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
   VoiceInteractionSession(serviceContext) {
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-  private val recognizer by lazy { OneShotRecognizer(serviceContext) }
-  private val speaker by lazy { AssistantSpeaker(serviceContext) }
+  // Created on first use and only then. A session can be shown and dismissed without a word being
+  // said - the pop-up is off, or the microphone is not granted - and `by lazy` in the tear-down
+  // path would build a speech engine purely in order to shut it down again.
+  private var recognizerOrNull: OneShotRecognizer? = null
+  private var speakerOrNull: AssistantSpeaker? = null
+
+  private val recognizer: OneShotRecognizer
+    get() = recognizerOrNull ?: OneShotRecognizer(serviceContext).also { recognizerOrNull = it }
+
+  private val speaker: AssistantSpeaker
+    get() = speakerOrNull ?: AssistantSpeaker(serviceContext).also { speakerOrNull = it }
 
   private var statusView: TextView? = null
   private var heardView: TextView? = null
@@ -86,6 +97,19 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
 
   /** The turn in flight, so a second summon or "Again" does not race the first. */
   private var answering: Job? = null
+
+  private val handler = Handler(Looper.getMainLooper())
+
+  /**
+   * Which round of listening is current.
+   *
+   * The silence cut-off is a timer, and a timer cannot be unscheduled reliably enough to rely on:
+   * it can already be running when the recognizer reports back. So each round takes a number and
+   * the timer only acts if its own round is still the one in progress. Without that, hearing an
+   * answer at three point nine seconds would be followed by the cut-off firing anyway and closing
+   * the microphone under the reply being worked out.
+   */
+  private var listenRound = 0
 
   override fun onCreateContentView(): View {
     val root = layoutInflater.inflate(R.layout.assist_panel, null)
@@ -135,28 +159,44 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
       handOver(query = query.trim(), listen = false)
       return
     }
-    recognizer.cancel()
+    recognizerOrNull?.cancel()
     answer(query.trim())
   }
 
   override fun onHide() {
+    // Whatever round was in flight is over, so a cut-off still queued must not act on the next one.
+    listenRound++
+    handler.removeCallbacksAndMessages(null)
     // The microphone and the speech engine both outlive the card unless they are told not to, and
     // a pop-up that keeps listening after it is dismissed is the worst version of this feature.
-    recognizer.cancel()
-    speaker.stop()
+    recognizerOrNull?.cancel()
+    speakerOrNull?.stop()
     answering?.cancel()
     super.onHide()
   }
 
   override fun onDestroy() {
-    recognizer.cancel()
-    speaker.release()
+    handler.removeCallbacksAndMessages(null)
+    recognizerOrNull?.cancel()
+    speakerOrNull?.release()
+    recognizerOrNull = null
+    speakerOrNull = null
     scope.cancel()
     super.onDestroy()
   }
 
-  private fun listen() {
+  /**
+   * Opens the microphone.
+   *
+   * @param giveUpAfterMillis how long to wait for someone to start speaking before closing the
+   *   microphone again, or null to leave that to the recognizer. Set for the round that follows an
+   *   answer: the assistant reopening the microphone every time it finishes a sentence is what
+   *   makes a conversation possible without touching the phone, and also what would leave the
+   *   microphone open indefinitely in a pocket if nobody replied.
+   */
+  private fun listen(giveUpAfterMillis: Long? = null) {
     answering?.cancel()
+    val round = ++listenRound
     showReply(null)
     if (
       ContextCompat.checkSelfPermission(serviceContext, Manifest.permission.RECORD_AUDIO) !=
@@ -172,8 +212,16 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
     setStatus(R.string.assist_panel_listening)
     heardView?.text = serviceContext.getString(R.string.assist_panel_prompt)
     recognizer.start(
-      onPartial = { partial -> if (partial.isNotBlank()) heardView?.text = partial },
+      onPartial = { partial ->
+        if (partial.isNotBlank()) {
+          // Something is being said, so the cut-off has done its job. Whoever is talking gets as
+          // long as they need to finish the sentence.
+          listenRound++
+          heardView?.text = partial
+        }
+      },
       onFinal = { spoken ->
+        listenRound++
         if (spoken.isBlank()) {
           setStatus(R.string.assist_panel_answered)
           heardView?.text = serviceContext.getString(R.string.assist_panel_no_speech)
@@ -183,6 +231,19 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
         }
       },
     )
+
+    if (giveUpAfterMillis != null) {
+      handler.postDelayed(
+        {
+          if (listenRound == round) {
+            recognizer.cancel()
+            setStatus(R.string.assist_panel_answered)
+            heardView?.text = serviceContext.getString(R.string.assist_panel_still_there)
+          }
+        },
+        giveUpAfterMillis,
+      )
+    }
   }
 
   private fun answer(query: String) {
@@ -204,7 +265,13 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
         // Always spoken, whatever the chat screen's own setting says. This panel is only ever
         // reached by holding a button and talking, and an answer that has to be read defeats the
         // gesture that asked for it.
-        speaker.speak(reply)
+        speaker.speak(reply) {
+          // Straight back to listening, the way a conversation works - no second button press to
+          // say the next thing. Not instantly, though: the phone's own speaker is still settling
+          // when the engine reports done, and a microphone opened into that records the assistant
+          // and answers itself.
+          handler.postDelayed({ listen(giveUpAfterMillis = FOLLOW_UP_SILENCE_MILLIS) }, SETTLE_MILLIS)
+        }
       }
   }
 
@@ -221,6 +288,19 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
   private fun showReply(text: String?) {
     replyView?.text = text.orEmpty()
     replyScroll?.visibility = if (text.isNullOrBlank()) View.GONE else View.VISIBLE
+  }
+
+  private companion object {
+    /**
+     * How long to wait for a reply before closing the microphone again.
+     *
+     * Long enough to answer a question, short enough that a panel left in a pocket is not still
+     * recording a minute later.
+     */
+    const val FOLLOW_UP_SILENCE_MILLIS = 4_000L
+
+    /** Long enough for the phone's own speaker to stop before the microphone opens. */
+    const val SETTLE_MILLIS = 250L
   }
 
   /** Opens the full chat, carrying [query] if there is one, and closes the panel. */

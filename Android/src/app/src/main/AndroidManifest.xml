@@ -116,6 +116,12 @@
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
+        <!--
+          Star Storyteller: so the Guide panel can tell whether Android Auto is on this phone and
+          offer a way into its settings. Without this the package is invisible and the panel would
+          report it missing on a phone that has it.
+        -->
+        <package android:name="com.google.android.projection.gearhead" />
     </queries>
 
     <uses-feature
