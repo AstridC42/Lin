@@ -103,8 +103,13 @@ reasons are worth keeping written down.
   open the conversation with the text written, for the sender to send. (Replying
   to a notification already on screen *does* send — different mechanism, and it
   works for any app with a reply button.)
-- **Avoiding Play Protect warnings.** Inherent to installing outside the Play
-  Store.
+- **Avoiding Play Protect warnings.** Play Protect checks every install against
+  Google's catalogue, and an app signed by a developer it has never heard of
+  gets "Unsafe app blocked". Nothing inside an APK changes that, and the app id
+  is already the fork's own rather than Google's, so there is no collision to
+  fix. The way through is on the device: **More details** then **Install
+  anyway**, or turn the scan off for the one install. Both are written up in
+  INSTALL.md and in every release's notes.
 - **A system-wide default music app.** Android has no such setting for an app to
   read. The in-app choice is the available substitute.
 - **Reading or answering an incoming call.** Requires being the phone's dialler.

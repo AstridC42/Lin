@@ -57,13 +57,33 @@ does the installing.
 3. Turn on **Allow from this source** — you are allowing your browser or file manager, not the app.
 4. Go back and tap **Install**.
 
-Two things that trip people up:
+### Play Protect blocking it
+
+The most common thing to hit. Play Protect checks every install against Google's catalogue, and an
+app that is not in it — signed by a developer it has never heard of — gets **"Unsafe app blocked"**
+or *"Play Protect doesn't recognise this developer"*. It is not a judgement about the app; every
+sideloaded build gets it, and nothing inside an APK can prevent it.
+
+Two ways past:
+
+1. On the blocking dialog, tap **More details**, then **Install anyway**. The link is deliberately
+   small and easy to miss. Depending on the Android version it may read *Install without scanning*
+   or offer **Send for scanning** first — scanning is fine, it just takes a minute and then lets
+   you continue.
+2. If there is no such option, turn the scan off for the install: **Play Store** → your profile
+   picture → **Play Protect** → the gear icon → turn off **Scan apps with Play Protect**. Install,
+   then turn it back on. Leaving it off is not worth it for one app.
+
+### Other things that trip people up
 
 - **"App not installed"** usually means a copy signed with a different key is already there.
-  Uninstall the old one and try again. This is common while releases are still unsigned — see
-  *Signing* below.
+  Uninstall the old one and try again — note that uninstalling deletes the downloaded models.
+  Every test build carries its signing key's fingerprint in the release notes, and a build whose
+  key has changed says so at the top.
 - Star Storyteller installs as `com.starstoryteller.assistant`, so it sits **alongside** Google AI
   Edge Gallery rather than replacing it. Having both is fine.
+- **"There was a problem parsing the package"** means the download did not finish. Check it against
+  `SHA256SUMS.txt` on the release, or just download it again.
 
 Requires **Android 12 or newer**.
 

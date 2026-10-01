@@ -278,6 +278,16 @@ jobs:
             echo
             echo "Checksums: [SHA256SUMS.txt](${base}/SHA256SUMS.txt)."
             echo
+            echo "### If Android refuses to install it"
+            echo
+            echo "**\"Unsafe app blocked\"** is Play Protect, and every sideloaded build gets it -"
+            echo "nothing in the APK can prevent it. Tap **More details** then **Install anyway**;"
+            echo "the link is small and easy to miss. If it is not offered, turn the check off for"
+            echo "the install: Play Store > your profile picture > Play Protect > the gear icon >"
+            echo "**Scan apps with Play Protect** off, install, then turn it back on."
+            echo
+            echo "**\"App not installed\"** is a different thing - see the signing key below."
+            echo
             echo "_This repository is private, so the links need you signed in to GitHub. If one"
             echo "does not open, the same files are under **Assets** — on the GitHub mobile app,"
             echo "tap **View release details** first._"
