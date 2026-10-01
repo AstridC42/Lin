@@ -40,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -61,6 +62,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.car.AndroidAutoStatus
+import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.notifications.StarNotificationListener
 import com.google.ai.edge.gallery.voice.AssistantRole
 
@@ -84,6 +86,7 @@ private data class ManualSection(val title: String, val lines: List<String>)
  */
 @Composable
 fun AssistantManual(
+  dataStoreRepository: DataStoreRepository,
   onOpenGallery: (() -> Unit)?,
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
@@ -118,6 +121,9 @@ fun AssistantManual(
       granted ->
       calendarGranted = granted.values.all { it }
     }
+  var stayReady by remember {
+    mutableStateOf(dataStoreRepository.readAssistantSettings().keepModelLoaded)
+  }
   val androidAutoInstalled = remember { AndroidAutoStatus.isInstalled(context) }
   val locationLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -237,6 +243,44 @@ fun AssistantManual(
             Text(stringResource(R.string.manual_grant_notifications))
           }
         }
+        // A switch rather than a button, because unlike everything else in this card it is not a
+        // trip to a system settings screen - it is a choice this app makes and keeps.
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(
+              stringResource(R.string.resident_setting_title),
+              style = MaterialTheme.typography.bodyMedium,
+              fontWeight = FontWeight.Medium,
+            )
+            Text(
+              stringResource(R.string.resident_setting_detail),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(
+            checked = stayReady,
+            onCheckedChange = { wanted ->
+              stayReady = wanted
+              dataStoreRepository.saveAssistantSettings(
+                dataStoreRepository
+                  .readAssistantSettings()
+                  .toBuilder()
+                  .setKeepModelLoaded(wanted)
+                  .build()
+              )
+              // Takes effect now rather than on the next model load, in both directions: turning
+              // it on while a model is already loaded is the common case.
+              if (wanted) ResidentAssistantService.startIfEnabled(context)
+              else ResidentAssistantService.stop(context)
+            },
+          )
+        }
+
         // Wraps rather than scrolls: on a phone in portrait these do not fit on one line, and a
         // settings button that is simply off the edge of the panel is a setting nobody finds.
         FlowRow(
@@ -362,6 +406,7 @@ private fun manualSections(): List<ManualSection> = listOf(
 /** The manual as a panel beside the chat, with a divider between the two. */
 @Composable
 fun AssistantManualPane(
+  dataStoreRepository: DataStoreRepository,
   onOpenGallery: (() -> Unit)?,
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
@@ -375,6 +420,7 @@ fun AssistantManualPane(
     color = MaterialTheme.colorScheme.surfaceContainerLow,
   ) {
     AssistantManual(
+      dataStoreRepository = dataStoreRepository,
       onOpenGallery = onOpenGallery,
       onOpenWebSearchSettings = onOpenWebSearchSettings,
       onOpenWakeWordSettings = onOpenWakeWordSettings,
@@ -416,6 +462,7 @@ fun AssistantTwoPane(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AssistantManualSheet(
+  dataStoreRepository: DataStoreRepository,
   onOpenGallery: (() -> Unit)?,
   onOpenWebSearchSettings: () -> Unit,
   onOpenWakeWordSettings: () -> Unit,
@@ -427,6 +474,7 @@ fun AssistantManualSheet(
 ) {
   ModalBottomSheet(onDismissRequest = onDismiss) {
     AssistantManual(
+      dataStoreRepository = dataStoreRepository,
       onOpenGallery = onOpenGallery,
       onOpenWebSearchSettings = onOpenWebSearchSettings,
       onOpenWakeWordSettings = onOpenWakeWordSettings,

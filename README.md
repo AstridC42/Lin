@@ -119,6 +119,19 @@ Contacts are only read after you grant `READ_CONTACTS`, at the moment the
 assistant first needs a number. When several people match a name, it asks
 instead of guessing.
 
+## Staying ready
+
+Everything that summons the assistant from outside the app — the power-button
+pop-up, the widget, the car, the wake word — can only answer in place while a
+model is loaded, and loading one takes tens of seconds. **Stay ready** in the
+Guide panel keeps the loaded model in memory after you close the chat, so they
+answer instead of opening the app.
+
+It is off by default because it is not free: the model's memory, often two to
+four gigabytes, stays claimed while it holds, and an ongoing notification says
+so with a Stop button. Android can still reclaim it under real memory pressure,
+and the pop-up falls back to opening the chat when it does.
+
 ## Using it as the phone's assistant
 
 The app implements a full `VoiceInteractionService`, so it can be selected under

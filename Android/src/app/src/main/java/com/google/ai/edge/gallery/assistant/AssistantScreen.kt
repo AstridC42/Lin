@@ -251,6 +251,7 @@ fun AssistantScreen(
     showManual = manualOnScreen,
     manual = {
       AssistantManualPane(
+        dataStoreRepository = dataStoreRepository,
         onOpenGallery = onOpenGallery,
         onOpenWebSearchSettings = { showWebSearchSettings = true },
         onOpenWakeWordSettings = { showWakeWordSettings = true },
@@ -358,6 +359,7 @@ fun AssistantScreen(
 
   if (showManual) {
     AssistantManualSheet(
+      dataStoreRepository = dataStoreRepository,
       onOpenGallery = onOpenGallery,
       onOpenWebSearchSettings = {
         showManual = false

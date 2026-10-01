@@ -155,6 +155,17 @@ fun AssistantRoute(
     }
   }
 
+  // Hold the process for as long as there is a loaded model to hold, and only then. Keyed on the
+  // initialization status so it follows the model: it starts when one finishes loading and goes
+  // away again when the model does, rather than holding an empty process because a setting is on.
+  LaunchedEffect(initializationStatus, selectedName) {
+    if (initializationStatus == ModelInitializationStatusType.INITIALIZED) {
+      ResidentAssistantService.startIfEnabled(context)
+    } else {
+      ResidentAssistantService.stop(context)
+    }
+  }
+
   // Bring the wake word listener back after a reboot or a swipe-away. The service is the only
   // thing that knows how to listen and it does not survive the process, so without this the
   // setting would silently mean nothing until the tile was tapped again.

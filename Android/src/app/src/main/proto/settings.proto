@@ -201,6 +201,15 @@ message AssistantSettings {
   // chooser every single time unless one is picked here. Empty leaves the
   // choice to the phone.
   string preferred_music_app = 13;
+
+  // Whether to keep the loaded model in memory after the chat is closed.
+  //
+  // Off by default and not free: the model's memory, often two to four
+  // gigabytes, stays claimed for as long as it holds, and an ongoing
+  // notification says so. What it buys is the pop-up, the widget, the car and
+  // the wake word answering in place instead of apologising and opening the
+  // chat, which is most of the difference between an app and an assistant.
+  bool keep_model_loaded = 14;
 }
 
 // A reminder the assistant will deliver at a set time.

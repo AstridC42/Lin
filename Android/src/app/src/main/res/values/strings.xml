@@ -926,6 +926,13 @@
   <string name="voice_settings_try" translatable="true" description="Button that speaks a sample line. [CHAR_LIMIT=30]">Hear it</string>
   <string name="voice_settings_manual_title" translatable="true" description="Manual entry for the voice settings. [CHAR_LIMIT=40]">Assistant voice</string>
   <string name="voice_settings_manual_body" translatable="true" description="Manual entry describing voice settings. [CHAR_LIMIT=200]">Pick which voice reads replies out loud, and how fast and how high it speaks. Long-press Speak on the chat screen to get here quickly.</string>
+  <string name="resident_channel_name" translatable="true" description="Notification channel for the service that keeps the model loaded. [CHAR_LIMIT=40]">Ready to answer</string>
+  <string name="resident_channel_description" translatable="true" description="Describes that notification channel. [CHAR_LIMIT=200]">Shown while Star Storyteller is holding its model in memory so it can answer immediately.</string>
+  <string name="resident_notification_title" translatable="true" description="Title of the ongoing notification. [CHAR_LIMIT=40]">Star Storyteller is ready</string>
+  <string name="resident_notification_text" translatable="true" description="Body of the ongoing notification. [CHAR_LIMIT=120]">Holding the model in memory so it can answer straight away.</string>
+  <string name="resident_stop" translatable="true" description="Action that stops holding the model. [CHAR_LIMIT=20]">Stop</string>
+  <string name="resident_setting_title" translatable="true" description="Switch that keeps the model loaded. [CHAR_LIMIT=40]">Stay ready</string>
+  <string name="resident_setting_detail" translatable="true" description="Explains the stay-ready switch. [CHAR_LIMIT=300]">Keep the model in memory after you close the chat, so the power-button pop-up, the widget and the car answer straight away instead of waiting to load one. It claims two to four gigabytes while it holds, and shows a notification saying so.</string>
   <string name="wake_word_settings_title" translatable="true" description="Title of the wake word settings dialog. [CHAR_LIMIT=40]">Wake word</string>
   <string name="wake_word_enable" translatable="true" description="Label of the switch that enables continuous listening. [CHAR_LIMIT=40]">Listen for the wake word</string>
   <string name="wake_word_phrase_label" translatable="true" description="Label of the field holding the wake phrase. [CHAR_LIMIT=30]">Phrase</string>

@@ -58,6 +58,12 @@
     <!-- Star Storyteller: the always-listening wake word service holds the microphone. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
     <!--
+      Star Storyteller: keeps the process alive so a loaded model survives the chat being closed.
+      There is no category for "holding a language model in memory" - it runs no loop, holds no
+      wake lock and listens to nothing - so special use is the honest declaration.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <!--
       Coarse only, and only ever the fix the phone already has: a forecast is the same across a
       town, so precise location would be asking for more than the answer needs.
     -->
@@ -317,6 +323,19 @@
             android:name="com.google.ai.edge.gallery.voice.WakeWordService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!--
+          Star Storyteller: the reason the process is not reclaimed while a model is loaded. See
+          ResidentAssistantService for why this is the mechanism and what it costs.
+        -->
+        <service
+            android:name="com.google.ai.edge.gallery.assistant.ResidentAssistantService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the on-device language model loaded so the assistant can answer when summoned from outside the app" />
+        </service>
 
         <service
             android:name="com.google.ai.edge.gallery.voice.WakeWordTileService"
