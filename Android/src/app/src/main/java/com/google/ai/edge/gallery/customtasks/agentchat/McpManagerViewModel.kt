@@ -24,6 +24,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.ai.edge.gallery.BuildConfig
 import com.google.ai.edge.gallery.GalleryEvent
 import com.google.ai.edge.gallery.firebaseAnalytics
+import com.google.ai.edge.gallery.mcp.McpPromptSafety
 import com.google.ai.edge.gallery.mcp.McpServerState
 import com.google.ai.edge.gallery.mcp.McpServersProvider
 import com.google.ai.edge.gallery.proto.McpAuth
@@ -273,8 +274,16 @@ constructor(
       .filter { it.mcpServer.enabled }
       .flatMap { it.mcpServer.toolsList }
       .filter { it.enabled }
-      .joinToString("\n\n") { tool ->
-        "MCP tool name: \"${tool.name}\"\n- Description: ${tool.description}\n- Input schema: ${tool.inputSchema}"
+      // One line per tool, and every field sanitised: these strings come from whichever server the
+      // user added, and they are being written into the same prompt that holds this app's own
+      // instructions. See McpPromptSafety for what that allowed and what the flattening does
+      // about it.
+      .joinToString("\n") { tool ->
+        McpPromptSafety.describeTool(
+          name = tool.name,
+          description = tool.description,
+          inputSchema = tool.inputSchema,
+        )
       }
   }
 
