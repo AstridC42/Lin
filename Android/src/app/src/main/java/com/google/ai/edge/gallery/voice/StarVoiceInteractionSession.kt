@@ -20,7 +20,9 @@ import android.Manifest
 import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
+import android.app.assist.AssistStructure
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -94,6 +96,7 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
   private var heardView: TextView? = null
   private var replyView: TextView? = null
   private var replyScroll: ScrollView? = null
+  private var screenButton: Button? = null
 
   /** The turn in flight, so a second summon or "Again" does not race the first. */
   private var answering: Job? = null
@@ -111,6 +114,18 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
    */
   private var listenRound = 0
 
+  /**
+   * What is on the screen behind the panel, when the platform offers it.
+   *
+   * Both are optional and arrive separately, after the session is shown: a screenshot for a model
+   * that can see, and the text of the view hierarchy for one that cannot. Whether either arrives
+   * at all is the system's decision, not this app's - some devices and some apps withhold both,
+   * and a FLAG_SECURE screen always will. So the button that uses them only appears once
+   * something has turned up.
+   */
+  private var screenshot: Bitmap? = null
+  private var screenText: String = ""
+
   override fun onCreateContentView(): View {
     val root = layoutInflater.inflate(R.layout.assist_panel, null)
     statusView = root.findViewById(R.id.assist_status)
@@ -118,6 +133,12 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
     replyView = root.findViewById(R.id.assist_reply)
     replyScroll = root.findViewById(R.id.assist_reply_scroll)
 
+    screenButton =
+      root.findViewById<Button>(R.id.assist_screen).apply {
+        setOnClickListener { askAboutScreen() }
+        // Shown only once the platform has offered a screenshot or the screen's text.
+        visibility = if (screenshot != null || screenText.isNotEmpty()) View.VISIBLE else View.GONE
+      }
     root.findViewById<Button>(R.id.assist_again).setOnClickListener { listen() }
     root.findViewById<Button>(R.id.assist_open).setOnClickListener {
       handOver(query = heardTextOrEmpty(), listen = false)
@@ -153,6 +174,11 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
       state.assistData?.getString(SearchManager.QUERY).orEmpty().ifEmpty {
         state.assistData?.getString(Intent.EXTRA_TEXT).orEmpty()
       }
+    // The text of the app in front, for a model that cannot see the screenshot. Captured whether
+    // or not a query came with the summon, since the question usually arrives afterwards.
+    screenText = readScreenText(state.assistStructure)
+    if (screenText.isNotEmpty() || screenshot != null) showScreenButton()
+
     if (query.isBlank()) return
     Log.d(TAG, "Assistant summoned with a query")
     if (!AssistAnswering.popupEnabled(serviceContext)) {
@@ -161,6 +187,13 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
     }
     recognizerOrNull?.cancel()
     answer(query.trim())
+  }
+
+  /** The screenshot of whatever was in front, scaled down to something a model can take. */
+  override fun onHandleScreenshot(screenshot: Bitmap?) {
+    super.onHandleScreenshot(screenshot)
+    this.screenshot = screenshot?.let { scaleForModel(it) }
+    if (this.screenshot != null) showScreenButton()
   }
 
   override fun onHide() {
@@ -172,6 +205,10 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
     recognizerOrNull?.cancel()
     speakerOrNull?.stop()
     answering?.cancel()
+    // A screenshot of somebody's banking app is not something to keep a reference to once the
+    // panel is gone, and it is several megabytes.
+    screenshot = null
+    screenText = ""
     super.onHide()
   }
 
@@ -275,6 +312,106 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
       }
   }
 
+  /**
+   * Shows the "This screen" button, now that there is something behind the panel to ask about.
+   *
+   * Hidden until then rather than present and refusing: both the screenshot and the view text are
+   * the system's to offer, and on a screen that withholds them - anything marked secure, a banking
+   * app, some keyboards - a button that could only apologise is worse than no button.
+   */
+  private fun showScreenButton() {
+    screenButton?.visibility = View.VISIBLE
+  }
+
+  /** Asks about what is on the screen, with whatever the platform gave us to go on. */
+  private fun askAboutScreen() {
+    val shot = screenshot
+    val text = screenText
+    if (shot == null && text.isEmpty()) return
+
+    heardView?.text = serviceContext.getString(R.string.assist_panel_this_screen_question)
+    answering?.cancel()
+    setStatus(R.string.assist_panel_thinking)
+    showReply(null)
+    answering =
+      scope.launch {
+        // The screenshot goes to a model that can see; the text goes to one that cannot, and is
+        // sent alongside either way - it costs little and it is the only thing a text-only model
+        // has to work from.
+        val question = buildString {
+          append(serviceContext.getString(R.string.assist_panel_this_screen_prompt))
+          if (text.isNotEmpty()) {
+            append("\n\n")
+            append(text)
+          }
+        }
+        val reply = AssistAnswering.answer(serviceContext, question, image = shot)
+        if (reply == null) {
+          showReply(serviceContext.getString(R.string.assist_panel_opening))
+          handOver(query = serviceContext.getString(R.string.assist_panel_this_screen_prompt), listen = false)
+          return@launch
+        }
+        setStatus(R.string.assist_panel_answered)
+        showReply(reply)
+        speaker.speak(reply) {
+          handler.postDelayed({ listen(giveUpAfterMillis = FOLLOW_UP_SILENCE_MILLIS) }, SETTLE_MILLIS)
+        }
+      }
+  }
+
+  /**
+   * Every piece of text in the app in front, in reading order.
+   *
+   * Walks the window hierarchies the platform handed over. Depth is bounded because a view tree is
+   * not guaranteed to be shallow and this runs on the main thread with a card already on screen.
+   */
+  private fun readScreenText(structure: AssistStructure?): String {
+    if (structure == null) return ""
+    val lines = mutableListOf<String>()
+    try {
+      for (window in 0 until structure.windowNodeCount) {
+        collect(structure.getWindowNodeAt(window).rootViewNode, lines, depth = 0)
+      }
+    } catch (e: Exception) {
+      // The structure is cross-process and can be recycled while being read.
+      Log.d(TAG, "Could not read the screen's text", e)
+    }
+    return ScreenText.summarize(lines)
+  }
+
+  private fun collect(node: AssistStructure.ViewNode?, into: MutableList<String>, depth: Int) {
+    if (node == null || depth > MAX_VIEW_DEPTH || into.size >= MAX_VIEW_LINES) return
+    node.text?.toString()?.takeIf { it.isNotBlank() }?.let(into::add)
+    node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let(into::add)
+    for (child in 0 until node.childCount) {
+      collect(node.getChildAt(child), into, depth + 1)
+    }
+  }
+
+  /**
+   * A screenshot small enough to hand a model.
+   *
+   * A phone screenshot is a few million pixels; a vision model works from a few hundred thousand
+   * and encoding the rest costs time and memory for nothing. Scaled on the long edge so an
+   * unfolded tablet and a tall phone both come out sensible.
+   */
+  private fun scaleForModel(source: Bitmap): Bitmap {
+    val longest = maxOf(source.width, source.height)
+    if (longest <= MAX_SCREENSHOT_EDGE) return source
+    val scale = MAX_SCREENSHOT_EDGE.toFloat() / longest
+    return try {
+      Bitmap.createScaledBitmap(
+        source,
+        (source.width * scale).toInt().coerceAtLeast(1),
+        (source.height * scale).toInt().coerceAtLeast(1),
+        true,
+      )
+    } catch (e: Exception) {
+      Log.d(TAG, "Could not scale the screenshot; using it as it came", e)
+      source
+    }
+  }
+
   private fun heardTextOrEmpty(): String {
     val placeholder = serviceContext.getString(R.string.assist_panel_prompt)
     val heard = heardView?.text?.toString().orEmpty()
@@ -301,6 +438,15 @@ class StarVoiceInteractionSession(private val serviceContext: Context) :
 
     /** Long enough for the phone's own speaker to stop before the microphone opens. */
     const val SETTLE_MILLIS = 250L
+
+    /** A view tree is not guaranteed shallow, and this walk runs on the main thread. */
+    const val MAX_VIEW_DEPTH = 24
+
+    /** Enough lines to cover a screen; the real cap on what is sent is in ScreenText. */
+    const val MAX_VIEW_LINES = 400
+
+    /** A vision model works from a few hundred thousand pixels, not a few million. */
+    const val MAX_SCREENSHOT_EDGE = 1024
   }
 
   /** Opens the full chat, carrying [query] if there is one, and closes the panel. */

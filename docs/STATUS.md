@@ -27,6 +27,11 @@ Confirmed on a real phone.
 - **Voice.** Dictation, spoken replies, a chosen voice with speed and pitch, and
   hands-free conversation in the pop-up: it listens again as soon as it stops
   speaking and gives up after four seconds of silence.
+- **Reading the screen.** The pop-up offers **This screen** when the platform
+  hands over a screenshot or the text of the app in front, so "what is this" and
+  "summarise this" work without copying anything. Whether either is offered is
+  the system's decision — a secure screen withholds both — so the button only
+  appears when there is something to ask about.
 - **Remembering you.** Twenty durable facts, written by the model when you tell
   it to remember something or by you directly, injected into every prompt.
   Capped and listed under **Memory** in the Guide panel, because a fact
@@ -53,6 +58,7 @@ Nobody has reported it working on a phone, so treat it as untested.
 | Media control | "pause", "next", "what's playing" | The same notification access |
 | Smart home | "turn off the kitchen light" | A Home Assistant address and token |
 | Web search, pictures, pages | "search for…", "show me a photo of…" | A SearXNG instance with `json` in `search.formats` |
+| What is on the screen | Hold the power button over an article or a message, then **This screen** | A model that can see, for the screenshot; the text works on any |
 | Memory | "remember that I take the train", then ask something that needs it | Nothing |
 | Staying ready | Close the chat, then hold the power button — it should answer rather than open the app | **Stay ready** in the Guide panel |
 | Widget and lock screen | The home-screen widget | Nothing |
@@ -107,17 +113,7 @@ reasons are worth keeping written down.
 
 In the order I would do them, with the reasoning rather than just the list.
 
-### 1. Seeing what is on the screen
-
-The assist session can be handed a screenshot and the structure of whatever app
-is in front. "What is this?", "summarise this page", "what does this say" — on
-screen content, without copying anything. It is the most distinctive thing the
-assistant being replaced does, and the plumbing for it is already half built:
-the session exists, and images already attach to any conversation.
-
-Needs a model that can see, which rules it out on the text-only ones.
-
-### 2. Fewer tools in front of the model at once
+### 1. Fewer tools in front of the model at once
 
 The real constraint on this app is not features, it is that around 25 tool
 schemas plus the system prompt consume roughly three quarters of a 4,000-token
@@ -135,7 +131,7 @@ sit behind, which is what makes the next item cheap instead of speculative.
 everything already built work better, and because adding tools before it
 actively trades against what is there.
 
-### 3. EmbeddingGemma, behind that same interface
+### 2. EmbeddingGemma, behind that same interface
 
 Once selection is dynamic, replacing lexical matching with embedding similarity
 is a drop-in: embed the message, compare against precomputed tool and skill
@@ -149,7 +145,7 @@ to hold it alongside the conversational model. Worth it only after step 1 proves
 the selection interface is right, which is the whole reason to do them in this
 order.
 
-### 4. MobileActions-270M as a fast path
+### 3. MobileActions-270M as a fast path
 
 The allowlist already carries a 270M model fine-tuned for phone actions, and
 upstream has a screen for it. It is excluded from the assistant today, correctly:
@@ -162,7 +158,7 @@ model. The work is in the routing decision and in a second engine's lifecycle,
 and it needs the memory-pressure handling to be as careful as the single-model
 path already had to become.
 
-### 5. Bring your own model — reachable, and documented
+### 4. Bring your own model — reachable, and documented
 
 Already works: a `.litertlm` or `.task` file imported from the phone, or a
 Hugging Face link, appears in the chat's model picker beside the rest. It was

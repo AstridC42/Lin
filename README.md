@@ -119,6 +119,17 @@ Contacts are only read after you grant `READ_CONTACTS`, at the moment the
 assistant first needs a number. When several people match a name, it asks
 instead of guessing.
 
+## Asking about what is on the screen
+
+Hold the power button over an article, a message thread or a receipt and the
+pop-up offers **This screen**. It sends a screenshot to a model that can see,
+and the text of the app in front to one that cannot, so "what is this" and
+"summarise this" work without copying anything out.
+
+The button only appears when there is something to ask about: whether a
+screenshot or the view text is offered at all is the system's decision, and a
+screen marked secure — a banking app, some keyboards — withholds both.
+
 ## Remembering you
 
 Tell it to remember something — what you call people, how you travel, anything

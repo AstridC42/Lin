@@ -891,6 +891,9 @@
   <string name="assist_panel_thinking" translatable="true" description="Status shown while the pop-up assistant is working out an answer. [CHAR_LIMIT=30]">Thinking</string>
   <string name="assist_panel_answered" translatable="true" description="Status shown once the pop-up assistant has answered. [CHAR_LIMIT=30]">Star Storyteller</string>
   <string name="assist_panel_prompt" translatable="true" description="Placeholder shown before anything has been heard. [CHAR_LIMIT=60]">Say what you need\u2026</string>
+  <string name="assist_panel_this_screen" translatable="true" description="Button that asks about what is on the screen. [CHAR_LIMIT=20]">This screen</string>
+  <string name="assist_panel_this_screen_question" translatable="true" description="Shown as the question when asking about the screen. [CHAR_LIMIT=60]">What is on my screen?</string>
+  <string name="assist_panel_this_screen_prompt" translatable="true" description="The question sent to the model about the screen. [CHAR_LIMIT=200]">Describe what is on the screen behind this panel, briefly, and say what I could do about it.</string>
   <string name="assist_panel_again" translatable="true" description="Button that listens again. [CHAR_LIMIT=20]">Again</string>
   <string name="assist_panel_open" translatable="true" description="Button that opens the full chat screen. [CHAR_LIMIT=20]">Open chat</string>
   <string name="assist_panel_close" translatable="true" description="Button that dismisses the pop-up. [CHAR_LIMIT=20]">Close</string>

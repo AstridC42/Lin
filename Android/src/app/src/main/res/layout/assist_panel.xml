@@ -73,6 +73,19 @@
             android:orientation="horizontal"
             android:gravity="end">
 
+            <!--
+              Hidden until the platform offers a screenshot or the screen's text, which is its
+              decision and not this app's: a secure screen withholds both, and a button that could
+              only apologise is worse than no button.
+            -->
+            <Button
+                android:id="@+id/assist_screen"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="@string/assist_panel_this_screen" />
+
             <Button
                 android:id="@+id/assist_again"
                 style="?android:attr/borderlessButtonStyle"
