@@ -210,6 +210,10 @@ fun GalleryNavHost(
           enableHomeScreenAnimation = true
           navController.navigate(ROUTE_HOMESCREEN)
         },
+        // Straight to the model manager, where a model file of your own is imported. It is three
+        // screens away through the gallery, which is three screens too many for the thing someone
+        // does right after being told the app can run a model they supply themselves.
+        onOpenModels = { navController.navigate(ROUTE_MODEL_MANAGER) },
         // Nothing sits below the assistant in the back stack, so "up" means leaving the app.
         onExit = { activity?.moveTaskToBack(true) },
         initialQuery = initialAssistantQuery,

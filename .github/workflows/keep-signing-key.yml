@@ -1,0 +1,43 @@
+# Keeps the CI signing key from being evicted.
+#
+# The key that test builds are signed with lives in the Actions cache and nowhere else, which is a
+# deliberate trade - a private key does not belong in the repository - but it comes with a deadline.
+# GitHub removes a cache entry that has not been *accessed* for seven days, and a build is the only
+# thing that accesses this one. So a gap of more than a week between pushes silently destroys the
+# key, the next build mints a different one, and the next APK refuses to install over the copy on
+# somebody's phone with nothing to explain why. That is exactly what a five-week gap did.
+#
+# Restoring the cache counts as accessing it, so this does nothing but restore it, twice a week.
+# It also says so when the key has gone, which turns a mystifying "App not installed" weeks later
+# into a warning at the point it happened.
+name: Keep the signing key alive
+
+on:
+  schedule:
+    # Mondays and Thursdays, so the longest gap is four days against a seven-day deadline. Not on
+    # the hour: schedules that land on :00 queue behind everybody else's.
+    - cron: '17 4 * * 1,4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  touch:
+    name: Touch the signing key cache
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore the CI signing key
+        id: signing-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ci-keystore
+          key: star-ci-signing-key-v2
+
+      - name: Report
+        run: |
+          if [ "${{ steps.signing-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "The CI signing key is still cached. Builds will keep installing over each other."
+          else
+            echo "::warning::The CI signing key cache is gone. The next test build will create a new key, and its APK will not install over an existing one without uninstalling first - which loses downloaded models. Set the four signing secrets to make the key permanent; see RELEASING.md."
+          fi

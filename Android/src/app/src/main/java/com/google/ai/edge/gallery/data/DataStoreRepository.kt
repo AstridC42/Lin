@@ -18,6 +18,7 @@ package com.google.ai.edge.gallery.data
 
 import androidx.datastore.core.DataStore
 import com.google.ai.edge.gallery.proto.AccessTokenData
+import com.google.ai.edge.gallery.proto.AssistantMemory
 import com.google.ai.edge.gallery.proto.AssistantSettings
 import com.google.ai.edge.gallery.proto.BenchmarkResult
 import com.google.ai.edge.gallery.proto.BenchmarkResults
@@ -146,6 +147,12 @@ interface DataStoreRepository {
 
   /** Persists the preferences of the unified assistant screen. */
   fun saveAssistantSettings(settings: AssistantSettings)
+
+  /** What the assistant has been told to remember about the user. */
+  fun readAssistantMemory(): AssistantMemory
+
+  /** Persists what the assistant remembers. */
+  fun saveAssistantMemory(memory: AssistantMemory)
 
   /** Reminders the assistant delivers itself. */
   fun readReminders(): Reminders
@@ -538,6 +545,12 @@ class DefaultDataStoreRepository(
 
   override fun saveAssistantSettings(settings: AssistantSettings) {
     updateSettings { it.setAssistantSettings(settings) }
+  }
+
+  override fun readAssistantMemory(): AssistantMemory = settings().assistantMemory
+
+  override fun saveAssistantMemory(memory: AssistantMemory) {
+    updateSettings { it.setAssistantMemory(memory) }
   }
 
   override fun readReminders(): Reminders = settings().reminders

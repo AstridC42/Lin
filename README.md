@@ -9,6 +9,10 @@ behind a single conversation, so the app can be used the way you actually use
 an assistant — ask a question, drop in a photo, tell it to call someone — often
 in the same message.
 
+[docs/STATUS.md](docs/STATUS.md) is where the project actually is: what works,
+what is built but unconfirmed, what cannot be done at all, and what is worth
+doing next. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the map of the code.
+
 ## What is different from upstream
 
 | | Edge Gallery | Star Storyteller |
@@ -19,7 +23,7 @@ in the same message.
 | Web access | None | Live search through your own SearXNG instance |
 | Device actions | A demo screen driven by a purpose-built 270M model | Real tools on any model: calls, texts, alarms, timers, maps, apps |
 | System integration | Launcher icon | Also registers as the phone's digital assistant |
-| Models | One list per capability | Every general-purpose model loadable from the chat |
+| Models | One list per capability | Every general-purpose model loadable from the chat, including one of your own |
 
 Everything upstream shipped is still there and still works: the capability
 gallery (now one tap away, from the grid button in the mode bar or the star in
@@ -114,6 +118,41 @@ place calls directly*, which also asks for `CALL_PHONE`; it is off by default.
 Contacts are only read after you grant `READ_CONTACTS`, at the moment the
 assistant first needs a number. When several people match a name, it asks
 instead of guessing.
+
+## Asking about what is on the screen
+
+Hold the power button over an article, a message thread or a receipt and the
+pop-up offers **This screen**. It sends a screenshot to a model that can see,
+and the text of the app in front to one that cannot, so "what is this" and
+"summarise this" work without copying anything out.
+
+The button only appears when there is something to ask about: whether a
+screenshot or the view text is offered at all is the system's decision, and a
+screen marked secure — a banking app, some keyboards — withholds both.
+
+## Remembering you
+
+Tell it to remember something — what you call people, how you travel, anything
+worth not repeating — and it goes into every conversation afterwards. "Forget
+that…" removes one.
+
+It keeps twenty facts, newest first, and everything it has been told is listed
+under **Memory** in the Guide panel, where you can add or delete lines yourself.
+That list is worth a look now and then: the model writes most of these, and a
+fact remembered wrongly gets repeated confidently until somebody corrects it.
+
+## Staying ready
+
+Everything that summons the assistant from outside the app — the power-button
+pop-up, the widget, the car, the wake word — can only answer in place while a
+model is loaded, and loading one takes tens of seconds. **Stay ready** in the
+Guide panel keeps the loaded model in memory after you close the chat, so they
+answer instead of opening the app.
+
+It is off by default because it is not free: the model's memory, often two to
+four gigabytes, stays claimed while it holds, and an ongoing notification says
+so with a Stop button. Android can still reclaim it under real memory pressure,
+and the pop-up falls back to opening the chat when it does.
 
 ## Using it as the phone's assistant
 
@@ -230,16 +269,11 @@ upstream Edge Gallery rather than replacing it.
 
 ## Where the changes live
 
-New code:
-
-```
-Android/src/app/src/main/java/com/google/ai/edge/gallery/
-├── assistant/          the unified screen: modes, prompts, TTS, intents, wiring
-├── search/             SearxngClient
-└── tools/
-    ├── WebSearchTool.kt      webSearch + openWebPage
-    └── DeviceActionsTool.kt  calls, texts, alarms, apps, maps, torch
-```
+Fourteen directories now, so the map lives in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) rather than here: what each one
+owns, which upstream files were changed and why, the two patterns in `tools/`
+that are easy to undo by accident, and why the tests cover the functions they
+cover.
 
 Upstream files were changed as little as possible. The largest edit is to
 `customtasks/agentchat/AgentChatScreen.kt`, which grew a handful of optional

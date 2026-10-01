@@ -891,6 +891,9 @@
   <string name="assist_panel_thinking" translatable="true" description="Status shown while the pop-up assistant is working out an answer. [CHAR_LIMIT=30]">Thinking</string>
   <string name="assist_panel_answered" translatable="true" description="Status shown once the pop-up assistant has answered. [CHAR_LIMIT=30]">Star Storyteller</string>
   <string name="assist_panel_prompt" translatable="true" description="Placeholder shown before anything has been heard. [CHAR_LIMIT=60]">Say what you need\u2026</string>
+  <string name="assist_panel_this_screen" translatable="true" description="Button that asks about what is on the screen. [CHAR_LIMIT=20]">This screen</string>
+  <string name="assist_panel_this_screen_question" translatable="true" description="Shown as the question when asking about the screen. [CHAR_LIMIT=60]">What is on my screen?</string>
+  <string name="assist_panel_this_screen_prompt" translatable="true" description="The question sent to the model about the screen. [CHAR_LIMIT=200]">Describe what is on the screen behind this panel, briefly, and say what I could do about it.</string>
   <string name="assist_panel_again" translatable="true" description="Button that listens again. [CHAR_LIMIT=20]">Again</string>
   <string name="assist_panel_open" translatable="true" description="Button that opens the full chat screen. [CHAR_LIMIT=20]">Open chat</string>
   <string name="assist_panel_close" translatable="true" description="Button that dismisses the pop-up. [CHAR_LIMIT=20]">Close</string>
@@ -904,6 +907,9 @@
   <string name="music_app_ask" translatable="true" description="Option leaving the choice to the phone. [CHAR_LIMIT=40]">Ask me each time</string>
   <string name="music_app_none" translatable="true" description="Shown when no app can play music by name. [CHAR_LIMIT=200]">No app on this phone can play music by name. Install a music app and open this again.</string>
   <string name="manual_grant_calendar" translatable="true" description="Button that asks for calendar access. [CHAR_LIMIT=60]">Allow the calendar</string>
+  <string name="manual_models_button" translatable="true" description="Button that opens the model manager. [CHAR_LIMIT=40]">Models</string>
+  <string name="manual_models_title" translatable="true" description="Manual section title about models. [CHAR_LIMIT=30]">Models</string>
+  <string name="manual_models_body" translatable="true" description="Manual section about using your own model. [CHAR_LIMIT=500]">Every general-purpose model in the list can be loaded from the chat, and so can one of your own: tap Models above, then the plus button, and point it at a .litertlm or .task file on the phone or paste a Hugging Face link. Imported models appear in the chat\'s model picker beside the rest. Bigger is not always better here - a model too large for the phone is killed while loading, and the picker warns you before that happens.</string>
   <string name="manual_music_app_button" translatable="true" description="Button that opens the music app picker. [CHAR_LIMIT=40]">Music app</string>
   <string name="manual_messaging_title" translatable="true" description="Manual section title for messaging. [CHAR_LIMIT=30]">Messages</string>
   <string name="manual_messaging_body" translatable="true" description="Manual section body for messaging. [CHAR_LIMIT=500]">Say who and what: \"text Sam I am running late\", \"message Dana on WhatsApp\", \"send Ori a Telegram\". The message is written into the conversation and you press send - WhatsApp and Telegram publish no way for another app to send on your behalf, and neither does the text composer. RCS needs nothing extra: your messaging app upgrades the conversation itself when both ends support it. The one thing that does send outright is replying to a message already in your notifications, which works for any app with a reply button.</string>
@@ -923,6 +929,22 @@
   <string name="voice_settings_try" translatable="true" description="Button that speaks a sample line. [CHAR_LIMIT=30]">Hear it</string>
   <string name="voice_settings_manual_title" translatable="true" description="Manual entry for the voice settings. [CHAR_LIMIT=40]">Assistant voice</string>
   <string name="voice_settings_manual_body" translatable="true" description="Manual entry describing voice settings. [CHAR_LIMIT=200]">Pick which voice reads replies out loud, and how fast and how high it speaks. Long-press Speak on the chat screen to get here quickly.</string>
+  <string name="memory_title" translatable="true" description="Title of the dialog listing what the assistant remembers. [CHAR_LIMIT=40]">What it remembers</string>
+  <string name="memory_explainer" translatable="true" description="Explains the memory list. [CHAR_LIMIT=300]">These go into every conversation, so the assistant knows them without being told again. It keeps the %1$d most recent. Delete anything wrong - it will be repeated confidently until you do.</string>
+  <string name="memory_empty" translatable="true" description="Shown when nothing is remembered yet. [CHAR_LIMIT=200]">Nothing yet. Tell the assistant to remember something, or add it below.</string>
+  <string name="memory_add_label" translatable="true" description="Label of the field for adding a fact. [CHAR_LIMIT=60]">Something to remember</string>
+  <string name="memory_add" translatable="true" description="Button that saves a fact. [CHAR_LIMIT=20]">Remember it</string>
+  <string name="memory_forget" translatable="true" description="Content description of the delete button on a remembered fact. [CHAR_LIMIT=30]">Forget this</string>
+  <string name="memory_manual_button" translatable="true" description="Button opening the memory list. [CHAR_LIMIT=40]">Memory</string>
+  <string name="memory_manual_title" translatable="true" description="Manual section title about memory. [CHAR_LIMIT=30]">Memory</string>
+  <string name="memory_manual_body" translatable="true" description="Manual section about memory. [CHAR_LIMIT=400]">Say \"remember that…\" and it keeps that in mind for every conversation afterwards - what you call people, how you travel, anything worth not repeating. Say \"forget that…\" to remove one. Everything it has been told is listed under Memory above, where you can add or delete lines yourself; worth a look now and then, because a fact remembered wrongly gets repeated confidently until someone corrects it.</string>
+  <string name="resident_channel_name" translatable="true" description="Notification channel for the service that keeps the model loaded. [CHAR_LIMIT=40]">Ready to answer</string>
+  <string name="resident_channel_description" translatable="true" description="Describes that notification channel. [CHAR_LIMIT=200]">Shown while Star Storyteller is holding its model in memory so it can answer immediately.</string>
+  <string name="resident_notification_title" translatable="true" description="Title of the ongoing notification. [CHAR_LIMIT=40]">Star Storyteller is ready</string>
+  <string name="resident_notification_text" translatable="true" description="Body of the ongoing notification. [CHAR_LIMIT=120]">Holding the model in memory so it can answer straight away.</string>
+  <string name="resident_stop" translatable="true" description="Action that stops holding the model. [CHAR_LIMIT=20]">Stop</string>
+  <string name="resident_setting_title" translatable="true" description="Switch that keeps the model loaded. [CHAR_LIMIT=40]">Stay ready</string>
+  <string name="resident_setting_detail" translatable="true" description="Explains the stay-ready switch. [CHAR_LIMIT=300]">Keep the model in memory after you close the chat, so the power-button pop-up, the widget and the car answer straight away instead of waiting to load one. It claims two to four gigabytes while it holds, and shows a notification saying so.</string>
   <string name="wake_word_settings_title" translatable="true" description="Title of the wake word settings dialog. [CHAR_LIMIT=40]">Wake word</string>
   <string name="wake_word_enable" translatable="true" description="Label of the switch that enables continuous listening. [CHAR_LIMIT=40]">Listen for the wake word</string>
   <string name="wake_word_phrase_label" translatable="true" description="Label of the field holding the wake phrase. [CHAR_LIMIT=30]">Phrase</string>
