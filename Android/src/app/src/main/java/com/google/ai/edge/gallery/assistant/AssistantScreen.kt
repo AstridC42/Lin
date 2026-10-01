@@ -114,6 +114,7 @@ fun AssistantScreen(
   initialImageUris: List<String> = listOf(),
   startListening: Boolean = false,
   onOpenGallery: (() -> Unit)? = null,
+  onOpenModels: (() -> Unit)? = null,
   viewModel: AssistantViewModel = hiltViewModel(),
   dictateViewModel: HoldToDictateViewModel = hiltViewModel(),
   skillManagerViewModel: SkillManagerViewModel = hiltViewModel(),
@@ -256,6 +257,7 @@ fun AssistantScreen(
         onOpenSmartHomeSettings = { showSmartHomeSettings = true },
         onOpenVoiceSettings = { showVoiceSettings = true },
         onOpenMusicApp = { showMusicApp = true },
+        onOpenModels = onOpenModels,
       )
     },
   ) {
@@ -377,6 +379,13 @@ fun AssistantScreen(
         showManual = false
         showMusicApp = true
       },
+      onOpenModels =
+        onOpenModels?.let {
+          {
+            showManual = false
+            it()
+          }
+        },
       onDismiss = { showManual = false },
     )
   }

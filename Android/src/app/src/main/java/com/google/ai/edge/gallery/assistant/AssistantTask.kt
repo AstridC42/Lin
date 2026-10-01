@@ -143,6 +143,7 @@ class AssistantTask(
       initialImageUris = myData.initialImageUris,
       startListening = myData.startListening,
       onOpenGallery = myData.onOpenGallery,
+      onOpenModels = myData.onOpenModels,
     )
   }
 

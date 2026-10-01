@@ -90,6 +90,7 @@ fun AssistantManual(
   onOpenSmartHomeSettings: () -> Unit,
   onOpenVoiceSettings: () -> Unit,
   onOpenMusicApp: () -> Unit,
+  onOpenModels: (() -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
@@ -257,6 +258,11 @@ fun AssistantManual(
           OutlinedButton(onClick = onOpenMusicApp) {
             Text(stringResource(R.string.manual_music_app_button))
           }
+          if (onOpenModels != null) {
+            OutlinedButton(onClick = onOpenModels) {
+              Text(stringResource(R.string.manual_models_button))
+            }
+          }
         }
       }
     }
@@ -344,6 +350,10 @@ private fun manualSections(): List<ManualSection> = listOf(
     listOf(stringResource(R.string.manual_web_body)),
   ),
   ManualSection(
+    stringResource(R.string.manual_models_title),
+    listOf(stringResource(R.string.manual_models_body)),
+  ),
+  ManualSection(
     stringResource(R.string.manual_car_title),
     listOf(stringResource(R.string.manual_car_body), stringResource(R.string.manual_car_steps)),
   ),
@@ -358,6 +368,7 @@ fun AssistantManualPane(
   onOpenSmartHomeSettings: () -> Unit,
   onOpenVoiceSettings: () -> Unit,
   onOpenMusicApp: () -> Unit,
+  onOpenModels: (() -> Unit)? = null,
 ) {
   Surface(
     modifier = Modifier.width(MANUAL_PANEL_WIDTH).fillMaxHeight(),
@@ -370,6 +381,7 @@ fun AssistantManualPane(
       onOpenSmartHomeSettings = onOpenSmartHomeSettings,
       onOpenVoiceSettings = onOpenVoiceSettings,
       onOpenMusicApp = onOpenMusicApp,
+      onOpenModels = onOpenModels,
       modifier = Modifier.fillMaxHeight(),
     )
   }
@@ -410,6 +422,7 @@ fun AssistantManualSheet(
   onOpenSmartHomeSettings: () -> Unit,
   onOpenVoiceSettings: () -> Unit,
   onOpenMusicApp: () -> Unit,
+  onOpenModels: (() -> Unit)? = null,
   onDismiss: () -> Unit,
 ) {
   ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -420,6 +433,7 @@ fun AssistantManualSheet(
       onOpenSmartHomeSettings = onOpenSmartHomeSettings,
       onOpenVoiceSettings = onOpenVoiceSettings,
       onOpenMusicApp = onOpenMusicApp,
+      onOpenModels = onOpenModels,
     )
   }
 }

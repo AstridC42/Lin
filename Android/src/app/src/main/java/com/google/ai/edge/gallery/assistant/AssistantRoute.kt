@@ -80,6 +80,7 @@ import com.google.ai.edge.gallery.voice.WakeWordSettings
 fun AssistantRoute(
   modelManagerViewModel: ModelManagerViewModel,
   onOpenGallery: () -> Unit,
+  onOpenModels: () -> Unit,
   onExit: () -> Unit,
   initialQuery: String? = null,
   initialImageUris: List<String> = listOf(),
@@ -257,6 +258,7 @@ fun AssistantRoute(
             initialImageUris = initialImageUris,
             startListening = startListening,
             onOpenGallery = onOpenGallery,
+            onOpenModels = onOpenModels,
           )
       )
   }

@@ -55,4 +55,7 @@ data class CustomTaskDataForBuiltinTask(
   // Opens the capability gallery. Only set for the assistant screen, which replaces the gallery
   // as the app's start destination and therefore has to offer a way back to it.
   val onOpenGallery: (() -> Unit)? = null,
+  // Opens the model manager, where a model file of the user's own is imported. Only set for the
+  // assistant screen, which is otherwise three screens away from it.
+  val onOpenModels: (() -> Unit)? = null,
 )

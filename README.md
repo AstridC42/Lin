@@ -9,6 +9,10 @@ behind a single conversation, so the app can be used the way you actually use
 an assistant — ask a question, drop in a photo, tell it to call someone — often
 in the same message.
 
+[docs/STATUS.md](docs/STATUS.md) is where the project actually is: what works,
+what is built but unconfirmed, what cannot be done at all, and what is worth
+doing next. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the map of the code.
+
 ## What is different from upstream
 
 | | Edge Gallery | Star Storyteller |
@@ -19,7 +23,7 @@ in the same message.
 | Web access | None | Live search through your own SearXNG instance |
 | Device actions | A demo screen driven by a purpose-built 270M model | Real tools on any model: calls, texts, alarms, timers, maps, apps |
 | System integration | Launcher icon | Also registers as the phone's digital assistant |
-| Models | One list per capability | Every general-purpose model loadable from the chat |
+| Models | One list per capability | Every general-purpose model loadable from the chat, including one of your own |
 
 Everything upstream shipped is still there and still works: the capability
 gallery (now one tap away, from the grid button in the mode bar or the star in
@@ -230,16 +234,11 @@ upstream Edge Gallery rather than replacing it.
 
 ## Where the changes live
 
-New code:
-
-```
-Android/src/app/src/main/java/com/google/ai/edge/gallery/
-├── assistant/          the unified screen: modes, prompts, TTS, intents, wiring
-├── search/             SearxngClient
-└── tools/
-    ├── WebSearchTool.kt      webSearch + openWebPage
-    └── DeviceActionsTool.kt  calls, texts, alarms, apps, maps, torch
-```
+Fourteen directories now, so the map lives in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) rather than here: what each one
+owns, which upstream files were changed and why, the two patterns in `tools/`
+that are easy to undo by accident, and why the tests cover the functions they
+cover.
 
 Upstream files were changed as little as possible. The largest edit is to
 `customtasks/agentchat/AgentChatScreen.kt`, which grew a handful of optional
