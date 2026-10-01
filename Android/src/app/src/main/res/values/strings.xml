@@ -926,6 +926,15 @@
   <string name="voice_settings_try" translatable="true" description="Button that speaks a sample line. [CHAR_LIMIT=30]">Hear it</string>
   <string name="voice_settings_manual_title" translatable="true" description="Manual entry for the voice settings. [CHAR_LIMIT=40]">Assistant voice</string>
   <string name="voice_settings_manual_body" translatable="true" description="Manual entry describing voice settings. [CHAR_LIMIT=200]">Pick which voice reads replies out loud, and how fast and how high it speaks. Long-press Speak on the chat screen to get here quickly.</string>
+  <string name="memory_title" translatable="true" description="Title of the dialog listing what the assistant remembers. [CHAR_LIMIT=40]">What it remembers</string>
+  <string name="memory_explainer" translatable="true" description="Explains the memory list. [CHAR_LIMIT=300]">These go into every conversation, so the assistant knows them without being told again. It keeps the %1$d most recent. Delete anything wrong - it will be repeated confidently until you do.</string>
+  <string name="memory_empty" translatable="true" description="Shown when nothing is remembered yet. [CHAR_LIMIT=200]">Nothing yet. Tell the assistant to remember something, or add it below.</string>
+  <string name="memory_add_label" translatable="true" description="Label of the field for adding a fact. [CHAR_LIMIT=60]">Something to remember</string>
+  <string name="memory_add" translatable="true" description="Button that saves a fact. [CHAR_LIMIT=20]">Remember it</string>
+  <string name="memory_forget" translatable="true" description="Content description of the delete button on a remembered fact. [CHAR_LIMIT=30]">Forget this</string>
+  <string name="memory_manual_button" translatable="true" description="Button opening the memory list. [CHAR_LIMIT=40]">Memory</string>
+  <string name="memory_manual_title" translatable="true" description="Manual section title about memory. [CHAR_LIMIT=30]">Memory</string>
+  <string name="memory_manual_body" translatable="true" description="Manual section about memory. [CHAR_LIMIT=400]">Say \"remember that…\" and it keeps that in mind for every conversation afterwards - what you call people, how you travel, anything worth not repeating. Say \"forget that…\" to remove one. Everything it has been told is listed under Memory above, where you can add or delete lines yourself; worth a look now and then, because a fact remembered wrongly gets repeated confidently until someone corrects it.</string>
   <string name="resident_channel_name" translatable="true" description="Notification channel for the service that keeps the model loaded. [CHAR_LIMIT=40]">Ready to answer</string>
   <string name="resident_channel_description" translatable="true" description="Describes that notification channel. [CHAR_LIMIT=200]">Shown while Star Storyteller is holding its model in memory so it can answer immediately.</string>
   <string name="resident_notification_title" translatable="true" description="Title of the ongoing notification. [CHAR_LIMIT=40]">Star Storyteller is ready</string>

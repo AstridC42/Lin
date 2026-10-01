@@ -93,6 +93,35 @@ message Settings {
 
   // Star Storyteller: Home Assistant connection for smart home control.
   SmartHomeSettings smart_home_settings = 15;
+
+  // Star Storyteller: what the assistant has been told to remember about the
+  // user, so a conversation does not start from nothing every time.
+  AssistantMemory assistant_memory = 16;
+}
+
+// One durable fact the assistant keeps about the user.
+message RememberedFact {
+  // Stable id, so a fact can be removed by name or from the list.
+  string id = 1;
+
+  // The fact, in the user's own terms: "my mother is saved as Ima",
+  // "I take the train, I do not drive".
+  string text = 2;
+
+  // When it was saved, so the list can be shown newest first and so an old
+  // fact can be recognised as old.
+  int64 saved_at_millis = 3;
+}
+
+// Everything the assistant remembers.
+//
+// Deliberately small and deliberately visible. These go into every system
+// prompt, so they are charged against the same budget as the tools and the
+// conversation - and a fact remembered wrongly is worse than one never saved,
+// because it is repeated confidently and never questioned. Both of those are
+// reasons to cap the list and to show it somewhere the user can edit it.
+message AssistantMemory {
+  repeated RememberedFact fact = 1;
 }
 
 // Connection settings for a SearXNG metasearch instance.

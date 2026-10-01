@@ -46,6 +46,9 @@ object AssistantPrompts {
   /** Substitution key filled in with the list of enabled MCP tools. */
   const val TOOLS_PLACEHOLDER = "___TOOLS___"
 
+  /** Substitution key filled in with what the assistant has been told to remember. */
+  const val MEMORY_PLACEHOLDER = "___MEMORY___"
+
   /** Heading that opens the mode block at the end of every prompt. */
   private const val MODE_HEADING = "=== MODE ==="
 
@@ -87,9 +90,17 @@ object AssistantPrompts {
     webSearchEnabled: Boolean,
     webSearchInstance: String = "",
     smartHomeEnabled: Boolean = false,
+    hasMemory: Boolean = false,
   ): String {
     val body =
-      buildBody(mode, hasMcpTools, webSearchEnabled, webSearchInstance, smartHomeEnabled)
+      buildBody(
+        mode,
+        hasMcpTools,
+        webSearchEnabled,
+        webSearchInstance,
+        smartHomeEnabled,
+        hasMemory,
+      )
     return "$MARKER_PREFIX${fingerprintOf(body)}$MARKER_SUFFIX\n$body"
   }
 
@@ -107,6 +118,7 @@ object AssistantPrompts {
     webSearchEnabled: Boolean,
     webSearchInstance: String = "",
     smartHomeEnabled: Boolean = false,
+    hasMemory: Boolean = false,
   ): String =
     if (currentPrompt.isBlank() || isGenerated(currentPrompt)) {
       build(
@@ -115,6 +127,7 @@ object AssistantPrompts {
         webSearchEnabled = webSearchEnabled,
         webSearchInstance = webSearchInstance,
         smartHomeEnabled = smartHomeEnabled,
+        hasMemory = hasMemory,
       )
     } else {
       buildString {
@@ -147,9 +160,19 @@ object AssistantPrompts {
     webSearchEnabled: Boolean,
     webSearchInstance: String,
     smartHomeEnabled: Boolean,
+    hasMemory: Boolean,
   ): String = buildString {
     appendLine(PERSONA.trimIndent())
     appendLine()
+    if (hasMemory) {
+      // Before the routing, not after: this is who the assistant is talking to, and it changes
+      // what the right answer is rather than how to go about finding it. Left out entirely when
+      // there is nothing remembered - a heading with nothing under it spends tokens saying the
+      // assistant knows nothing about you.
+      appendLine(MEMORY_HEADING)
+      appendLine(MEMORY_PLACEHOLDER)
+      appendLine()
+    }
     appendLine(ROUTING.trimIndent())
     appendLine()
     // Directly under the routing step that names it. A small model reads the top of its prompt and
@@ -214,6 +237,8 @@ object AssistantPrompts {
     3. ANSWER - only if nothing above fits. Say so when unsure rather than inventing detail.
     Never claim you are unable to do something before checking 1 and 2.
     """
+
+  private const val MEMORY_HEADING = "ABOUT THE USER - what you have been told to remember:"
 
   private const val SKILLS_HEADING =
     "SKILLS - make the call shown, then follow the instructions it returns exactly:"

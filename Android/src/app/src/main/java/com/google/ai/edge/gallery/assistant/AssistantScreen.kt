@@ -141,6 +141,7 @@ fun AssistantScreen(
   var showWebSearchSettings by remember { mutableStateOf(false) }
   var showVoiceSettings by remember { mutableStateOf(false) }
   var showMusicApp by remember { mutableStateOf(false) }
+  var showMemory by remember { mutableStateOf(false) }
   var showWakeWordSettings by remember { mutableStateOf(false) }
   var showSmartHomeSettings by remember { mutableStateOf(false) }
 
@@ -188,6 +189,12 @@ fun AssistantScreen(
   // The mode lives in the system prompt, so it is folded in here rather than sent as a message.
   val smartHomeEnabled = remember(webSearchRevision) { homeAssistantClient.isConfigured() }
 
+  // Whether there is anything to tell the model about the user. Shares the revision counter with
+  // the capability settings because it changes the prompt the same way they do: the section is
+  // present or absent, and the session has to be rebuilt either way.
+  val hasMemory =
+    remember(webSearchRevision) { dataStoreRepository.readAssistantMemory().factCount > 0 }
+
   val systemPromptResolver =
     remember(mode, webSearchEnabled, webSearchHost, smartHomeEnabled) {
       { currentPrompt: String, hasMcpTools: Boolean ->
@@ -198,6 +205,7 @@ fun AssistantScreen(
           webSearchEnabled = webSearchEnabled,
           webSearchInstance = webSearchHost,
           smartHomeEnabled = smartHomeEnabled,
+          hasMemory = hasMemory,
         )
       }
     }
@@ -228,6 +236,7 @@ fun AssistantScreen(
             webSearchEnabled = webSearchEnabled,
             webSearchInstance = webSearchHost,
             smartHomeEnabled = smartHomeEnabled,
+            hasMemory = hasMemory,
           )
         },
       )
@@ -258,6 +267,7 @@ fun AssistantScreen(
         onOpenSmartHomeSettings = { showSmartHomeSettings = true },
         onOpenVoiceSettings = { showVoiceSettings = true },
         onOpenMusicApp = { showMusicApp = true },
+        onOpenMemory = { showMemory = true },
         onOpenModels = onOpenModels,
       )
     },
@@ -381,6 +391,10 @@ fun AssistantScreen(
         showManual = false
         showMusicApp = true
       },
+      onOpenMemory = {
+        showManual = false
+        showMemory = true
+      },
       onOpenModels =
         onOpenModels?.let {
           {
@@ -402,6 +416,16 @@ fun AssistantScreen(
         // derived values above recompute from it.
         webSearchRevision++
       },
+    )
+  }
+
+  if (showMemory) {
+    MemoryDialog(
+      dataStoreRepository = dataStoreRepository,
+      onDismiss = { showMemory = false },
+      // Editing what is remembered changes the system prompt, so the session has to be rebuilt
+      // for it to take effect - the same path a capability setting takes.
+      onChanged = { webSearchRevision++ },
     )
   }
 

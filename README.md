@@ -119,6 +119,17 @@ Contacts are only read after you grant `READ_CONTACTS`, at the moment the
 assistant first needs a number. When several people match a name, it asks
 instead of guessing.
 
+## Remembering you
+
+Tell it to remember something — what you call people, how you travel, anything
+worth not repeating — and it goes into every conversation afterwards. "Forget
+that…" removes one.
+
+It keeps twenty facts, newest first, and everything it has been told is listed
+under **Memory** in the Guide panel, where you can add or delete lines yourself.
+That list is worth a look now and then: the model writes most of these, and a
+fact remembered wrongly gets repeated confidently until somebody corrects it.
+
 ## Staying ready
 
 Everything that summons the assistant from outside the app — the power-button

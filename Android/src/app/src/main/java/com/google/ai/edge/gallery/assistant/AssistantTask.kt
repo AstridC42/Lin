@@ -31,10 +31,11 @@ import com.google.ai.edge.gallery.data.Category
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
+import com.google.ai.edge.gallery.memory.MemoryBook
 import com.google.ai.edge.gallery.search.SearxngClient
-import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.skills.SkillsProvider
 import com.google.ai.edge.gallery.skills.formatSelectedSkills
+import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.litertlm.Contents
 import java.net.URL
 import kotlinx.coroutines.CoroutineScope
@@ -159,6 +160,7 @@ class AssistantTask(
     availableSkills: String,
   ): String {
     val settings = dataStoreRepository.readAssistantSettings()
+    val memory = MemoryBook.format(dataStoreRepository.readAssistantMemory())
     val template =
       AssistantPrompts.resolve(
         currentPrompt = currentPrompt,
@@ -167,6 +169,7 @@ class AssistantTask(
         webSearchEnabled = searxngClient.isConfigured(),
         webSearchInstance = searxngClient.instanceUrlOrNull()?.let { hostOf(it) }.orEmpty(),
         smartHomeEnabled = homeAssistantClient.isConfigured(),
+        hasMemory = memory.isNotEmpty(),
       )
     return PromptExpander()
       .formatSystemInstructions(
@@ -175,6 +178,7 @@ class AssistantTask(
           mapOf(
             AssistantPrompts.SKILLS_PLACEHOLDER to availableSkills,
             AssistantPrompts.TOOLS_PLACEHOLDER to toolsPrompt,
+            AssistantPrompts.MEMORY_PLACEHOLDER to memory,
           ),
       )
   }
