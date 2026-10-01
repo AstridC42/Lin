@@ -280,6 +280,12 @@ jobs:
             echo
             echo "### If Android refuses to install it"
             echo
+            echo "**On a Samsung, check Auto Blocker first.** One UI 6.1 and newer ship it turned"
+            echo "on, and it blocks installs from outside the Play Store outright while talking"
+            echo "about a harmful app - which sends people to Play Protect, where nothing helps."
+            echo "Settings, search **Auto Blocker**, turn off **Block app installs from"
+            echo "unauthorised sources** (and **App security check** while installing)."
+            echo
             echo "**\"Unsafe app blocked\"** is Play Protect, and every sideloaded build gets it -"
             echo "nothing in the APK can prevent it. Tap **More details** then **Install anyway**;"
             echo "the link is small and easy to miss. If it is not offered, turn the check off for"
