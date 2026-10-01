@@ -57,6 +57,23 @@ does the installing.
 3. Turn on **Allow from this source** — you are allowing your browser or file manager, not the app.
 4. Go back and tap **Install**.
 
+### Samsung: Auto Blocker
+
+On Samsung phones this is usually the real culprit, and it is **not** Play Protect. One UI 6.1 and
+newer ship **Auto Blocker** turned on, and it blocks installing apps from outside the Play Store
+outright. Its message talks about a harmful app, which sends everyone looking at Play Protect
+instead — where nothing they change makes any difference.
+
+Open **Settings**, search for **Auto Blocker**, and turn off either the whole thing or just **Block
+app installs from unauthorised sources**. While you are there, **App security check** in the same
+screen can also quarantine an app after it installs, so turn that off for the install too.
+
+Install, then turn Auto Blocker back on if you like — switching it on again does not remove an app
+that is already installed.
+
+On One UI 5 and 6.0 there is no Auto Blocker; the setting is **Settings → Biometrics and security →
+Install unknown apps** instead.
+
 ### Play Protect blocking it
 
 The most common thing to hit. Play Protect checks every install against Google's catalogue, and an
@@ -82,6 +99,9 @@ Two ways past:
   key has changed says so at the top.
 - Star Storyteller installs as `com.starstoryteller.assistant`, so it sits **alongside** Google AI
   Edge Gallery rather than replacing it. Having both is fine.
+- **A message about a *harmful* app, with no way to continue**, is a hard block rather than a
+  warning. Google offers no override for that classification and neither does Samsung's, so
+  tapping is not the answer — the switch above is.
 - **"There was a problem parsing the package"** means the download did not finish. Check it against
   `SHA256SUMS.txt` on the release, or just download it again.
 

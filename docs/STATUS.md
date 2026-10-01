@@ -103,6 +103,11 @@ reasons are worth keeping written down.
   open the conversation with the text written, for the sender to send. (Replying
   to a notification already on screen *does* send — different mechanism, and it
   works for any app with a reply button.)
+- **Avoiding a manufacturer's install block.** Samsung's Auto Blocker, on by
+  default since One UI 6.1, refuses sideloaded installs outright and describes
+  the app as harmful while doing it - which sends people to Play Protect, where
+  nothing they change helps. Only its own switch turns it off. Other makers add
+  similar checks. Nothing in an APK affects any of them.
 - **Avoiding Play Protect warnings.** Play Protect checks every install against
   Google's catalogue, and an app signed by a developer it has never heard of
   gets "Unsafe app blocked". Nothing inside an APK changes that, and the app id
