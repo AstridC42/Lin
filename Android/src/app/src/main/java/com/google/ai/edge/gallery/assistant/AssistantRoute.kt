@@ -80,6 +80,7 @@ import com.google.ai.edge.gallery.voice.WakeWordSettings
 fun AssistantRoute(
   modelManagerViewModel: ModelManagerViewModel,
   onOpenGallery: () -> Unit,
+  onOpenModels: () -> Unit,
   onExit: () -> Unit,
   initialQuery: String? = null,
   initialImageUris: List<String> = listOf(),
@@ -151,6 +152,17 @@ fun AssistantRoute(
     val current = repository.readAssistantSettings()
     if (current.loadingModelName != marker) {
       repository.saveAssistantSettings(current.toBuilder().setLoadingModelName(marker).build())
+    }
+  }
+
+  // Hold the process for as long as there is a loaded model to hold, and only then. Keyed on the
+  // initialization status so it follows the model: it starts when one finishes loading and goes
+  // away again when the model does, rather than holding an empty process because a setting is on.
+  LaunchedEffect(initializationStatus, selectedName) {
+    if (initializationStatus == ModelInitializationStatusType.INITIALIZED) {
+      ResidentAssistantService.startIfEnabled(context)
+    } else {
+      ResidentAssistantService.stop(context)
     }
   }
 
@@ -257,6 +269,7 @@ fun AssistantRoute(
             initialImageUris = initialImageUris,
             startListening = startListening,
             onOpenGallery = onOpenGallery,
+            onOpenModels = onOpenModels,
           )
       )
   }

@@ -25,6 +25,7 @@ import com.google.ai.edge.gallery.tools.CallJsSkillResultWebview
 import com.google.ai.edge.gallery.tools.DeviceActionsTool
 import com.google.ai.edge.gallery.tools.CalendarTool
 import com.google.ai.edge.gallery.tools.MediaControlTool
+import com.google.ai.edge.gallery.tools.MemoryTool
 import com.google.ai.edge.gallery.notifications.StarNotificationListener
 import com.google.ai.edge.gallery.tools.NotificationAccessSetupTool
 import com.google.ai.edge.gallery.tools.NotificationsTool
@@ -85,6 +86,8 @@ class AssistantTools(
 
   private val calendarTool by lazy { CalendarTool(context = context) }
 
+  private val memoryTool by lazy { MemoryTool(repository = settingsRepository) }
+
   private val smartHomeTool by lazy { SmartHomeTool(client = homeAssistantClient) }
 
   private val weatherTool by lazy { WeatherTool(context = context) }
@@ -111,6 +114,7 @@ class AssistantTools(
     // the missing permission themselves, and a calendar that is simply absent from the tool list
     // comes back to the user as "I cannot do that" with nothing to act on.
     tools.add(calendarTool)
+    tools.add(memoryTool)
     tools.add(remindersTool)
     // Needs nothing configured, unlike web search - which is the point of it being here. Before
     // this, the most-asked question an assistant gets could only be answered on a phone whose

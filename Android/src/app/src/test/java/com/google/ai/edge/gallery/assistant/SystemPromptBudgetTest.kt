@@ -47,6 +47,7 @@ class SystemPromptBudgetTest {
       webSearchEnabled = everything,
       webSearchInstance = if (everything) "searx.example.org" else "",
       smartHomeEnabled = everything,
+      hasMemory = everything,
     )
 
   @Test
@@ -91,8 +92,37 @@ class SystemPromptBudgetTest {
     )
   }
 
+  @Test
+  fun anEmptyMemoryCostsNothing() {
+    val off = prompt(AssistantMode.AUTO, everything = false)
+    assertTrue(
+      "the memory section should be absent when there is nothing remembered",
+      !off.contains(AssistantPrompts.MEMORY_PLACEHOLDER),
+    )
+  }
+
+  /**
+   * What is remembered goes in before the routing, because it changes what the right answer is
+   * rather than how to go looking for it.
+   */
+  @Test
+  fun whatIsRememberedComesBeforeTheRouting() {
+    val text = prompt(AssistantMode.AUTO, everything = true)
+    val memory = text.indexOf(AssistantPrompts.MEMORY_PLACEHOLDER)
+    val routing = text.indexOf("For EVERY request")
+    assertTrue("the memory section must be present", memory >= 0)
+    assertTrue("the routing must be present", routing >= 0)
+    assertTrue("what is remembered must come before the routing", memory < routing)
+  }
+
   companion object {
     private const val BUDGET = 800
-    private const val WORST_CASE_BUDGET = 950
+
+    /**
+     * Every capability on, including a memory section. Raised from 950 when memory was added: the
+     * heading is real cost, and the facts themselves are capped separately in MemoryBook rather
+     * than measured here, since they are substituted in after this prompt is built.
+     */
+    private const val WORST_CASE_BUDGET = 1000
   }
 }
