@@ -189,6 +189,17 @@ jobs:
             echo "kind=$kind"
             echo "fingerprint=$fingerprint"
           } >> "$GITHUB_OUTPUT"
+      - name: Read the fingerprint builds have been using
+        id: expected
+        run: |
+          set -euo pipefail
+          file=".github/ci-signing-fingerprint.txt"
+          if [ -f "$file" ]; then
+            echo "fingerprint=$(tr -d '[:space:]' < "$file")" >> "$GITHUB_OUTPUT"
+          else
+            echo "fingerprint=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run the unit tests
         working-directory: ./Android/src
         run: ./gradlew --no-daemon testReleaseUnitTest
@@ -232,6 +243,10 @@ jobs:
           REPO: ${{ github.repository }}
           SIGNED: ${{ env.KEYSTORE_BASE64 != '' }}
           FINGERPRINT: ${{ steps.keystore.outputs.fingerprint }}
+          # The key every build so far has used. Compared, not enforced: a changed key still
+          # produces an installable APK, it just needs the old one removed first, and saying so is
+          # the whole point.
+          EXPECTED_FINGERPRINT: ${{ steps.expected.outputs.fingerprint }}
         run: |
           set -euo pipefail
           base="https://github.com/${REPO}/releases/download/dev"
@@ -267,6 +282,18 @@ jobs:
             echo "does not open, the same files are under **Assets** — on the GitHub mobile app,"
             echo "tap **View release details** first._"
             echo
+            # Said first and said loudly when it applies: by the time somebody is reading this
+            # they are standing in front of "App not installed" with no idea why, and the answer
+            # is not something they could work out from the fingerprint alone.
+            if [ -n "${EXPECTED_FINGERPRINT:-}" ] && [ "$EXPECTED_FINGERPRINT" != "$FINGERPRINT" ]; then
+              echo "> **This build is signed with a different key than the last one.** Android"
+              echo "> will refuse to install it over the copy on your phone: uninstall Star"
+              echo "> Storyteller first, and the downloaded models will need fetching again."
+              echo "> The test key lives only in the Actions cache and is evicted after a week"
+              echo "> without builds. Setting the four signing secrets makes it permanent - see"
+              echo "> RELEASING.md."
+              echo
+            fi
             echo "Signing key: \`${FINGERPRINT}\`."
             if [ "$SIGNED" != "true" ]; then
               echo "This is a CI test key, kept in the Actions cache."
