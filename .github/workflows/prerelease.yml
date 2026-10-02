@@ -31,6 +31,14 @@ jobs:
   prerelease:
     name: Build and publish the test build
     runs-on: ubuntu-latest
+    # Shared with keep-signing-key.yml so an empty cache cannot be filled twice at once. A push
+    # to main starts the test build and can start a release a minute later; with both minting
+    # their own key against one cache name, one save wins and the other ships an APK signed with
+    # a key that exists nowhere afterwards. That is how v0.3.1 and the test build before it came
+    # to differ. At job level, because this workflow already has a run-level group of its own.
+    concurrency:
+      group: star-signing-key
+      cancel-in-progress: false
     env:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       # Not a secret in any meaningful sense: it protects a keystore that lives only in the
