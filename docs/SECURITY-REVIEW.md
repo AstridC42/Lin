@@ -91,7 +91,31 @@ to this one), which is what would have made it serious.
 Not changed: the WebView is shared upstream code and narrowing it needs a flag
 plumbed through the chat message type. Noted rather than fixed.
 
-### 5. Exported components
+### 5. Cleartext HTTP is permitted, and narrowed in code
+
+**Accepted, with the narrowing as the mitigation.** `usesCleartextTraffic` is on. Without it the
+two services a user brings themselves — a SearXNG instance and Home Assistant — cannot be reached
+at all: both normally live on the home network at a plain `http://` address, and nobody issues a
+certificate for `192.168.0.9`. Android has refused cleartext by default since API 28, so every
+such request failed before leaving the phone, reported as though the server were down.
+
+The platform's own mechanism cannot express "the local network" — a network security config lists
+domains, and the address is only known once the user types it. So the rule is in `LocalNetwork`
+and enforced by the only two clients that make these requests: plain HTTP to a private, loopback,
+link-local or carrier-grade-NAT address or a reserved local name; TLS required for anything else.
+`SearxngClient` enforces it at its single request choke point and again on the separate image
+download; `HomeAssistantClient` enforces it before each request, which is what keeps a long-lived
+access token off the open wire.
+
+What remains is real and worth stating: traffic to the user's own network is unencrypted, so
+anybody already on that network can read their searches and see the Home Assistant token. That is
+the same exposure as using those services from a browser on the same network, and it is the
+exposure the user chose by running them without TLS.
+
+`LocalNetworkTest` holds the boundary down, including the case a prefix check gets wrong —
+`192.168.0.9.example.com` resolves on the internet.
+
+### 6. Exported components
 
 Reviewed all ten. The ones without a permission are:
 
@@ -103,7 +127,7 @@ Reviewed all ten. The ones without a permission are:
 | `AssistantWidgetProvider` | Launches the app. No data in, nothing to redirect. |
 | `BootReceiver` | Upstream. Checks the action and only reschedules the app's own notifications; a forged broadcast achieves nothing. Our own `ReminderBootReceiver` is not exported. |
 
-### 6. Secrets in logs
+### 7. Secrets in logs
 
 **None found.** Nothing logs the Home Assistant token or the SearXNG
 `Authorization` header. Upstream's `DownloadWorker` logs the first ten characters
@@ -121,6 +145,8 @@ Security properties worth asserting rather than reviewing once, all in
 | `McpPromptSafetyTest` | A third-party MCP server forging prompt structure: twelve injection attempts, including Unicode line breaks and invisible characters. |
 | `MessagingAppsTest` | A local phone number opening a WhatsApp conversation with a stranger who happens to share those digits. |
 | `SystemPromptBudgetTest` | A prompt placeholder reaching the model unsubstituted, and a capability that is off being described anyway. |
+| `LocalNetworkTest` | Cleartext carrying a Home Assistant token or a SearXNG `Authorization` header to a host on the internet, now that the platform's own ban had to be lifted. |
+| `DeviceActionsToolTest` (garbled copy) | A call placed to a stranger because the model wrote a contact's digits out in the wrong order. |
 | `MemoryBookTest` | Unbounded growth of what is injected into every prompt, and a deletion taking the wrong line when the instruction is ambiguous. |
 | `ScreenTextTest` | Unbounded screen content being sent, and a line cut in half that the model would answer about. |
 | `DeviceActionsToolTest`, `ReminderTimeTest`, `CalendarTimeTest` | Actions landing on the wrong contact, the wrong time or the wrong day. |

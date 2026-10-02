@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery.search
 
 import android.util.Log
+import com.google.ai.edge.gallery.net.LocalNetwork
 import com.google.ai.edge.gallery.proto.WebSearchSettings
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -29,6 +30,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val TAG = "AGSearxngClient"
+
+/**
+ * A request this app declined to make, as opposed to one the network refused.
+ *
+ * Cleartext is permitted in the manifest so a self-hosted instance on the home network is
+ * reachable at all; this is what keeps that from meaning "cleartext to anywhere". It extends
+ * IOException so it travels the path every caller already has for a request that did not happen.
+ */
+private class InsecureTargetException(message: String) : IOException(message)
 
 /** A single hit returned by a SearXNG instance. */
 data class WebSearchHit(
@@ -259,6 +269,9 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
   suspend fun downloadImage(url: String, maxBytes: Int = MAX_IMAGE_BYTES): ImageDownloadOutcome =
     withContext(Dispatchers.IO) {
       if (url.isBlank()) return@withContext ImageDownloadOutcome.Failure("No picture URL.")
+      LocalNetwork.cleartextRefusal(url)?.let {
+        return@withContext ImageDownloadOutcome.Failure(it)
+      }
       val settings = readSettings()
       val timeout = (settings.timeoutSeconds.takeIf { it > 0 } ?: DEFAULT_TIMEOUT_SECONDS) * 1000
       var connection: HttpURLConnection? = null
@@ -427,6 +440,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
   }
 
   private fun httpGet(url: String, settings: WebSearchSettings, accept: String): String {
+    LocalNetwork.cleartextRefusal(url)?.let { throw InsecureTargetException(it) }
     val timeoutMs = (settings.timeoutSeconds.takeIf { it > 0 } ?: DEFAULT_TIMEOUT_SECONDS) * 1000
     var connection: HttpURLConnection? = null
     try {
@@ -469,11 +483,11 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
    * knowing the address is right and the app will not use it.
    */
   private fun describeNetworkFailure(e: IOException, target: String): String {
+    // Our own rule, with a message already written for the user.
+    if (e is InsecureTargetException) return e.message.orEmpty()
     val detail = e.message.orEmpty()
     if (detail.contains("Cleartext", ignoreCase = true)) {
-      return "This build will not make plain http:// requests, so $target was never contacted. " +
-        "Either serve the instance over https://, or ask for cleartext to the home network to " +
-        "be turned back on in the app."
+      return "Android refused a plain http:// request to $target, so it was never contacted."
     }
     return "Could not reach $target (${detail.ifEmpty { "network error" }})."
   }

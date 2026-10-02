@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery.smarthome
 
 import android.util.Log
+import com.google.ai.edge.gallery.net.LocalNetwork
 import com.google.ai.edge.gallery.proto.SmartHomeSettings
 import java.io.BufferedReader
 import java.net.HttpURLConnection
@@ -153,6 +154,14 @@ class HomeAssistantClient(private val readSettings: () -> SmartHomeSettings) {
     body: String?,
   ): String? {
     val base = normalizeBaseUrl(settings.baseUrl)
+    // Cleartext is permitted in the manifest so that a Home Assistant on the home network is
+    // reachable at all. This is what keeps that from meaning cleartext to anywhere: every request
+    // here carries a long-lived access token in an Authorization header, and that must not cross
+    // the open internet in the clear.
+    LocalNetwork.cleartextRefusal("$base$path")?.let {
+      Log.w(TAG, "Refusing a cleartext request to a host outside the local network")
+      return null
+    }
     val timeout = (settings.timeoutSeconds.takeIf { it > 0 } ?: DEFAULT_TIMEOUT_SECONDS) * 1000
     val connection = (URL("$base$path").openConnection() as HttpURLConnection).apply {
       requestMethod = method
