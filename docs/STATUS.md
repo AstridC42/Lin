@@ -1,6 +1,6 @@
 # Status
 
-Where the project actually is, as of pre-release `0.3.1-dev.25`.
+Where the project actually is, as of `0.4.0`.
 
 **Upstream base:** `google-ai-edge/gallery` at `70061fd` (version 1.0.20,
 1 October 2026). What that merge brought with it is at the bottom of this file.
@@ -60,7 +60,7 @@ Nobody has reported it working on a phone, so treat it as untested.
 | Notifications | "what did I miss", "reply to Sam" | Notification access, from the Guide panel |
 | Media control | "pause", "next", "what's playing" | The same notification access |
 | Smart home | "turn off the kitchen light" | A Home Assistant address and token |
-| Web search, pictures, pages | "search for…", "show me a photo of…" | A SearXNG instance with `json` in `search.formats` |
+| Web search, pictures, pages | "search for…", "show me a photo of…" | A SearXNG instance with `json` in `search.formats`. A plain `http://` address on your own network now works; anything on the internet needs `https://`. |
 | What is on the screen | Hold the power button over an article or a message, then **This screen** | A model that can see, for the screenshot; the text works on any |
 | Memory | "remember that I take the train", then ask something that needs it | Nothing |
 | Staying ready | Close the chat, then hold the power button — it should answer rather than open the app | **Stay ready** in the Guide panel |
