@@ -865,6 +865,7 @@
   <string name="assistant_shared_image_prompt" translatable="true" description="Prompt used when an image is shared into the app without a caption. [CHAR_LIMIT=80]">What is in this image?</string>
   <!-- Shown when the assistant has no model to load. [CHAR_LIMIT=200] -->
   <string name="assistant_no_models" translatable="true" description="Shown when the assistant has no model to load. [CHAR_LIMIT=200]">No assistant model is available yet. Open the capability gallery to download one.</string>
+  <string name="assistant_slow_start" translatable="true" description="Shown when the start screen has been loading for a while. [CHAR_LIMIT=250]">This is taking longer than it should. The model list is fetched once and then kept, so a slow or blocked connection can hold it up. Try again, or open the gallery and work from there.</string>
   <!-- Content description of the button that returns to the assistant. [CHAR_LIMIT=40] -->
   <string name="cd_open_assistant" translatable="true" description="Content description of the button that returns to the assistant. [CHAR_LIMIT=40]">Open the assistant</string>
   <!-- Title shown when the model list could not be loaded. [CHAR_LIMIT=60] -->

@@ -79,6 +79,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationRequest
 import net.openid.appauth.AuthorizationResponse
@@ -100,6 +101,14 @@ private const val ALLOWLIST_BASE_URL =
  * upstream publishes a newer one worth picking up.
  */
 private const val UPSTREAM_ALLOWLIST_VERSION = "1_0_19"
+
+/**
+ * How long the whole remote fetch of the model list may take.
+ *
+ * Generous against a slow connection and still well short of the patience of somebody holding a
+ * phone that will not open. Past it the bundled copy is used, which is the same list.
+ */
+private const val ALLOWLIST_FETCH_TIMEOUT_MS = 25_000L
 
 /** Copy of [UPSTREAM_ALLOWLIST_VERSION] shipped in assets, so a fresh install works offline. */
 private const val BUNDLED_MODEL_ALLOWLIST_ASSET = "model_allowlist.json"
@@ -1038,7 +1047,18 @@ constructor(
           // UPSTREAM_ALLOWLIST_VERSION.
           val url = getAllowlistUrl(UPSTREAM_ALLOWLIST_VERSION)
           Log.d(TAG, "Loading model allowlist from internet. Url: $url")
-          val data = getJsonResponse<ModelAllowlist>(url = url)
+          // Bounded as a whole, on top of the socket timeouts inside the call. Those cover a
+          // connection that stalls; they do not cover one that keeps trickling bytes, or a proxy
+          // that answers slowly forever. This runs before the first screen can render, so an
+          // unbounded wait here is an app that never starts - and the bundled list below is a
+          // perfectly good answer, so there is nothing to gain by waiting longer.
+          val data =
+            withTimeoutOrNull(ALLOWLIST_FETCH_TIMEOUT_MS) {
+              getJsonResponse<ModelAllowlist>(url = url)
+            }
+          if (data == null) {
+            Log.w(TAG, "The model allowlist did not arrive within ${ALLOWLIST_FETCH_TIMEOUT_MS}ms")
+          }
           modelAllowlist = data?.jsonObj
 
           if (modelAllowlist == null) {
