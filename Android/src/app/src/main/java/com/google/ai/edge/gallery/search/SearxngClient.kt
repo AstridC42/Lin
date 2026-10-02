@@ -162,7 +162,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
           return@withContext WebSearchOutcome.Failure(describeHttpFailure(e, baseUrl))
         } catch (e: IOException) {
           return@withContext WebSearchOutcome.Failure(
-            "Could not reach the SearXNG instance at $baseUrl (${e.message ?: "network error"})."
+            describeNetworkFailure(e, baseUrl)
           )
         }
 
@@ -215,7 +215,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
           return@withContext ImageSearchOutcome.Failure(describeHttpFailure(e, baseUrl))
         } catch (e: IOException) {
           return@withContext ImageSearchOutcome.Failure(
-            "Could not reach the SearXNG instance at $baseUrl (${e.message ?: "network error"})."
+            describeNetworkFailure(e, baseUrl)
           )
         }
 
@@ -349,7 +349,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
           )
         } catch (e: IOException) {
           return@withContext PageFetchOutcome.Failure(
-            "Could not download the page (${e.message ?: "network error"})."
+            describeNetworkFailure(e, url)
           )
         }
 
@@ -457,6 +457,25 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
     } finally {
       connection?.disconnect()
     }
+  }
+
+  /**
+   * What to say when the request never reached the instance.
+   *
+   * Worth more than the exception's own text in one case. Android refuses cleartext by default,
+   * so a plain `http://` address on the home network - which is what a self-hosted instance
+   * almost always is - fails before anything leaves the phone, with a message that reads like the
+   * server is down. Naming it is the difference between a user checking their router and a user
+   * knowing the address is right and the app will not use it.
+   */
+  private fun describeNetworkFailure(e: IOException, target: String): String {
+    val detail = e.message.orEmpty()
+    if (detail.contains("Cleartext", ignoreCase = true)) {
+      return "This build will not make plain http:// requests, so $target was never contacted. " +
+        "Either serve the instance over https://, or ask for cleartext to the home network to " +
+        "be turned back on in the app."
+    }
+    return "Could not reach $target (${detail.ifEmpty { "network error" }})."
   }
 
   private fun describeHttpFailure(e: SearxngHttpException, baseUrl: String): String =
