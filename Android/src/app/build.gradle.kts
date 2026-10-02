@@ -107,6 +107,11 @@ android {
     }
   }
 
+  // AGP 9 creates unit tests only for the variant named here; earlier versions created them for
+  // every variant. Release is what ships and what every workflow tests, so that is the one, and
+  // naming it keeps `testReleaseUnitTest` working rather than silently testing nothing.
+  testBuildType = "release"
+
   // Ship one APK per ABI plus a universal fallback. The LiteRT and MediaPipe native libraries
   // dominate the download, so a device-matched APK is roughly a third of the universal one.
   splits {
