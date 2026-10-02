@@ -29,24 +29,28 @@ import com.google.ai.edge.gallery.agent.AgentRuntimeExecutor
 import com.google.ai.edge.gallery.agent.AiChatExecutor
 import com.google.ai.edge.gallery.agent.Attachment
 import com.google.ai.edge.gallery.agent.sessions.LlmSessionManager
+import com.google.ai.edge.gallery.agent.sessions.generateSessionId
 import com.google.ai.edge.gallery.common.SystemPromptHelper
-import com.google.ai.edge.gallery.data.ChatSessionRepository
 import com.google.ai.edge.gallery.data.ConfigKeys
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.SystemPromptRepository
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.data.awaitInitialization
+import com.google.ai.edge.gallery.proto.ChatSessionProto
 import com.google.ai.edge.gallery.tools.ToolAction
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageAudioClip
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageError
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageInfo
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageLoading
+import com.google.ai.edge.gallery.ui.common.chat.ChatMessageMapper
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageText
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageThinking
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageType
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageWarning
 import com.google.ai.edge.gallery.ui.common.chat.ChatSide
 import com.google.ai.edge.gallery.ui.common.chat.ChatViewModel
+import com.google.ai.edge.gallery.ui.common.chat.ContextCompactionStatus
+import com.google.ai.edge.gallery.ui.common.chat.ContextCompactionTriggerType
 import com.google.ai.edge.gallery.ui.common.chat.convertToLitertMessage
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.litertlm.ExperimentalApi
@@ -54,8 +58,11 @@ import com.google.ai.edge.litertlm.Message
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -65,17 +72,18 @@ private const val TAG = "AGLlmChatViewModel"
 @OptIn(ExperimentalApi::class)
 open class LlmChatViewModelBase(
   private val systemPromptRepository: SystemPromptRepository? = null,
-  chatSessionRepository: ChatSessionRepository? = null,
   private val modelFeedbackRepository: Any? = null,
   override val runtimeExecutor: AgentRuntimeExecutor,
-  override val llmSessionManager: LlmSessionManager? = null,
-) : ChatViewModel(chatSessionRepository, runtimeExecutor, llmSessionManager) {
+  llmSessionManager: LlmSessionManager,
+) : ChatViewModel(runtimeExecutor, llmSessionManager) {
   private val _uiSystemPrompt = MutableStateFlow("")
   val uiSystemPrompt = _uiSystemPrompt.asStateFlow()
   // Map to track if the session was stopped by the model for a given model name.
   private val sessionStoppedByModel = mutableMapOf<String, Boolean>()
   // The current task ID for the session.
   private var currentTaskId: String = ""
+  // Active session transition job to ensure transitions (restore, new session, reset) do not race.
+  private var sessionTransitionJob: Job? = null
 
   /**
    * Sets the system prompt in the UI.
@@ -128,8 +136,8 @@ open class LlmChatViewModelBase(
         task = task,
         model = model,
         systemInstruction = newPrompt,
-        supportImage = model.llmSupportImage,
-        supportAudio = model.llmSupportAudio,
+        supportImage = model.supportImage,
+        supportAudio = model.supportAudio,
         onDone = { addMessage(model, ChatMessageInfo(content = systemPromptUpdatedMessage)) },
       )
     }
@@ -145,7 +153,7 @@ open class LlmChatViewModelBase(
     onError: (String) -> Unit,
     allowThinking: Boolean = false,
   ) {
-    val accelerator = model.getStringConfigValue(key = ConfigKeys.ACCELERATOR, defaultValue = "")
+    val accelerator = model.currentAccelerator?.name ?: ""
     viewModelScope.launch(Dispatchers.Default) {
       setInProgress(true)
       setPreparing(true)
@@ -165,9 +173,19 @@ open class LlmChatViewModelBase(
         allowThinking &&
           model.getBooleanConfigValue(key = ConfigKeys.ENABLE_THINKING, defaultValue = false)
       val extraContext = if (enableThinking) mapOf("enable_thinking" to "true") else emptyMap()
+      // ChatMessageLoading was already appended above as the placeholder for the upcoming agent
+      // response (and is replaced in-place when streaming starts), so `currentMessages.size - 1`
+      // is the 0-based message list index of this turn's inference output (matching
+      // `agentMessageIndex` in `submitFeedback` / `linkFeedbackToSession`).
+      val currentMessages = uiState.value.messagesByModel[model.name] ?: emptyList()
+      val messageIndex = currentMessages.size - 1
+
       val metadata =
         buildMap<String, Any> {
           put(AgentRequest.SESSION_ID, currentSessionId)
+          if (messageIndex >= 0) {
+            put(AgentRequest.MESSAGE_INDEX, messageIndex)
+          }
           if (extraContext.isNotEmpty()) {
             put(AgentRequest.LITERTLM_EXTRA_CONTEXT, extraContext)
           }
@@ -175,9 +193,10 @@ open class LlmChatViewModelBase(
 
       val request = AgentRequest(query = input, attachments = attachments, metadata = metadata)
 
-      val context = AgentExecutionContext()
+      val executionContext = AgentExecutionContext()
 
       var firstRun = true
+      var compactionSucceeded = false
       val start = System.currentTimeMillis()
 
       if (sessionStoppedByModel[model.name] == true) {
@@ -191,8 +210,8 @@ open class LlmChatViewModelBase(
           AgentRuntimeConfig(
             model = model,
             taskId = currentTaskId,
-            supportImage = model.llmSupportImage,
-            supportAudio = model.llmSupportAudio,
+            supportImage = model.supportImage,
+            supportAudio = model.supportAudio,
             systemInstruction = _uiSystemPrompt.value.ifEmpty { null },
             initialMessages = initialMessages,
           )
@@ -200,9 +219,23 @@ open class LlmChatViewModelBase(
       }
 
       // Run inference.
-      runtimeExecutor.executeStream(context = context, request = request).collect { event ->
+      runtimeExecutor.executeStream(context = executionContext, request = request).collect { event
+        ->
         when (event) {
           is AgentEvent.LoopInitiated -> {}
+          is AgentEvent.ContextCompactionStarted -> {
+            compactionSucceeded = false
+            setContextCompactionStatus(model, ContextCompactionStatus.COMPACTING)
+          }
+          is AgentEvent.ContextCompactionFinished -> {
+            compactionSucceeded = event.success
+            if (
+              !event.success &&
+                getContextCompactionStatus(model) == ContextCompactionStatus.COMPACTING
+            ) {
+              setContextCompactionStatus(model, ContextCompactionStatus.IDLE)
+            }
+          }
           is AgentEvent.StreamToken -> {
             val lastMessage = getLastMessage(model = model)
             val wasLoading = lastMessage?.type == ChatMessageType.LOADING
@@ -310,17 +343,48 @@ open class LlmChatViewModelBase(
                 )
               }
             }
-            setInProgress(false)
+            if (getContextCompactionStatus(model) == ContextCompactionStatus.COMPACTING) {
+              setContextCompactionStatus(
+                model,
+                if (compactionSucceeded) {
+                  ContextCompactionStatus.COMPACTED
+                } else {
+                  ContextCompactionStatus.IDLE
+                },
+              )
+            }
             setPreparing(false)
+            val isLimitReached = llmSessionManager.isTokenLimitReached(currentSessionId, model)
+            try {
+              if (isLimitReached) {
+                if (isAutoCompactEnabled(model)) {
+                  executeCompactContext(
+                    model = model,
+                    taskId = currentTaskId,
+                    triggerType = ContextCompactionTriggerType.AUTO,
+                  )
+                } else {
+                  setContextCompactionStatus(model, ContextCompactionStatus.TOKEN_LIMIT_REACHED)
+                }
+              }
+            } finally {
+              setInProgress(false)
+            }
             onDone()
           }
           is AgentEvent.Error -> {
             Log.e(TAG, "Error occurred while running inference: ${event.errorMessage}")
+            if (getContextCompactionStatus(model) == ContextCompactionStatus.COMPACTING) {
+              setContextCompactionStatus(model, ContextCompactionStatus.IDLE)
+            }
             setInProgress(false)
             setPreparing(false)
             onError(event.errorMessage)
           }
           is AgentEvent.LoopCancelled -> {
+            if (getContextCompactionStatus(model) == ContextCompactionStatus.COMPACTING) {
+              setContextCompactionStatus(model, ContextCompactionStatus.IDLE)
+            }
             setInProgress(false)
             setPreparing(false)
           }
@@ -331,6 +395,10 @@ open class LlmChatViewModelBase(
 
   fun stopResponse(model: Model) {
     Log.d(TAG, "Stopping response for model ${model.name}...")
+    cancelCompaction()
+    if (getContextCompactionStatus(model) == ContextCompactionStatus.COMPACTING) {
+      setContextCompactionStatus(model, ContextCompactionStatus.IDLE)
+    }
     if (getLastMessage(model = model) is ChatMessageLoading) {
       removeLastMessage(model = model)
     } else {
@@ -354,10 +422,40 @@ open class LlmChatViewModelBase(
     clearHistory: Boolean = true,
   ) {
     currentTaskId = task.id
-    viewModelScope.launch(Dispatchers.Default) {
-      setIsResettingSession(true)
+    sessionTransitionJob?.cancel()
+    sessionTransitionJob =
+      viewModelScope.launch(Dispatchers.Default) {
+        executeResetSession(
+          task = task,
+          model = model,
+          systemInstruction = systemInstruction,
+          actionChannel = actionChannel,
+          supportImage = supportImage,
+          supportAudio = supportAudio,
+          onDone = onDone,
+          enableConversationConstrainedDecoding = enableConversationConstrainedDecoding,
+          initialMessages = initialMessages,
+          clearHistory = clearHistory,
+        )
+      }
+  }
+
+  private suspend fun executeResetSession(
+    task: Task,
+    model: Model,
+    systemInstruction: String? = null,
+    actionChannel: SendChannel<ToolAction>? = null,
+    supportImage: Boolean = false,
+    supportAudio: Boolean = false,
+    onDone: () -> Unit = {},
+    enableConversationConstrainedDecoding: Boolean = false,
+    initialMessages: List<Message> = listOf(),
+    clearHistory: Boolean = true,
+  ) {
+    setIsResettingSession(true)
+    try {
       if (clearHistory) {
-        currentSessionId = UUID.randomUUID().toString()
+        currentSessionId = generateSessionId()
         clearAllMessages(model = model)
       }
       stopResponse(model = model)
@@ -379,7 +477,97 @@ open class LlmChatViewModelBase(
 
       setIsResettingSession(false)
       onDone()
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to reset session: ${e.message}", e)
+      setIsResettingSession(false)
     }
+  }
+
+  /**
+   * Restores a saved chat session from persistent storage into the UI state and model runtime.
+   *
+   * @param session The protobuf representation of the session to restore.
+   * @param task The task associated with this session.
+   * @param model The active model to restore into.
+   * @param systemInstruction Optional system instruction prompt to apply.
+   * @param supportImage Whether image input is supported.
+   * @param supportAudio Whether audio input is supported.
+   * @param onDone Callback invoked when restoration is complete.
+   */
+  open fun restoreSession(
+    session: ChatSessionProto,
+    task: Task,
+    model: Model,
+    systemInstruction: String? = null,
+    supportImage: Boolean = false,
+    supportAudio: Boolean = false,
+    onDone: () -> Unit = {},
+  ) {
+    currentTaskId = task.id
+    sessionTransitionJob?.cancel()
+    sessionTransitionJob =
+      viewModelScope.launch(Dispatchers.Default) {
+        setIsResettingSession(true)
+        stopResponse(model = model)
+
+        try {
+          val messages = ChatMessageMapper.deserializeProtoMessages(session.messagesList)
+          ensureActive()
+
+          currentSessionId = session.sessionId
+          setRestoredMessages(model = model, messages = messages)
+
+          val litertMessages = messages.mapNotNull { convertToLitertMessage(it) }
+          executeResetSession(
+            task = task,
+            model = model,
+            systemInstruction = systemInstruction ?: _uiSystemPrompt.value.ifEmpty { null },
+            supportImage = supportImage,
+            supportAudio = supportAudio,
+            initialMessages = litertMessages,
+            clearHistory = false,
+            onDone = onDone,
+          )
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to restore session: ${e.message}", e)
+          setIsResettingSession(false)
+        }
+      }
+  }
+
+  /**
+   * Starts a new empty chat session, resetting both UI state and model runtime.
+   *
+   * @param task The task associated with the new session.
+   * @param model The active model for the new session.
+   * @param systemInstruction Optional system instruction prompt to apply.
+   * @param supportImage Whether image input is supported.
+   * @param supportAudio Whether audio input is supported.
+   * @param onDone Callback invoked when creation is complete.
+   */
+  open fun startNewSession(
+    task: Task,
+    model: Model,
+    systemInstruction: String? = null,
+    supportImage: Boolean = false,
+    supportAudio: Boolean = false,
+    onDone: () -> Unit = {},
+  ) {
+    currentTaskId = task.id
+    resetSession(
+      task = task,
+      model = model,
+      systemInstruction = systemInstruction ?: _uiSystemPrompt.value.ifEmpty { null },
+      supportImage = supportImage,
+      supportAudio = supportAudio,
+      initialMessages = emptyList(),
+      clearHistory = true,
+      onDone = onDone,
+    )
   }
 
   fun runAgain(
@@ -470,11 +658,10 @@ open class LlmChatViewModel
 @Inject
 constructor(
   systemPromptRepository: SystemPromptRepository,
-  chatSessionRepository: ChatSessionRepository,
   @AiChatExecutor runtimeExecutor: AgentRuntimeExecutor,
   llmSessionManager: LlmSessionManager,
 ) :
-LlmChatViewModelBase(systemPromptRepository, chatSessionRepository, null, runtimeExecutor,
+LlmChatViewModelBase(systemPromptRepository, null, runtimeExecutor,
 llmSessionManager)
 
 @HiltViewModel
@@ -482,11 +669,10 @@ class LlmAskImageViewModel
 @Inject
 constructor(
   systemPromptRepository: SystemPromptRepository,
-  chatSessionRepository: ChatSessionRepository,
   @AiChatExecutor runtimeExecutor: AgentRuntimeExecutor,
   llmSessionManager: LlmSessionManager,
 ) :
-LlmChatViewModelBase(systemPromptRepository, chatSessionRepository, null, runtimeExecutor,
+LlmChatViewModelBase(systemPromptRepository, null, runtimeExecutor,
 llmSessionManager)
 
 @HiltViewModel
@@ -494,9 +680,8 @@ class LlmAskAudioViewModel
 @Inject
 constructor(
   systemPromptRepository: SystemPromptRepository,
-  chatSessionRepository: ChatSessionRepository,
   @AiChatExecutor runtimeExecutor: AgentRuntimeExecutor,
   llmSessionManager: LlmSessionManager,
 ) :
-LlmChatViewModelBase(systemPromptRepository, chatSessionRepository, null, runtimeExecutor,
+LlmChatViewModelBase(systemPromptRepository, null, runtimeExecutor,
 llmSessionManager)

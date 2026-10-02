@@ -70,6 +70,7 @@ import com.google.ai.edge.gallery.data.Accelerator
 import com.google.ai.edge.gallery.data.Config
 import com.google.ai.edge.gallery.data.ConfigKey
 import com.google.ai.edge.gallery.data.ConfigKeys
+import com.google.ai.edge.gallery.data.DEFAULT_MAX_TOKEN
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.NumberSliderConfig
 import com.google.ai.edge.gallery.data.SegmentedButtonConfig
@@ -89,11 +90,15 @@ fun BenchmarkScreen(
   modelManagerViewModel: ModelManagerViewModel,
   modifier: Modifier = Modifier,
   viewModel: BenchmarkViewModel = hiltViewModel(),
+  hideProgressIndicator: Boolean = false,
+  initialShowConfirmationDialog: Boolean = false,
   onBackClicked: () -> Unit,
 ) {
   val uiState by viewModel.uiState.collectAsState()
   var enableBackButton by remember { mutableStateOf(true) }
-  var showRunBenchmarkConfirmationDialog by remember { mutableStateOf(false) }
+  var showRunBenchmarkConfirmationDialog by remember {
+    mutableStateOf(initialShowConfirmationDialog)
+  }
   val downloadedLlmModelNames = remember {
     modelManagerViewModel
       .getAllDownloadedModels()
@@ -112,8 +117,9 @@ fun BenchmarkScreen(
         add(
           SegmentedButtonConfig(
             key = ConfigKeys.ACCELERATOR,
-            defaultValue = selectedModel.accelerators.getOrNull(0)?.label ?: Accelerator.CPU.label,
-            options = selectedModel.accelerators.map { it.label },
+            defaultValue =
+              selectedModel.backendSpec.defaultAccelerator?.label ?: Accelerator.CPU.label,
+            options = selectedModel.backendSpec.accelerators.map { it.label },
             allowMultiple = false,
           )
         )
@@ -121,7 +127,7 @@ fun BenchmarkScreen(
           NumberSliderConfig(
             key = ConfigKeys.PREFILL_TOKENS,
             sliderMin = 16f,
-            sliderMax = selectedModel.llmMaxToken.toFloat(),
+            sliderMax = (selectedModel.llmProfile?.maxTokens ?: DEFAULT_MAX_TOKEN).toFloat(),
             defaultValue = 256f,
             valueType = ValueType.INT,
           )
@@ -159,7 +165,7 @@ fun BenchmarkScreen(
   val sumOfPrefillAndDecodeTokens =
     getIntConfigValue(values = values, key = ConfigKeys.PREFILL_TOKENS) +
       getIntConfigValue(values = values, key = ConfigKeys.DECODE_TOKENS)
-  val maxToken = selectedModel.llmMaxToken
+  val maxToken = selectedModel.llmProfile?.maxTokens ?: DEFAULT_MAX_TOKEN
 
   // Update filteredResults when selected model is changed.
   LaunchedEffect(selectedModelName, uiState.results) {
@@ -287,6 +293,7 @@ fun BenchmarkScreen(
         initialModelName = selectedModelName,
         modelManagerViewModel = modelManagerViewModel,
         viewModel = viewModel,
+        hideProgressIndicator = hideProgressIndicator,
         onClose = { viewModel.setShowResultsViewer(showResultsViewer = false) },
       )
     }

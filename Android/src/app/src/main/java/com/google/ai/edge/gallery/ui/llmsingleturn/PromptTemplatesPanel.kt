@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -85,6 +86,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
@@ -93,7 +95,6 @@ import androidx.compose.ui.unit.dp
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.ui.common.chat.MessageBubbleShape
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.theme.bodyLargeNarrow
 import com.google.ai.edge.gallery.ui.theme.customColors
@@ -117,7 +118,6 @@ fun PromptTemplatesPanel(
 ) {
   val scope = rememberCoroutineScope()
   val uiState by viewModel.uiState.collectAsState()
-  val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
   val selectedPromptTemplateType = uiState.selectedPromptTemplateType
   val inProgress = uiState.inProgress
   var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -135,7 +135,7 @@ fun PromptTemplatesPanel(
   val focusManager = LocalFocusManager.current
   val interactionSource = remember { MutableInteractionSource() }
   val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
-  val modelInitializationStatus = modelManagerUiState.modelInitializationStatus[model.name]
+  val initStatus by model.initStatusFlow.collectAsState()
 
   // Update input editor values when prompt template changes.
   LaunchedEffect(selectedPromptTemplateType) {
@@ -266,20 +266,21 @@ fun PromptTemplatesPanel(
             selectedPromptTemplateType != PromptTemplateType.FREE_FORM &&
               curTextInputContent.isNotEmpty()
           ) {
+            val isFullPromptOn = inputEditorValues[FULL_PROMPT_SWITCH_KEY] as Boolean
             Row(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(4.dp),
               modifier =
                 Modifier.clip(CircleShape)
                   .background(
-                    if (inputEditorValues[FULL_PROMPT_SWITCH_KEY] as Boolean)
-                      MaterialTheme.colorScheme.secondaryContainer
+                    if (isFullPromptOn) MaterialTheme.colorScheme.secondaryContainer
                     else MaterialTheme.customColors.agentBubbleBgColor
                   )
-                  .clickable {
-                    inputEditorValues[FULL_PROMPT_SWITCH_KEY] =
-                      !(inputEditorValues[FULL_PROMPT_SWITCH_KEY] as Boolean)
-                  }
+                  .toggleable(
+                    value = isFullPromptOn,
+                    role = Role.Switch,
+                    onValueChange = { inputEditorValues[FULL_PROMPT_SWITCH_KEY] = it },
+                  )
                   .height(40.dp)
                   .border(
                     width = 1.dp,
@@ -288,7 +289,7 @@ fun PromptTemplatesPanel(
                   )
                   .padding(horizontal = 12.dp),
             ) {
-              if (inputEditorValues[FULL_PROMPT_SWITCH_KEY] as Boolean) {
+              if (isFullPromptOn) {
                 Icon(
                   imageVector = Icons.Rounded.Visibility,
                   contentDescription = null,
@@ -361,8 +362,7 @@ fun PromptTemplatesPanel(
             )
           }
 
-          val modelInitializing =
-            modelInitializationStatus?.status == ModelInitializationStatusType.INITIALIZING
+          val modelInitializing = initStatus is Model.InitializationStatus.Initializing
           if (inProgress && !modelInitializing && !uiState.preparing) {
             IconButton(
               onClick = { onStopButtonClicked(model) },

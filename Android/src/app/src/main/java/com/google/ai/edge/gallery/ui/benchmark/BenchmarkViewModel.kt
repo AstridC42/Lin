@@ -22,7 +22,6 @@ import androidx.lifecycle.viewModelScope
 import com.google.ai.edge.gallery.BuildConfig
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.Model
-import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.proto.BenchmarkResult
 import com.google.ai.edge.gallery.proto.LlmBenchmarkBasicInfo
 import com.google.ai.edge.gallery.proto.LlmBenchmarkResult
@@ -77,14 +76,14 @@ data class BenchmarkUiState(
 )
 
 @HiltViewModel
-class BenchmarkViewModel
+open class BenchmarkViewModel
 @Inject
 constructor(
   @ApplicationContext private val appContext: Context,
-  val dataStoreRepository: DataStoreRepository,
+  open val dataStoreRepository: DataStoreRepository,
 ) : ViewModel() {
   protected val _uiState = MutableStateFlow(BenchmarkUiState())
-  val uiState = _uiState.asStateFlow()
+  open val uiState = _uiState.asStateFlow()
 
   init {
     // Load results from storage.
@@ -300,7 +299,7 @@ constructor(
     }
   }
 
-  fun clearBaseline() {
+  open fun clearBaseline() {
     _uiState.update { _uiState.value.copy(baselineResult = null) }
   }
 

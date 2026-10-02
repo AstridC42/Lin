@@ -51,6 +51,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
@@ -99,13 +100,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -123,7 +124,6 @@ import com.google.ai.edge.gallery.data.Category
 import com.google.ai.edge.gallery.data.CategoryInfo
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.ui.common.RevealingText
-import com.google.ai.edge.gallery.ui.common.SwipingText
 import com.google.ai.edge.gallery.ui.common.TaskIcon
 import com.google.ai.edge.gallery.ui.common.buildTrackableUrlAnnotatedString
 import com.google.ai.edge.gallery.ui.common.rememberDelayedAnimationProgress
@@ -131,7 +131,6 @@ import com.google.ai.edge.gallery.ui.common.tos.AppTosDialog
 import com.google.ai.edge.gallery.ui.common.tos.TosViewModel
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.theme.customColors
-import com.google.ai.edge.gallery.ui.theme.homePageTitleStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -141,7 +140,6 @@ private const val ANIMATION_INIT_DELAY = 0L
 private const val TOP_APP_BAR_ANIMATION_DURATION = 600
 private const val TITLE_FIRST_LINE_ANIMATION_DURATION = 600
 private const val TITLE_SECOND_LINE_ANIMATION_DURATION = 600
-private const val TITLE_SECOND_LINE_ANIMATION_DURATION2 = 800
 private const val TITLE_SECOND_LINE_ANIMATION_START =
   ANIMATION_INIT_DELAY + (TITLE_FIRST_LINE_ANIMATION_DURATION * 0.5).toInt()
 private const val TASK_LIST_ANIMATION_START = TITLE_SECOND_LINE_ANIMATION_START + 110
@@ -169,7 +167,6 @@ fun HomeScreen(
   onAssistantClicked: (() -> Unit)? = null,
   enableAnimation: Boolean,
   modifier: Modifier = Modifier,
-  gm4: Boolean = false,
 ) {
   val uiState by modelManagerViewModel.uiState.collectAsState()
   var showSettingsDialog by remember { mutableStateOf(false) }
@@ -178,7 +175,7 @@ fun HomeScreen(
   val context = LocalContext.current
   val isDevBuild = context.packageName.endsWith(".dev")
 
-  var tasks = uiState.tasks
+  val tasks = uiState.tasks
 
   val categoryMap: Map<String, CategoryInfo> =
     remember(tasks) { tasks.associateBy { it.category.id }.mapValues { it.value.category } }
@@ -379,15 +376,7 @@ fun HomeScreen(
           // Outer box for coloring the background edge to edge.
           Box(
             contentAlignment = Alignment.TopCenter,
-            modifier =
-              Modifier.fillMaxSize()
-                .background(
-                  if (gm4) {
-                    MaterialTheme.colorScheme.surface
-                  } else {
-                    MaterialTheme.colorScheme.surfaceContainer
-                  }
-                ),
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
           ) {
             // Inner box to hold content.
             Box(
@@ -398,37 +387,35 @@ fun HomeScreen(
                   .verticalScroll(rememberScrollState()),
             ) {
               // Background star at top.
-              if (gm4) {
-                val progress =
-                  if (!enableAnimation) {
-                    1f
-                  } else {
-                    rememberDelayedAnimationProgress(
-                      initialDelay = ANIMATION_INIT_DELAY,
-                      animationDurationMs = 2000,
-                      animationLabel = "bg star",
-                    )
-                  }
-                val configuration = LocalConfiguration.current
-                val screenWidth = configuration.screenWidthDp.dp
-                val targetWidth = screenWidth * 1.5f
-                Image(
-                  painter = painterResource(id = R.drawable.bg_star),
-                  contentDescription = null,
-                  modifier =
-                    Modifier.requiredWidth(targetWidth)
-                      .blur(radius = 35.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                      .offset(x = screenWidth * 0.25f, y = -screenWidth * 0.1f)
-                      .graphicsLayer {
-                        rotationZ = (1f - progress) * 40f
-                        scaleX = 0.4f + 0.6f * progress
-                        scaleY = 0.4f + 0.6f * progress
-                        alpha = progress * 2f
-                      },
-                  contentScale = ContentScale.Crop,
-                  colorFilter = ColorFilter.tint(MaterialTheme.customColors.bgStarColor),
-                )
-              }
+              val progress =
+                if (!enableAnimation) {
+                  1f
+                } else {
+                  rememberDelayedAnimationProgress(
+                    initialDelay = ANIMATION_INIT_DELAY,
+                    animationDurationMs = 2000,
+                    animationLabel = "bg star",
+                  )
+                }
+              val configuration = LocalConfiguration.current
+              val screenWidth = configuration.screenWidthDp.dp
+              val targetWidth = screenWidth * 1.5f
+              Image(
+                painter = painterResource(id = R.drawable.bg_star),
+                contentDescription = null,
+                modifier =
+                  Modifier.requiredWidth(targetWidth)
+                    .blur(radius = 35.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .offset(x = screenWidth * 0.25f, y = -screenWidth * 0.1f)
+                    .graphicsLayer {
+                      rotationZ = (1f - progress) * 40f
+                      scaleX = 0.4f + 0.6f * progress
+                      scaleY = 0.4f + 0.6f * progress
+                      alpha = progress * 2f
+                    },
+                contentScale = ContentScale.Crop,
+                colorFilter = ColorFilter.tint(MaterialTheme.customColors.bgStarColor),
+              )
 
               Column(modifier = Modifier.fillMaxWidth()) {
                 var selectedCategoryIndex by remember { mutableIntStateOf(0) }
@@ -436,23 +423,14 @@ fun HomeScreen(
                 // App title and intro text.
                 Column(
                   modifier =
-                    Modifier.padding(
-                        horizontal = if (gm4) 24.dp else 40.dp,
-                        vertical = if (gm4) 0.dp else 48.dp,
-                      )
+                    Modifier.padding(horizontal = 24.dp)
                       .padding(top = 24.dp, bottom = 16.dp)
                       .semantics(mergeDescendants = true) {},
                   verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                  if (gm4) {
-                    AppTitleGm4(enableAnimation = enableAnimation)
-                  } else {
-                    AppTitle(enableAnimation = enableAnimation)
-                  }
-                  IntroText(enableAnimation = enableAnimation, gm4 = gm4)
-                  if (gm4) {
-                    TryGm4IntroText(enableAnimation = enableAnimation)
-                  }
+                  AppTitle(enableAnimation = enableAnimation)
+                  IntroText(enableAnimation = enableAnimation)
+                  TryGm4IntroText(enableAnimation = enableAnimation)
                 }
 
                 // Tab header for categories.
@@ -477,7 +455,6 @@ fun HomeScreen(
 
                 // Task list in a horizontal pager. Each page shows the list of tasks for the
                 // category.
-                val grid = gm4
                 TaskList(
                   modelManagerViewModel = modelManagerViewModel,
                   pagerState = pagerState,
@@ -485,8 +462,6 @@ fun HomeScreen(
                   tasksByCategories = uiState.tasksByCategory,
                   enableAnimation = enableAnimation,
                   navigateToTaskScreen = navigateToTaskScreen,
-                  gm4 = gm4,
-                  grid = grid,
                 )
 
                 Spacer(modifier = Modifier.height(innerPadding.calculateBottomPadding() + 10.dp))
@@ -559,82 +534,6 @@ fun HomeScreen(
 
 @Composable
 private fun AppTitle(enableAnimation: Boolean) {
-  val firstLineText = stringResource(R.string.app_name_first_part)
-  val secondLineText = stringResource(R.string.app_name_second_part)
-  val titleColor = MaterialTheme.customColors.appTitleGradientColors[1]
-  val screenWidthInDp = LocalConfiguration.current.screenWidthDp.dp
-  val fontSize = with(LocalDensity.current) { (screenWidthInDp.toPx() * 0.12f).toSp() }
-  val titleStyle = homePageTitleStyle.copy(fontSize = fontSize, lineHeight = fontSize)
-
-  // First line text "Google AI" and its animation.
-  //
-  // The animation starts with the first line of text swiping in from left to right, progressively
-  // revealing itself in the title color (blue). Then, after a brief delay, the exact same text, but
-  // in the onSurface color (which is black in light mode), begins its own left-to-right swiping
-  // animation. This second animation is positioned directly on top of the first, appearing just as
-  // the initial reveal is finishing or has just completed, creating a layered and dynamic visual
-  // effect.
-  Box(modifier = Modifier.clearAndSetSemantics {}) {
-    var delay = ANIMATION_INIT_DELAY
-    if (enableAnimation) {
-      SwipingText(
-        text = firstLineText,
-        style = titleStyle,
-        color = titleColor,
-        animationDelay = delay,
-        animationDurationMs = TITLE_FIRST_LINE_ANIMATION_DURATION,
-      )
-      delay += (TITLE_FIRST_LINE_ANIMATION_DURATION * 0.3).toLong()
-    }
-    SwipingText(
-      text = firstLineText,
-      style = titleStyle,
-      color = MaterialTheme.colorScheme.onSurface,
-      animationDelay = if (enableAnimation) delay else 0,
-      animationDurationMs = if (enableAnimation) TITLE_FIRST_LINE_ANIMATION_DURATION else 0,
-    )
-  }
-  // Second line text "Edge Gallery" and its animation.
-  //
-  // The initial animation is the same as the first line text. Right before it is done, the final
-  // text with a gradient is revealed.
-  Box(modifier = Modifier.clearAndSetSemantics {}) {
-    var delay = TITLE_SECOND_LINE_ANIMATION_START
-    if (enableAnimation) {
-      SwipingText(
-        text = secondLineText,
-        style = titleStyle,
-        color = titleColor,
-        modifier = Modifier.offset(y = (-16).dp),
-        animationDelay = delay,
-        animationDurationMs = TITLE_SECOND_LINE_ANIMATION_DURATION,
-      )
-      delay += (TITLE_SECOND_LINE_ANIMATION_DURATION * 0.3).toInt()
-      SwipingText(
-        text = secondLineText,
-        style = titleStyle,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.offset(y = (-16).dp),
-        animationDelay = delay,
-        animationDurationMs = TITLE_SECOND_LINE_ANIMATION_DURATION,
-      )
-      delay += (TITLE_SECOND_LINE_ANIMATION_DURATION * 0.6).toInt()
-    }
-    RevealingText(
-      text = secondLineText,
-      style =
-        titleStyle.copy(
-          brush = linearGradient(colors = MaterialTheme.customColors.appTitleGradientColors)
-        ),
-      modifier = Modifier.offset(x = (-16).dp, y = (-16).dp),
-      animationDelay = if (enableAnimation) delay else 0,
-      animationDurationMs = if (enableAnimation) TITLE_SECOND_LINE_ANIMATION_DURATION2 else 0,
-    )
-  }
-}
-
-@Composable
-fun AppTitleGm4(enableAnimation: Boolean) {
   val text1 = "Google"
   val text2 = "AI Edge Gallery"
   val annotatedText = buildAnnotatedString {
@@ -659,7 +558,7 @@ fun AppTitleGm4(enableAnimation: Boolean) {
 }
 
 @Composable
-private fun IntroText(enableAnimation: Boolean, gm4: Boolean) {
+private fun IntroText(enableAnimation: Boolean) {
   val litertUrl = "https://huggingface.co/litert-community"
 
   // Intro text animation:
@@ -678,31 +577,21 @@ private fun IntroText(enableAnimation: Boolean, gm4: Boolean) {
 
   val introText = buildAnnotatedString {
     val gemma4Url = "https://ai.google.dev/gemma"
-    if (gm4) {
-      append("${stringResource(R.string.gemma4_intro_part_1)} ")
-      append(
-        buildTrackableUrlAnnotatedString(
-          url = litertUrl,
-          linkText = stringResource(R.string.litert_community_label),
-        )
+    append("${stringResource(R.string.gemma4_intro_part_1)} ")
+    append(
+      buildTrackableUrlAnnotatedString(
+        url = litertUrl,
+        linkText = stringResource(R.string.litert_community_label),
       )
-      append("${stringResource(R.string.gemma4_intro_part_2)} ")
-      append(
-        buildTrackableUrlAnnotatedString(
-          url = gemma4Url,
-          linkText = stringResource(R.string.gemma4_label),
-        )
+    )
+    append("${stringResource(R.string.gemma4_intro_part_2)} ")
+    append(
+      buildTrackableUrlAnnotatedString(
+        url = gemma4Url,
+        linkText = stringResource(R.string.gemma4_label),
       )
-      append(".")
-    } else {
-      append("${stringResource(R.string.app_intro)} ")
-      append(
-        buildTrackableUrlAnnotatedString(
-          url = litertUrl,
-          linkText = stringResource(R.string.litert_community_label),
-        )
-      )
-    }
+    )
+    append(".")
   }
   Text(
     introText,
@@ -806,25 +695,29 @@ private fun CategoryTabHeader(
                 if (selectedIndex == index) MaterialTheme.customColors.tabHeaderBgColor
                 else Color.Transparent
             )
-            .clickable {
-              onCategorySelected(index)
+            .selectable(
+              selected = (selectedIndex == index),
+              role = Role.Tab,
+              onClick = {
+                onCategorySelected(index)
 
-              // Scroll to clicked item when the item is not fully inside view.
-              scope.launch {
-                val visibleItems = listState.layoutInfo.visibleItemsInfo
-                val targetItem = visibleItems.find {
-                  // +1 because the first item is the item keyed at spacer_start.
-                  it.index == index + 1
+                // Scroll to clicked item when the item is not fully inside view.
+                scope.launch {
+                  val visibleItems = listState.layoutInfo.visibleItemsInfo
+                  val targetItem = visibleItems.find {
+                    // +1 because the first item is the item keyed at spacer_start.
+                    it.index == index + 1
+                  }
+                  if (
+                    targetItem == null ||
+                      targetItem.offset < 0 ||
+                      targetItem.offset + targetItem.size > listState.layoutInfo.viewportSize.width
+                  ) {
+                    listState.animateScrollToItem(index = index)
+                  }
                 }
-                if (
-                  targetItem == null ||
-                    targetItem.offset < 0 ||
-                    targetItem.offset + targetItem.size > listState.layoutInfo.viewportSize.width
-                ) {
-                  listState.animateScrollToItem(index = index)
-                }
-              }
-            },
+              },
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
       ) {
@@ -849,21 +742,21 @@ private fun TaskList(
   tasksByCategories: Map<String, List<Task>>,
   enableAnimation: Boolean,
   navigateToTaskScreen: (Task) -> Unit,
-  gm4: Boolean = false,
-  grid: Boolean = false,
 ) {
   // Model list animation:
   //
   // 1.  Slide Up: The entire column of task cards translates upwards,
   // 2.  Fade in one by one: The task card fade in one by one. See TaskCard for details.
   val progress =
-    if (!enableAnimation) 1f
-    else
+    if (!enableAnimation) {
+      1f
+    } else {
       rememberDelayedAnimationProgress(
         initialDelay = TASK_LIST_ANIMATION_START,
         animationDurationMs = CONTENT_COMPOSABLES_ANIMATION_DURATION,
         animationLabel = "task card animation",
       )
+    }
 
   // Tracks when the initial animation is done.
   //
@@ -874,50 +767,46 @@ private fun TaskList(
     initialAnimationDone = true
   }
 
-  // The highlighted tiles at the top.
-  if (gm4) {
-    Column(
-      verticalArrangement = Arrangement.spacedBy(10.dp),
-      modifier =
-        Modifier.padding(horizontal = 24.dp).graphicsLayer {
-          alpha = progress
-          translationY = (CONTENT_COMPOSABLES_OFFSET_Y.dp * (1 - progress)).toPx()
-        },
-    ) {
-      val chatToDescription =
-        mapOf(
-          BuiltInTaskId.LLM_CHAT to stringResource(R.string.gemma_reskin_try_gemma_4_chat),
-          // use "\u00a0" to make sure the word before and after it should always be together when
-          // wrapping lines.
-          BuiltInTaskId.LLM_AGENT_CHAT to stringResource(R.string.gemma_reskin_try_gemma_4_skills),
-        )
-      for (task in
-        listOf(
-          modelManagerViewModel.getTaskById(BuiltInTaskId.LLM_CHAT)!!,
-          modelManagerViewModel.getTaskById(BuiltInTaskId.LLM_AGENT_CHAT)!!,
-        )) {
-        TaskCard(
-          task = task,
-          index = 0,
-          animate = !initialAnimationDone && enableAnimation,
-          onClick = { navigateToTaskScreen(task) },
-          modifier = Modifier.fillMaxWidth(),
-          description = chatToDescription[task.id]!!,
-        )
-      }
+  val taskIds = listOf(BuiltInTaskId.LLM_CHAT, BuiltInTaskId.LLM_AGENT_CHAT)
 
-      Text(
-        text = stringResource(R.string.explore_other_use_cases),
-        style =
-          MaterialTheme.typography.headlineSmall.copy(
-            fontWeight = FontWeight.Medium,
-            fontSize = 20.sp,
-            lineHeight = 24.sp,
-          ),
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(top = 22.dp, bottom = 16.dp),
+  // The highlighted tiles at the top.
+  Column(
+    verticalArrangement = Arrangement.spacedBy(10.dp),
+    modifier =
+      Modifier.padding(horizontal = 24.dp).graphicsLayer {
+        alpha = progress
+        translationY = (CONTENT_COMPOSABLES_OFFSET_Y.dp * (1 - progress)).toPx()
+      },
+  ) {
+    val chatToDescription =
+      mapOf(
+        BuiltInTaskId.LLM_CHAT to stringResource(R.string.gemma_reskin_try_gemma_4_chat),
+        // use "\u00a0" to make sure the word before and after it should always be together when
+        // wrapping lines.
+        BuiltInTaskId.LLM_AGENT_CHAT to stringResource(R.string.gemma_reskin_try_gemma_4_skills),
+      )
+    for (task in taskIds.map { modelManagerViewModel.getTaskById(it)!! }) {
+      TaskCard(
+        task = task,
+        index = 0,
+        animate = !initialAnimationDone && enableAnimation,
+        onClick = { navigateToTaskScreen(task) },
+        modifier = Modifier.fillMaxWidth(),
+        description = chatToDescription[task.id]!!,
       )
     }
+
+    Text(
+      text = stringResource(R.string.explore_other_use_cases),
+      style =
+        MaterialTheme.typography.headlineSmall.copy(
+          fontWeight = FontWeight.Medium,
+          fontSize = 20.sp,
+          lineHeight = 24.sp,
+        ),
+      color = MaterialTheme.colorScheme.onSurface,
+      modifier = Modifier.padding(top = 22.dp, bottom = 16.dp),
+    )
   }
 
   HorizontalPager(
@@ -925,67 +814,45 @@ private fun TaskList(
     verticalAlignment = Alignment.Top,
     contentPadding = PaddingValues(horizontal = 20.dp),
   ) { pageIndex ->
-    val tasks = tasksByCategories[sortedCategories[pageIndex].id]!!
-    if (grid) {
-      Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier =
-          Modifier.fillMaxWidth().padding(4.dp).graphicsLayer {
-            translationY = (CONTENT_COMPOSABLES_OFFSET_Y.dp * (1 - progress)).toPx()
-          },
-      ) {
-        for (i in tasks.indices step 2) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-          ) {
-            // First item in the row
+    val tasks = tasksByCategories[sortedCategories[pageIndex].id]!!.filter { it.id !in taskIds }
+    Column(
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+      modifier =
+        Modifier.fillMaxWidth().padding(4.dp).graphicsLayer {
+          translationY = (CONTENT_COMPOSABLES_OFFSET_Y.dp * (1 - progress)).toPx()
+        },
+    ) {
+      for (i in tasks.indices step 2) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+          // First item in the row
+          TaskCard(
+            task = tasks[i],
+            index = i,
+            animate =
+              (pageIndex == 0 || pageIndex == 1) && !initialAnimationDone && enableAnimation,
+            onClick = { navigateToTaskScreen(tasks[i]) },
+            modifier = Modifier.weight(1f),
+            square = true,
+          )
+
+          // Second item in the row, if it exists
+          if (i + 1 < tasks.size) {
             TaskCard(
-              task = tasks[i],
-              index = i,
+              task = tasks[i + 1],
+              index = i + 1,
               animate =
                 (pageIndex == 0 || pageIndex == 1) && !initialAnimationDone && enableAnimation,
-              onClick = { navigateToTaskScreen(tasks[i]) },
+              onClick = { navigateToTaskScreen(tasks[i + 1]) },
               modifier = Modifier.weight(1f),
               square = true,
             )
-
-            // Second item in the row, if it exists
-            if (i + 1 < tasks.size) {
-              TaskCard(
-                task = tasks[i + 1],
-                index = i + 1,
-                animate =
-                  (pageIndex == 0 || pageIndex == 1) && !initialAnimationDone && enableAnimation,
-                onClick = { navigateToTaskScreen(tasks[i + 1]) },
-                modifier = Modifier.weight(1f),
-                square = true,
-              )
-            } else {
-              // Add a spacer to fill the remaining space if there's only one item in the last row
-              Spacer(modifier = Modifier.weight(1f))
-            }
+          } else {
+            // Add a spacer to fill the remaining space if there's only one item in the last row
+            Spacer(modifier = Modifier.weight(1f))
           }
-        }
-      }
-    } else {
-      Column(
-        modifier =
-          Modifier.fillMaxWidth().padding(4.dp).graphicsLayer {
-            translationY = (CONTENT_COMPOSABLES_OFFSET_Y.dp * (1 - progress)).toPx()
-          },
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-      ) {
-        for ((index, task) in tasks.withIndex()) {
-          TaskCard(
-            task = task,
-            index = index,
-            animate =
-              (pageIndex == 0 || pageIndex == 1) && !initialAnimationDone && enableAnimation,
-            onClick = { navigateToTaskScreen(task) },
-            modifier = Modifier.fillMaxWidth(),
-            square = false,
-          )
         }
       }
     }
@@ -1044,24 +911,20 @@ private fun TaskCard(
       )
     else 1f
 
-  val cbTask = stringResource(R.string.cd_task_card, task.label, task.models.size)
+  val descText = if (description.isNotEmpty()) description else task.shortDescription
+  val baseCbTask = stringResource(R.string.cd_task_card, task.label, task.models.size)
+  val cbTask = if (descText.isNotEmpty()) "$baseCbTask, $descText" else baseCbTask
   Card(
     modifier =
       modifier
         .clip(RoundedCornerShape(24.dp))
         .clickable(onClick = onClick)
         .graphicsLayer { alpha = progress }
-        .semantics { contentDescription = cbTask },
-    colors =
-      CardDefaults.cardColors(
-        containerColor =
-          if (description.isNotEmpty() || square) {
-            MaterialTheme.colorScheme.surfaceContainer
-          } else {
-
-            MaterialTheme.customColors.taskCardBgColor
-          }
-      ),
+        .semantics(mergeDescendants = true) {
+          contentDescription = cbTask
+          role = Role.Button
+        },
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
   ) {
     if (square) {
       Column(
@@ -1074,7 +937,6 @@ private fun TaskCard(
             curModelCountLabel,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
-            modifier = Modifier.clearAndSetSemantics {},
           )
           Text(
             task.label,
@@ -1085,7 +947,6 @@ private fun TaskCard(
             task.shortDescription,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 14.sp),
-            modifier = Modifier.clearAndSetSemantics {},
             minLines = 2,
             maxLines = 2,
             autoSize =
@@ -1099,76 +960,44 @@ private fun TaskCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
       ) {
-        if (description.isNotEmpty()) {
-          // Icon.
-          TaskIcon(task = task, width = 40.dp)
+        // Icon.
+        TaskIcon(task = task, width = 40.dp)
 
-          // Title and description.
-          Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-              Text(
-                task.label,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-              )
-              if (task.newFeature) {
-                Box(
-                  modifier =
-                    Modifier.offset(y = (-6).dp, x = 6.dp)
-                      .clip(RoundedCornerShape(8.dp))
-                      .background(MaterialTheme.customColors.newFeatureContainerColor)
-                      .padding(horizontal = 12.dp)
-                      .height(26.dp),
-                  contentAlignment = Alignment.Center,
-                ) {
-                  Text(
-                    stringResource(R.string.new_badge),
-                    color = MaterialTheme.customColors.newFeatureTextColor,
-                    style = MaterialTheme.typography.labelLarge,
-                  )
-                }
-              }
-            }
+        // Title and description.
+        Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+          ) {
             Text(
-              description,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              style =
-                MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 15.sp),
-              modifier = Modifier.clearAndSetSemantics {},
+              task.label,
+              color = MaterialTheme.colorScheme.onSurface,
+              style = MaterialTheme.typography.titleMedium,
             )
-          }
-        } else {
-          // Title and model count
-          Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Text(
-                task.label,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-              )
-              if (task.experimental) {
-                Icon(
-                  painter = painterResource(R.drawable.ic_experiment),
-                  contentDescription = "Experimental",
-                  modifier = Modifier.size(20.dp).padding(start = 4.dp),
-                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (task.newFeature) {
+              Box(
+                modifier =
+                  Modifier.offset(y = (-6).dp, x = 6.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.customColors.newFeatureContainerColor)
+                    .padding(horizontal = 12.dp)
+                    .height(26.dp),
+                contentAlignment = Alignment.Center,
+              ) {
+                Text(
+                  stringResource(R.string.new_badge),
+                  color = MaterialTheme.customColors.newFeatureTextColor,
+                  style = MaterialTheme.typography.labelLarge,
                 )
               }
             }
-            Text(
-              curModelCountLabel,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              style = MaterialTheme.typography.bodyMedium,
-              modifier = Modifier.clearAndSetSemantics {},
-            )
           }
-
-          // Icon.
-          TaskIcon(task = task, width = 40.dp)
+          Text(
+            description,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 15.sp),
+          )
         }
       }
     }

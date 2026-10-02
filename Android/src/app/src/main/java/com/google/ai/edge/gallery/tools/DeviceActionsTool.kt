@@ -63,7 +63,8 @@ class DeviceActionsTool(
   @Tool(
     description =
       "Look up phone numbers in the user's contacts. Call this before placing a call or sending " +
-        "a text when the user referred to a person by name rather than by number."
+        "a text when the user referred to a person by name rather than by number. Pass the " +
+        "contact_id it returns to placePhoneCall or sendTextMessage - never retype the digits."
   )
   fun findContact(
     @ToolParam(description = "All or part of the contact's name, for example 'Sam' or 'mum'.")
@@ -90,17 +91,26 @@ class DeviceActionsTool(
         itemTitle = "Contact lookup",
         itemDescription = matches.joinToString("\n") { "- ${it.name}: ${it.number}" },
       )
+      val handles = matches.map { rememberContact(it) }
       mapOf(
         "status" to "succeeded",
         "matches" to
-          matches.map {
-            mapOf("name" to it.name, "phone_number" to it.number, "label" to it.label)
+          handles.map { (id, match) ->
+            mapOf(
+              "contact_id" to id,
+              "name" to match.name,
+              "phone_number" to match.number,
+              "label" to match.label,
+            )
           },
         "hint" to
           if (matches.size > 1) {
-            "Several contacts matched. Ask the user which one before calling or texting."
+            "Several contacts matched. Ask the user which one, then pass that contact_id to " +
+              "placePhoneCall or sendTextMessage."
           } else {
-            "Use this phone number for the call or text."
+            "Pass contact_id (\"${handles.first().first}\") to placePhoneCall or " +
+              "sendTextMessage. Do not copy the digits out; passing them by hand is how calls " +
+              "reach the wrong person."
           },
       )
     }
@@ -113,7 +123,9 @@ class DeviceActionsTool(
   )
   fun placePhoneCall(
     @ToolParam(
-      description = "The contact name to call, or a phone number in national or E.164 format."
+      description =
+        "A contact_id from findContact (preferred), or a contact name, or a phone number the " +
+          "user themselves dictated."
     )
     nameOrNumber: String
   ): Map<String, Any> {
@@ -126,6 +138,9 @@ class DeviceActionsTool(
           "Could not find a phone number for \"$nameOrNumber\". Use findContact first, or ask " +
             "the user for the number."
         )
+      resolved.garbledCopyOf?.let { intended ->
+        return@runBlocking garbledNumberRefusal(given = nameOrNumber.trim(), intended = intended)
+      }
       if (resolved.ambiguousMatches.size > 1) {
         return@runBlocking mapOf(
           "status" to "needs_clarification",
@@ -171,7 +186,12 @@ class DeviceActionsTool(
         "user presses send."
   )
   fun sendTextMessage(
-    @ToolParam(description = "The contact name or phone number to write to.") nameOrNumber: String,
+    @ToolParam(
+      description =
+        "A contact_id from findContact (preferred), or a contact name, or a phone number the " +
+          "user themselves dictated."
+    )
+    nameOrNumber: String,
     @ToolParam(description = "The message body.") message: String,
     @ToolParam(description = "Which app: whatsapp, telegram, or empty for the phone's messages.")
     app: String = "",
@@ -188,6 +208,9 @@ class DeviceActionsTool(
         resolveNumber(nameOrNumber) ?: return@runBlocking failure(
           "Could not find a phone number for \"$nameOrNumber\"."
         )
+      resolved.garbledCopyOf?.let { intended ->
+        return@runBlocking garbledNumberRefusal(given = nameOrNumber.trim(), intended = intended)
+      }
       if (resolved.ambiguousMatches.size > 1) {
         return@runBlocking mapOf(
           "status" to "needs_clarification",
@@ -528,16 +551,83 @@ class DeviceActionsTool(
     }
   }
 
+  /**
+   * The contacts most recently read out of the address book, by the short id given to the model.
+   *
+   * Small and deliberately short-lived: it exists so that the step between "look up Dana" and
+   * "call her" carries an id rather than eleven digits, and so that a number arriving in a later
+   * call can be checked against what was actually offered.
+   */
+  private val recentContacts = LinkedHashMap<String, ContactMatch>()
+
+  private var contactHandleCounter = 0
+
+  /** Files [match] under a fresh id and returns both. */
+  private fun rememberContact(match: ContactMatch): Pair<String, ContactMatch> {
+    // The same person looked up twice keeps one id, so a conversation does not accumulate
+    // synonyms for the same number.
+    recentContacts.entries.firstOrNull { it.value.number == match.number && it.value.name == match.name }
+      ?.let {
+        return it.key to it.value
+      }
+    val id = "contact_${++contactHandleCounter}"
+    recentContacts[id] = match
+    while (recentContacts.size > MAX_REMEMBERED_CONTACTS) {
+      recentContacts.remove(recentContacts.keys.first())
+    }
+    return id to match
+  }
+
+  /**
+   * What to say when the number given is nearly one just offered.
+   *
+   * Deliberately not a silent correction to the contact it resembles. The model may have been
+   * asked for somebody else entirely, and a call placed to the wrong person cannot be taken back
+   * - so this comes back as a question with both numbers in it, and the user decides.
+   */
+  private fun garbledNumberRefusal(given: String, intended: ContactMatch): Map<String, Any> =
+    mapOf(
+      "status" to "needs_clarification",
+      "given_number" to given,
+      "closest_contact" to
+        mapOf("name" to intended.name, "phone_number" to intended.number, "label" to intended.label),
+      "hint" to
+        "\"$given\" is not a number in the contacts, but it is nearly ${intended.name}'s " +
+          "(${intended.number}) with the digits in a different order. Nothing was dialled. Ask " +
+          "the user whether they meant ${intended.name}, and if so call this tool again with " +
+          "the contact_id rather than the digits.",
+    )
+
   /** A phone number resolved from either a raw number or a contact name. */
   private data class ResolvedNumber(
     val number: String,
     val displayName: String,
     val ambiguousMatches: List<ContactMatch> = emptyList(),
+    /** Set when the number given is nearly, but not exactly, one just read out of the contacts. */
+    val garbledCopyOf: ContactMatch? = null,
   )
 
   private suspend fun resolveNumber(nameOrNumber: String): ResolvedNumber? {
     val trimmed = nameOrNumber.trim()
+    // A contact_id handed back by findContact. The number never passed through the model, so
+    // there is nothing here that could have been mistyped.
+    recentContacts[trimmed.lowercase()]?.let {
+      return ResolvedNumber(number = it.number, displayName = it.name)
+    }
     if (looksLikePhoneNumber(trimmed)) {
+      // The model copied digits out of a contact lookup rather than passing the id, and copying
+      // digits is where this goes wrong: the same digits in a different order reach a stranger,
+      // and the user finds out when somebody answers. A number that is nearly one just offered
+      // is treated as a slip rather than dialled.
+      val nearMiss =
+        recentContacts.values.firstOrNull { looksLikeAGarbledCopy(trimmed, it.number) }
+      if (nearMiss != null) {
+        return ResolvedNumber(
+          number = "",
+          displayName = trimmed,
+          garbledCopyOf = nearMiss,
+        )
+      }
       return ResolvedNumber(number = trimmed, displayName = trimmed)
     }
     if (!ensurePermission(Manifest.permission.READ_CONTACTS)) {
@@ -823,6 +913,69 @@ class DeviceActionsTool(
     }
 
     fun looksLikePhoneNumber(value: String): Boolean = PHONE_NUMBER_REGEX.matches(value.trim())
+
+    /** Below this a number is too short for a transposition to be distinguishable from a wrong one. */
+    private const val MIN_COMPARABLE_DIGITS = 7
+
+    /** How many contacts stay addressable by id. A few lookups' worth, not a copy of the book. */
+    internal const val MAX_REMEMBERED_CONTACTS = 24
+
+    /**
+     * Whether [given] looks like [known] written down wrong, rather than a different number.
+     *
+     * This is the check behind the only refusal in this file that stops an action the user asked
+     * for, so both directions of error matter. Miss one and the call goes to whoever owns the
+     * transposed digits. Fire on a genuinely different number and a call the user wanted turns
+     * into a question.
+     *
+     * Two shapes count. The same digits in a different order, which is the reported failure and
+     * cannot be coincidence at this length. And a single wrong, missing or extra digit, which is
+     * the other way a copied number comes out wrong. Anything further apart is treated as a
+     * different number and dialled, because at that point a refusal would be guessing.
+     *
+     * Only the last [MIN_COMPARABLE_DIGITS] or more are compared, so a number saved with a
+     * country code and dictated without one still matches itself rather than reading as a slip.
+     */
+    internal fun looksLikeAGarbledCopy(given: String, known: String): Boolean {
+      val a = given.filter { it.isDigit() }
+      val b = known.filter { it.isDigit() }
+      if (a.length < MIN_COMPARABLE_DIGITS || b.length < MIN_COMPARABLE_DIGITS) return false
+      // Compare the national part, so +972 50 123 4567 and 050 123 4567 are the same number.
+      val tail = minOf(a.length, b.length)
+      val left = a.takeLast(tail)
+      val right = b.takeLast(tail)
+      if (left == right) return false // Copied correctly.
+      if (left.toList().sorted() == right.toList().sorted()) return true // Reordered.
+      return editDistanceAtMostOne(a, b)
+    }
+
+    /** Whether one insertion, deletion or substitution turns [a] into [b]. */
+    private fun editDistanceAtMostOne(a: String, b: String): Boolean {
+      if (kotlin.math.abs(a.length - b.length) > 1) return false
+      if (a.length == b.length) {
+        var differences = 0
+        for (i in a.indices) {
+          if (a[i] != b[i] && ++differences > 1) return false
+        }
+        return differences == 1
+      }
+      val shorter = if (a.length < b.length) a else b
+      val longer = if (a.length < b.length) b else a
+      var i = 0
+      var j = 0
+      var skipped = false
+      while (i < shorter.length && j < longer.length) {
+        if (shorter[i] == longer[j]) {
+          i++
+          j++
+        } else {
+          if (skipped) return false
+          skipped = true
+          j++
+        }
+      }
+      return true
+    }
 
     private fun String.uriEncode(): String = java.net.URLEncoder.encode(this, "UTF-8")
 

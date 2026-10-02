@@ -19,14 +19,14 @@ package com.google.ai.edge.gallery.agent
 import android.content.Context
 import android.util.Log
 import com.google.ai.edge.gallery.agent.sessions.LlmSessionManager
-import com.google.ai.edge.gallery.data.Model
+import com.google.ai.edge.gallery.agent.sessions.SessionConfig
+import com.google.ai.edge.gallery.agent.sessions.generateSessionId
 import com.google.ai.edge.gallery.runtime.runtimeHelper
 import com.google.ai.edge.gallery.skills.SkillsProvider
 import com.google.ai.edge.gallery.tools.ToolDispatcher
 import com.google.ai.edge.gallery.tools.ToolExecutionContext
 import com.google.ai.edge.gallery.tools.ToolsProvider
 import com.google.ai.edge.litertlm.Contents
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
@@ -60,8 +60,7 @@ open class DefaultAgentRuntimeExecutor(
 
   /** Active session state for the current conversation. */
   private data class ActiveSession(
-    val sessionId: String,
-    val model: Model,
+    val sessionConfig: SessionConfig,
     val toolExecutionContext: ToolExecutionContext,
   )
 
@@ -69,24 +68,32 @@ open class DefaultAgentRuntimeExecutor(
   private val activeSession = AtomicReference<ActiveSession?>(null)
 
   override val activeSessionId: String?
-    get() = activeSession.get()?.sessionId
+    get() = llmSessionManager.activeSessionId
 
   override suspend fun initialize(
     context: Context,
     config: AgentRuntimeConfig,
     onDone: (String) -> Unit,
   ) {
-    val effectiveSessionId = config.sessionId.ifEmpty { UUID.randomUUID().toString() }
-    val systemInstruction = Contents.of(config.systemInstruction ?: "")
+    val effectiveSessionId =
+      config.sessionId.ifEmpty { llmSessionManager.activeSessionId ?: generateSessionId() }
+    val effectiveSystemInstruction =
+      if (!config.systemInstruction.isNullOrEmpty()) Contents.of(config.systemInstruction) else null
     val executionContext =
       ToolExecutionContext(taskId = config.taskId, actionChannel = config.actionChannel)
 
-    activeSession.set(
-      ActiveSession(
-        sessionId = effectiveSessionId,
+    val sessionConfig =
+      SessionConfig(
         model = config.model,
-        toolExecutionContext = executionContext,
+        taskId = config.taskId,
+        supportImage = config.supportImage,
+        supportAudio = config.supportAudio,
+        systemInstruction = effectiveSystemInstruction,
+        tools = toolsProvider.getLiteRtToolProviders(),
       )
+
+    activeSession.set(
+      ActiveSession(sessionConfig = sessionConfig, toolExecutionContext = executionContext)
     )
 
     toolDispatcher.setupExecutionContext(
@@ -101,8 +108,15 @@ open class DefaultAgentRuntimeExecutor(
       supportImage = config.supportImage,
       supportAudio = config.supportAudio,
       onDone = onDone,
-      systemInstruction = systemInstruction,
+      systemInstruction = effectiveSystemInstruction,
       tools = toolsProvider.getLiteRtToolProviders(),
+      enableConversationConstrainedDecoding = config.enableConversationConstrainedDecoding,
+    )
+
+    llmSessionManager.resetSession(
+      sessionId = effectiveSessionId,
+      config = sessionConfig,
+      initialMessages = config.initialMessages,
       enableConversationConstrainedDecoding = config.enableConversationConstrainedDecoding,
     )
   }
@@ -119,7 +133,7 @@ open class DefaultAgentRuntimeExecutor(
 
     val session =
       activeSession.get() ?: error("Model not initialized in DefaultAgentRuntimeExecutor")
-    val curModel = session.model
+    val curModel = session.sessionConfig.model
 
     toolDispatcher.setupExecutionContext(
       tools = toolsProvider.getAvailableTools(),
@@ -135,9 +149,12 @@ open class DefaultAgentRuntimeExecutor(
       (request.metadata[AgentRequest.LITERTLM_EXTRA_CONTEXT] as? Map<*, *>)
         ?.entries
         ?.mapNotNull { (k, v) -> if (k is String && v is String) k to v else null }
-        ?.toMap()
-        ?.ifEmpty { null }
-    val sessionId = (request.metadata[AgentRequest.SESSION_ID] as? String) ?: session.sessionId
+        ?.toMap() ?: emptyMap()
+    val sessionId =
+      (request.metadata[AgentRequest.SESSION_ID] as? String)
+        ?: llmSessionManager.activeSessionId
+        ?: error("No active session in LlmSessionManager")
+    val messageIndex = request.metadata[AgentRequest.MESSAGE_INDEX] as? Int
 
     val resultListener = { partialResult: String, done: Boolean, partialThinking: String? ->
       if (!partialResult.startsWith("<ctrl")) {
@@ -169,6 +186,11 @@ open class DefaultAgentRuntimeExecutor(
       Unit
     }
 
+    val onCompactionStart = { emitEvent(AgentEvent.ContextCompactionStarted) }
+    val onCompactionFinished = { success: Boolean ->
+      emitEvent(AgentEvent.ContextCompactionFinished(success = success))
+    }
+
     llmSessionManager.generateResponse(
       sessionId = sessionId,
       model = curModel,
@@ -176,9 +198,12 @@ open class DefaultAgentRuntimeExecutor(
       resultListener = resultListener,
       cleanUpListener = cleanUpListener,
       onError = onError,
+      onCompactionStart = onCompactionStart,
+      onCompactionFinished = onCompactionFinished,
       images = images,
       audioClips = audioClips,
       extraContext = extraContext,
+      messageIndex = messageIndex,
     )
 
     awaitClose {
@@ -210,24 +235,32 @@ open class DefaultAgentRuntimeExecutor(
 
   override fun interrupt() {
     val session = activeSession.get() ?: return
-    val curModel = session.model
-    val sessionId = session.sessionId
+    val curModel = session.sessionConfig.model
+    val sessionId = llmSessionManager.activeSessionId ?: return
     Log.d(TAG, "Interrupting session $sessionId for model: ${curModel.name}")
     llmSessionManager.stopResponse(sessionId = sessionId, model = curModel)
   }
 
   override suspend fun resetSession(config: AgentRuntimeConfig) {
     val effectiveSessionId =
-      config.sessionId.ifEmpty { activeSession.get()?.sessionId ?: UUID.randomUUID().toString() }
+      config.sessionId.ifEmpty { llmSessionManager.activeSessionId ?: generateSessionId() }
     val executionContext =
       ToolExecutionContext(taskId = config.taskId, actionChannel = config.actionChannel)
 
-    activeSession.set(
-      ActiveSession(
-        sessionId = effectiveSessionId,
+    val effectiveSystemInstruction =
+      if (!config.systemInstruction.isNullOrEmpty()) Contents.of(config.systemInstruction) else null
+    val sessionConfig =
+      SessionConfig(
         model = config.model,
-        toolExecutionContext = executionContext,
+        taskId = config.taskId,
+        supportImage = config.supportImage,
+        supportAudio = config.supportAudio,
+        systemInstruction = effectiveSystemInstruction,
+        tools = toolsProvider.getLiteRtToolProviders(),
       )
+
+    activeSession.set(
+      ActiveSession(sessionConfig = sessionConfig, toolExecutionContext = executionContext)
     )
 
     toolDispatcher.setupExecutionContext(
@@ -235,18 +268,11 @@ open class DefaultAgentRuntimeExecutor(
       context = executionContext,
     )
 
-    val effectiveSystemInstruction =
-      if (!config.systemInstruction.isNullOrEmpty()) Contents.of(config.systemInstruction) else null
-    llmSessionManager.updateSessionConfiguration(
+    llmSessionManager.resetSession(
       sessionId = effectiveSessionId,
-      model = config.model,
-      taskId = config.taskId,
-      supportImage = config.supportImage,
-      supportAudio = config.supportAudio,
-      systemInstruction = effectiveSystemInstruction,
-      tools = toolsProvider.getLiteRtToolProviders(),
+      config = sessionConfig,
+      initialMessages = config.initialMessages,
       enableConversationConstrainedDecoding = config.enableConversationConstrainedDecoding,
-      initialMessages = config.initialMessages.ifEmpty { null },
     )
   }
 
@@ -256,6 +282,9 @@ open class DefaultAgentRuntimeExecutor(
       onDone()
       return
     }
-    session.model.runtimeHelper.cleanUp(model = session.model, onDone = onDone)
+    session.sessionConfig.model.runtimeHelper.cleanUp(
+      model = session.sessionConfig.model,
+      onDone = onDone,
+    )
   }
 }

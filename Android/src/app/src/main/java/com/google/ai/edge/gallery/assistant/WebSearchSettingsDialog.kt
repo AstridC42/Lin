@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.proto.WebSearchSettings
+import com.google.ai.edge.gallery.net.LocalNetwork
 import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.search.WebSearchOutcome
 import kotlinx.coroutines.launch
@@ -137,6 +138,12 @@ fun WebSearchSettingsDialog(
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
           modifier = Modifier.fillMaxWidth(),
         )
+
+        // Said here rather than left to fail at the first search. A self-hosted instance is
+        // normally plain http:// on the home network, Android refuses cleartext, and the error
+        // that surfaced read like the instance was down - so the address looked wrong when it was
+        // right.
+        CleartextWarning(instanceUrl)
 
         SettingSwitchRow(
           label = stringResource(R.string.web_search_enable),
@@ -288,4 +295,33 @@ private fun SettingSwitchRow(
     )
     Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
   }
+}
+
+/**
+ * Warns when an address cannot be fetched as typed.
+ *
+ * Two different problems wear the same `http://` prefix and need different answers from the user,
+ * which is why they are told apart rather than lumped into one message. A plain address on the
+ * home network is the ordinary way to run these services and the app is what has to change. A
+ * plain address on the internet would put the instance's credentials on the wire in the clear,
+ * and the user should change the address instead.
+ */
+@Composable
+private fun CleartextWarning(url: String) {
+  val typed = url.trim()
+  if (!typed.startsWith("http://", ignoreCase = true)) return
+  val host = typed.removePrefix("http://").substringBefore('/').substringBeforeLast(':')
+  val onHomeNetwork = LocalNetwork.isPrivateHost(host)
+  Text(
+    if (onHomeNetwork) {
+      "This build does not make plain http:// requests, so this address will not be reached. " +
+        "Serve the instance over https://, or ask for cleartext to the home network to be " +
+        "turned back on."
+    } else {
+      "$host is on the internet, so http:// would send your searches and any Authorization " +
+        "header in the clear. Use https://."
+    },
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.error,
+  )
 }

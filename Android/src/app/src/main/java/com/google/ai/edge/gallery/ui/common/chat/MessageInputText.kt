@@ -130,7 +130,6 @@ import com.google.ai.edge.gallery.common.rotateBitmap
 import com.google.ai.edge.gallery.data.MAX_AUDIO_CLIP_COUNT
 import com.google.ai.edge.gallery.data.MAX_IMAGE_COUNT
 import com.google.ai.edge.gallery.data.MAX_IMAGE_COUNT_AI_CORE
-import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.data.SAMPLE_RATE
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.ui.common.getTaskIconColor
@@ -180,6 +179,7 @@ fun MessageInputText(
   showImagePicker: Boolean = false,
   showAudioPicker: Boolean = false,
   showStopButtonWhenInProgress: Boolean = false,
+  isContextLimitReached: Boolean = false,
   onImageLimitExceeded: () -> Unit = {},
   onImagesIgnored: () -> Unit = {},
   onModelNotSupportImage: () -> Unit = {},
@@ -201,7 +201,7 @@ fun MessageInputText(
   val sensorObserver = remember { SensorObserver(context) }
 
   val updatePickedImages: (List<Bitmap>) -> Unit = { bitmaps ->
-    val isAiCore = modelManagerUiState.selectedModel.runtimeType == RuntimeType.AICORE
+    val isAiCore = modelManagerUiState.selectedModel.isAiCore
     var limit = MAX_IMAGE_COUNT
     if (isAiCore) {
       limit = MAX_IMAGE_COUNT_AI_CORE
@@ -391,6 +391,7 @@ fun MessageInputText(
                   minLines = 1,
                   maxLines = 3,
                   onValueChange = onValueChanged,
+                  enabled = !isResettingSession && !modelInitializing,
                   colors =
                     TextFieldDefaults.colors(
                       unfocusedContainerColor = Color.Transparent,
@@ -452,11 +453,11 @@ fun MessageInputText(
                     ) {
                       if (showImagePicker) {
                         val isImageLimitExceededForAiCore =
-                          modelManagerUiState.selectedModel.runtimeType == RuntimeType.AICORE &&
+                          modelManagerUiState.selectedModel.isAiCore &&
                             (imageCount + pickedImages.size) >= MAX_IMAGE_COUNT_AI_CORE
                         val enableAddImageMenuItems =
                           (imageCount + pickedImages.size) < MAX_IMAGE_COUNT
-                        val isImageSupported = modelManagerUiState.selectedModel.llmSupportImage
+                        val isImageSupported = modelManagerUiState.selectedModel.supportImage
                         val imageItemColors =
                           MenuDefaults.itemColors(
                             textColor =
@@ -548,7 +549,7 @@ fun MessageInputText(
                       if (showAudioPicker) {
                         val enableRecordAudioClipMenuItems =
                           (audioClipMessageCount + pickedAudioClips.size) < MAX_AUDIO_CLIP_COUNT
-                        val isAudioSupported = modelManagerUiState.selectedModel.llmSupportAudio
+                        val isAudioSupported = modelManagerUiState.selectedModel.supportAudio
                         val audioItemColors =
                           MenuDefaults.itemColors(
                             textColor =
@@ -740,6 +741,7 @@ fun MessageInputText(
                     enabled =
                       !inProgress &&
                         !isResettingSession &&
+                        !isContextLimitReached &&
                         (curMessage.isNotEmpty() || pickedAudioClips.isNotEmpty()),
                     onClick = {
                       var message = curMessage.trim()

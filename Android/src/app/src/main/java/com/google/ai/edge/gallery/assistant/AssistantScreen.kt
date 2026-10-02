@@ -237,13 +237,18 @@ fun AssistantScreen(
         viewModel.uiState.value.messagesByModel[selectedModel.name]?.toList() ?: listOf(),
       clearHistory = false,
       baseSystemPromptResolver = { prompt, hasMcpTools ->
+        // Read live rather than using the values remembered above. A settings dialog bumps the
+        // revision counter and rebuilds in the same lambda, and the remembered values do not
+        // recompute until the next composition - so using them here would describe the settings
+        // as they were before the user changed them, which is the whole thing being fixed.
         AssistantPrompts.resolve(
           currentPrompt = prompt,
           mode = forMode,
           hasMcpTools = hasMcpTools,
-          webSearchEnabled = webSearchEnabled,
-          webSearchInstance = webSearchHost,
-          smartHomeEnabled = smartHomeEnabled,
+          webSearchEnabled = searxngClient.isConfigured(),
+          webSearchInstance =
+            searxngClient.instanceUrlOrNull()?.let { AssistantTask.hostOf(it) }.orEmpty(),
+          smartHomeEnabled = homeAssistantClient.isConfigured(),
           hasMemory = dataStoreRepository.readAssistantMemory().factCount > 0,
         )
       },
@@ -441,8 +446,10 @@ fun AssistantScreen(
       onDismiss = {
         showSmartHomeSettings = false
         // Shares the revision counter with web search: both change which tools exist, and the
-        // derived values above recompute from it.
+        // derived values above recompute from it. And both need the session rebuilt for the tool
+        // to reach the model at all.
         webSearchRevision++
+        rebuildSession(mode)
       },
     )
   }
@@ -465,7 +472,10 @@ fun AssistantScreen(
       onDismiss = { showMemory = false },
       // Editing what is remembered changes the system prompt, so the session has to be rebuilt
       // for it to take effect - the same path a capability setting takes.
-      onChanged = { webSearchRevision++ },
+      onChanged = {
+        webSearchRevision++
+        rebuildSession(mode)
+      },
     )
   }
 
@@ -498,6 +508,11 @@ fun AssistantScreen(
       onDismiss = {
         showWebSearchSettings = false
         webSearchRevision++
+        // Which search tool exists is decided when the session is built: unconfigured, the model
+        // is given a stand-in whose only answer is "web search is not set up". Setting the
+        // address up changed nothing until the session was rebuilt, so the assistant went on
+        // saying it could not search with the instance sitting configured behind it.
+        rebuildSession(mode)
       },
     )
   }

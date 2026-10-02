@@ -68,6 +68,13 @@ interface CustomTask {
   val task: Task
 
   /**
+   * Whether models used by this task should be kept alive when navigating away from the task.
+   * Defaults to false.
+   */
+  val keepModelAlive: Boolean
+    get() = false
+
+  /**
    * Called to initialize and prepare a model for use with an optional system instruction.
    *
    * This function will be called from a coroutine with Dispatchers.Default dispatcher.
@@ -102,6 +109,24 @@ interface CustomTask {
     model: Model,
     onDone: () -> Unit,
   )
+
+  /**
+   * Called when a model associated with this task is deleted from the model repository. Allows
+   * tasks to clean up task-specific database files, cancel workers, or release resources.
+   *
+   * @param context The application context.
+   * @param model The `Model` object being deleted.
+   */
+  fun onDeleteModelFn(context: Context, model: Model) {}
+
+  /**
+   * Called when optional extra data files associated with this task's model are removed. Allows
+   * tasks to clean up task-specific database files, cancel workers, or release resources.
+   *
+   * @param context The application context.
+   * @param model The `Model` object whose extra data files are being deleted.
+   */
+  fun onDeleteExtraDataFn(context: Context, model: Model) {}
 
   /**
    * The main Composable UI for your custom task's detail screen.

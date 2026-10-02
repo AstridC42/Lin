@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery.search
 
 import android.util.Log
+import com.google.ai.edge.gallery.net.LocalNetwork
 import com.google.ai.edge.gallery.proto.WebSearchSettings
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -29,6 +30,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val TAG = "AGSearxngClient"
+
+/**
+ * A request this app declined to make, as opposed to one the network refused.
+ *
+ * Cleartext is permitted in the manifest so a self-hosted instance on the home network is
+ * reachable at all; this is what keeps that from meaning "cleartext to anywhere". It extends
+ * IOException so it travels the path every caller already has for a request that did not happen.
+ */
+private class InsecureTargetException(message: String) : IOException(message)
 
 /** A single hit returned by a SearXNG instance. */
 data class WebSearchHit(
@@ -162,7 +172,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
           return@withContext WebSearchOutcome.Failure(describeHttpFailure(e, baseUrl))
         } catch (e: IOException) {
           return@withContext WebSearchOutcome.Failure(
-            "Could not reach the SearXNG instance at $baseUrl (${e.message ?: "network error"})."
+            describeNetworkFailure(e, baseUrl)
           )
         }
 
@@ -215,7 +225,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
           return@withContext ImageSearchOutcome.Failure(describeHttpFailure(e, baseUrl))
         } catch (e: IOException) {
           return@withContext ImageSearchOutcome.Failure(
-            "Could not reach the SearXNG instance at $baseUrl (${e.message ?: "network error"})."
+            describeNetworkFailure(e, baseUrl)
           )
         }
 
@@ -259,6 +269,9 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
   suspend fun downloadImage(url: String, maxBytes: Int = MAX_IMAGE_BYTES): ImageDownloadOutcome =
     withContext(Dispatchers.IO) {
       if (url.isBlank()) return@withContext ImageDownloadOutcome.Failure("No picture URL.")
+      LocalNetwork.cleartextRefusal(url)?.let {
+        return@withContext ImageDownloadOutcome.Failure(it)
+      }
       val settings = readSettings()
       val timeout = (settings.timeoutSeconds.takeIf { it > 0 } ?: DEFAULT_TIMEOUT_SECONDS) * 1000
       var connection: HttpURLConnection? = null
@@ -349,7 +362,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
           )
         } catch (e: IOException) {
           return@withContext PageFetchOutcome.Failure(
-            "Could not download the page (${e.message ?: "network error"})."
+            describeNetworkFailure(e, url)
           )
         }
 
@@ -427,6 +440,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
   }
 
   private fun httpGet(url: String, settings: WebSearchSettings, accept: String): String {
+    LocalNetwork.cleartextRefusal(url)?.let { throw InsecureTargetException(it) }
     val timeoutMs = (settings.timeoutSeconds.takeIf { it > 0 } ?: DEFAULT_TIMEOUT_SECONDS) * 1000
     var connection: HttpURLConnection? = null
     try {
@@ -457,6 +471,25 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
     } finally {
       connection?.disconnect()
     }
+  }
+
+  /**
+   * What to say when the request never reached the instance.
+   *
+   * Worth more than the exception's own text in one case. Android refuses cleartext by default,
+   * so a plain `http://` address on the home network - which is what a self-hosted instance
+   * almost always is - fails before anything leaves the phone, with a message that reads like the
+   * server is down. Naming it is the difference between a user checking their router and a user
+   * knowing the address is right and the app will not use it.
+   */
+  private fun describeNetworkFailure(e: IOException, target: String): String {
+    // Our own rule, with a message already written for the user.
+    if (e is InsecureTargetException) return e.message.orEmpty()
+    val detail = e.message.orEmpty()
+    if (detail.contains("Cleartext", ignoreCase = true)) {
+      return "Android refused a plain http:// request to $target, so it was never contacted."
+    }
+    return "Could not reach $target (${detail.ifEmpty { "network error" }})."
   }
 
   private fun describeHttpFailure(e: SearxngHttpException, baseUrl: String): String =

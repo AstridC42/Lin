@@ -89,7 +89,9 @@ class AssistantTask(
     coroutineScope.launch(Dispatchers.Default) {
       // Skills and MCP servers have to be loaded before the prompt can list them.
       val skillsJob = launch {
-        agentTools.skillsProvider.loadSkills(SkillManagerViewModel.DEFAULT_DISABLED_SKILLS)
+        agentTools.skillsProvider.loadSkills(
+          SkillManagerViewModel.getDefaultDisabledSkills(model)
+        )
       }
       val mcpJob = launch { agentTools.mcpManagerViewModel.loadMcpServers() }
       skillsJob.join()
@@ -110,8 +112,8 @@ class AssistantTask(
           actionChannel = agentTools.sendActionChannel,
           // The assistant always accepts every kind of attachment the model can handle, whatever
           // mode it is in - that is the whole point of merging the screens.
-          supportImage = model.llmSupportImage,
-          supportAudio = model.llmSupportAudio,
+          supportImage = model.supportImage,
+          supportAudio = model.supportAudio,
           enableConversationConstrainedDecoding = true,
           systemInstruction = finalSystemPrompt,
         )

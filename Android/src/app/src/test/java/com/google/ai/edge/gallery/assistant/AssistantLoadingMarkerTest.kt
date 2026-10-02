@@ -16,8 +16,10 @@
 
 package com.google.ai.edge.gallery.assistant
 
+import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -51,7 +53,8 @@ class AssistantLoadingMarkerTest {
       loadingMarkerFor(
         modelName = "Gemma 3n E4B",
         downloadStatus = ModelDownloadStatusType.SUCCEEDED,
-        initializationStatus = ModelInitializationStatusType.INITIALIZING,
+        initializationStatus =
+          Model.InitializationStatus.Initializing(TimeSource.Monotonic.markNow()),
       ),
     )
   }
@@ -63,7 +66,8 @@ class AssistantLoadingMarkerTest {
       loadingMarkerFor(
         modelName = "Gemma 3n E4B",
         downloadStatus = ModelDownloadStatusType.SUCCEEDED,
-        initializationStatus = ModelInitializationStatusType.INITIALIZED,
+        initializationStatus =
+          Model.InitializationStatus.Initialized(instance = Any(), duration = Duration.ZERO),
       ),
     )
   }
@@ -76,7 +80,11 @@ class AssistantLoadingMarkerTest {
       loadingMarkerFor(
         modelName = "Gemma 3n E4B",
         downloadStatus = ModelDownloadStatusType.SUCCEEDED,
-        initializationStatus = ModelInitializationStatusType.ERROR,
+        initializationStatus =
+          Model.InitializationStatus.Failed(
+            error = IllegalStateException("too large"),
+            duration = Duration.ZERO,
+          ),
       ),
     )
   }

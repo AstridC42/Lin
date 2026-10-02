@@ -56,7 +56,6 @@ import com.google.ai.edge.gallery.ui.common.MemoryWarningAlert
 import com.google.ai.edge.gallery.ui.common.isMemoryLow
 import com.google.ai.edge.gallery.ui.common.tos.AppTosDialog
 import com.google.ai.edge.gallery.ui.common.tos.TosViewModel
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.voice.WakeWordService
 import com.google.ai.edge.gallery.voice.WakeWordSettings
@@ -173,7 +172,7 @@ fun AssistantRoute(
   // can tell. Cleared once loading ends - on success, and on a reported error too, since an error
   // the app lived to report is not the case this guards against.
   val selectedName = uiState.selectedModel.name
-  val initializationStatus = uiState.modelInitializationStatus[selectedName]?.status
+  val initializationStatus by uiState.selectedModel.initStatusFlow.collectAsState()
   LaunchedEffect(selectedName, initializationStatus, blockedBeforeLoading) {
     if (selectedName.isEmpty() || blockedBeforeLoading) return@LaunchedEffect
     val marker =
@@ -192,7 +191,7 @@ fun AssistantRoute(
   // initialization status so it follows the model: it starts when one finishes loading and goes
   // away again when the model does, rather than holding an empty process because a setting is on.
   LaunchedEffect(initializationStatus, selectedName) {
-    if (initializationStatus == ModelInitializationStatusType.INITIALIZED) {
+    if (initializationStatus is Model.InitializationStatus.Initialized) {
       ResidentAssistantService.startIfEnabled(context)
     } else {
       ResidentAssistantService.stop(context)
@@ -329,13 +328,13 @@ fun AssistantRoute(
 internal fun loadingMarkerFor(
   modelName: String,
   downloadStatus: ModelDownloadStatusType?,
-  initializationStatus: ModelInitializationStatusType?,
+  initializationStatus: Model.InitializationStatus?,
 ): String =
   when {
     modelName.isEmpty() -> ""
-    initializationStatus == ModelInitializationStatusType.INITIALIZED -> ""
+    initializationStatus is Model.InitializationStatus.Initialized -> ""
     // An error that reached the UI means the app outlived the failure and can say so itself.
-    initializationStatus == ModelInitializationStatusType.ERROR -> ""
+    initializationStatus is Model.InitializationStatus.Failed -> ""
     downloadStatus == ModelDownloadStatusType.SUCCEEDED -> modelName
     else -> ""
   }
