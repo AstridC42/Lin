@@ -30,6 +30,18 @@ typealias ResultListener =
 typealias CleanUpListener = () -> Unit
 
 /**
+ * Abstraction over a model instance's active conversation for inspecting token usage and sending
+ * synchronous messages (e.g., for context compaction).
+ */
+interface LlmConversationInstance {
+  /** Returns the current token count in the active conversation's KV cache. */
+  fun getTokenCount(): Int
+
+  /** Sends a synchronous prompt to the active conversation and returns the generated [Message]. */
+  fun sendMessage(prompt: String): Message
+}
+
+/**
  * Base interface for all LLM runtimes. It defines the foundational operations needed to initialize,
  * manage conversations, execute inferences, and clean up resources for different Large Language
  * Model backends.
@@ -103,7 +115,10 @@ interface LlmModelHelper {
    * @param images optional list of images provided as input context.
    * @param audioClips optional list of audio clips provided as input context.
    * @param coroutineScope optional coroutine scope for async inference execution.
-   * @param extraContext optional extra context for inference.
+   * @param extraContext optional extra context for inference (e.g. "enable_thinking").
+   * @param sessionId optional conversation session identifier for telemetry correlation.
+   * @param messageIndex optional sequential message index within the conversation for telemetry
+   *   correlation.
    */
   fun runInference(
     model: Model,
@@ -115,6 +130,8 @@ interface LlmModelHelper {
     audioClips: List<ByteArray> = listOf(),
     coroutineScope: CoroutineScope? = null,
     extraContext: Map<String, String>? = null,
+    sessionId: String? = null,
+    messageIndex: Int? = null,
   )
 
   /**

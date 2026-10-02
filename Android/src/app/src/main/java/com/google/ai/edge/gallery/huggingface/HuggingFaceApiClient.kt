@@ -18,6 +18,7 @@ package com.google.ai.edge.gallery.huggingface
 
 import android.util.Log
 import androidx.core.net.toUri
+import com.google.ai.edge.gallery.data.ModelAccessibility
 import com.google.ai.edge.gallery.di.IoDispatcher
 import com.google.ai.edge.gallery.proto.HfModelItemProto
 import com.google.ai.edge.gallery.proto.HfSiblingProto
@@ -44,24 +45,26 @@ constructor(@IoDispatcher private val ioDispatcher: CoroutineDispatcher) {
    * Fetches models from the Hugging Face API and applies official community promotion sorting.
    * Search fetching and model sorting are decoupled via [fetchModels] and [sortModels].
    */
-  suspend fun searchModels(
+  open suspend fun searchModels(
     query: String = "",
     sort: HfSortOptionProto = HfSortOptionProto.HF_SORT_OPTION_DOWNLOADS,
     limit: Int = 50,
     accessToken: String? = null,
   ): List<HfModelItemProto> {
-    val rawModels = fetchModels(query = query, limit = limit, accessToken = accessToken)
+    val rawModels =
+      fetchModels(query = query, sort = sort, limit = limit, accessToken = accessToken)
     return sortModels(rawModels, sort)
   }
 
-  /** Fetches matching catalog items from Hugging Face API without imposing a display sort order. */
-  suspend fun fetchModels(
+  /** Fetches matching catalog items from Hugging Face API with the given sort order. */
+  open suspend fun fetchModels(
     query: String = "",
+    sort: HfSortOptionProto = HfSortOptionProto.HF_SORT_OPTION_DOWNLOADS,
     limit: Int = 50,
     accessToken: String? = null,
   ): List<HfModelItemProto> =
     withContext(ioDispatcher) {
-      val urlString = buildApiUrl(query = query, limit = limit)
+      val urlString = buildApiUrl(query = query, sort = sort, limit = limit)
       val responseText = executeGetRequest(urlString = urlString, accessToken = accessToken)
 
       if (responseText.isNullOrEmpty()) {
@@ -89,16 +92,23 @@ constructor(@IoDispatcher private val ioDispatcher: CoroutineDispatcher) {
     return models.filter { it.hasCompatibleModelFiles() }
   }
 
-  private fun buildApiUrl(query: String, limit: Int): String {
+  private fun buildApiUrl(
+    query: String,
+    sort: HfSortOptionProto = HfSortOptionProto.HF_SORT_OPTION_DOWNLOADS,
+    limit: Int,
+  ): String {
     val queryParams =
       mutableListOf(
         "filter" to "litert-lm",
+        "sort" to sort.queryValue,
+        "direction" to "-1",
         "limit" to limit.toString(),
         "expand" to "siblings",
         "expand" to "tags",
         "expand" to "likes",
         "expand" to "downloads",
         "expand" to "lastModified",
+        "expand" to "trendingScore",
       )
     if (query.isNotBlank()) {
       queryParams.add("search" to URLEncoder.encode(query.trim(), "UTF-8"))
@@ -151,15 +161,73 @@ constructor(@IoDispatcher private val ioDispatcher: CoroutineDispatcher) {
       return@withContext null
     }
 
-  private fun executeGetRequest(urlString: String, accessToken: String? = null): String? {
-    return try {
-      Log.d(TAG, "Executing HF HTTP GET request: $urlString")
-      val connection = URL(urlString).openConnection() as HttpURLConnection
-      connection.requestMethod = "GET"
-      connection.setRequestProperty("User-Agent", USER_AGENT)
-      if (!accessToken.isNullOrEmpty()) {
-        connection.setRequestProperty("Authorization", "Bearer $accessToken")
+  /**
+   * Probes the accessibility of a Hugging Face model URL using an optional Bearer access token.
+   *
+   * @param modelUrl The download URL of the model.
+   * @param accessToken Optional Bearer access token for authorization.
+   * @return [ModelAccessibility] indicating whether the model is accessible, gated, or needs token
+   *   exchange.
+   */
+  open suspend fun checkModelAccessibility(
+    modelUrl: String,
+    accessToken: String? = null,
+  ): ModelAccessibility =
+    withContext(ioDispatcher) {
+      if (modelUrl.isEmpty()) {
+        return@withContext ModelAccessibility.ACCESSIBLE
       }
+      val responseCode =
+        try {
+          val connection =
+            openHttpConnection(urlString = modelUrl, method = "HEAD", accessToken = accessToken)
+          connection.connect()
+          connection.responseCode
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to probe model accessibility for URL: $modelUrl", e)
+          return@withContext ModelAccessibility.ERROR
+        }
+
+      when (responseCode) {
+        in 200..299 -> ModelAccessibility.ACCESSIBLE
+        HttpURLConnection.HTTP_UNAUTHORIZED -> ModelAccessibility.NEEDS_TOKEN_EXCHANGE
+        HttpURLConnection.HTTP_FORBIDDEN -> {
+          if (accessToken.isNullOrEmpty()) {
+            ModelAccessibility.NEEDS_TOKEN_EXCHANGE
+          } else {
+            ModelAccessibility.GATED
+          }
+        }
+        else -> {
+          Log.w(TAG, "Unexpected response code checking HF model accessibility: $responseCode")
+          ModelAccessibility.ERROR
+        }
+      }
+    }
+
+  /**
+   * Opens and configures an [HttpURLConnection] with default headers and optional authorization.
+   */
+  protected open fun openHttpConnection(
+    urlString: String,
+    method: String = "GET",
+    accessToken: String? = null,
+  ): HttpURLConnection {
+    val url = URL(urlString)
+    val connection = url.openConnection() as HttpURLConnection
+    connection.requestMethod = method
+    connection.setRequestProperty("User-Agent", USER_AGENT)
+    if (!accessToken.isNullOrEmpty()) {
+      connection.setRequestProperty("Authorization", "Bearer $accessToken")
+    }
+    return connection
+  }
+
+  private fun executeGetRequest(urlString: String, accessToken: String? = null): String? {
+    Log.d(TAG, "Executing HF HTTP GET request: $urlString")
+    return try {
+      val connection =
+        openHttpConnection(urlString = urlString, method = "GET", accessToken = accessToken)
       connection.connect()
 
       val responseCode = connection.responseCode
@@ -182,6 +250,7 @@ constructor(@IoDispatcher private val ioDispatcher: CoroutineDispatcher) {
     jsonObj.getOrNull("downloads")?.let { downloads = it.asLong }
     jsonObj.getOrNull("likes")?.let { likes = it.asLong }
     jsonObj.getOrNull("lastModified")?.let { lastModified = it.asString }
+    jsonObj.getOrNull("trendingScore")?.let { trendingScore = it.asLong }
 
     jsonObj
       .getAsJsonArray("tags")

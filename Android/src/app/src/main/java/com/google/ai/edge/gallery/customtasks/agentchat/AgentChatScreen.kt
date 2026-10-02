@@ -110,7 +110,6 @@ import com.google.ai.edge.gallery.ui.common.chat.convertToLitertMessage
 import com.google.ai.edge.gallery.ui.common.chat.handleImagesSelected
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatScreen
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatViewModel
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import java.lang.Exception
 import kotlin.coroutines.resume
@@ -210,7 +209,7 @@ fun AgentChatScreen(
   }
 
   val selectedModel = modelManagerUiState.selectedModel
-  val modelInitStatus = modelManagerUiState.modelInitializationStatus[selectedModel.name]
+  val modelInitStatus by selectedModel.initStatusFlow.collectAsState()
 
   DisposableEffect(selectedModel.name, task.id) {
     if (selectedModel.setupAgentSkillTopK()) {
@@ -230,7 +229,7 @@ fun AgentChatScreen(
 
   LaunchedEffect(
     llmChatUiState.isResettingSession,
-    modelInitStatus?.status,
+    modelInitStatus,
     selectedModel.name,
     initialQuery,
     initialImageUris,
@@ -241,7 +240,7 @@ fun AgentChatScreen(
     if (
       hasInitialContent &&
         !initialQueryConsumed &&
-        modelInitStatus?.status == ModelInitializationStatusType.INITIALIZED &&
+        modelInitStatus is Model.InitializationStatus.Initialized &&
         !llmChatUiState.isResettingSession
     ) {
       initialQueryConsumed = true
@@ -546,8 +545,7 @@ fun AgentChatScreen(
     },
     emptyStateComposable = { model ->
       val uiState by viewModel.uiState.collectAsState()
-      val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
-      val modelInitializationStatus = modelManagerUiState.modelInitializationStatus[model.name]
+      val initStatus by model.initStatusFlow.collectAsState()
       Box(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(
           !WindowInsets.isImeVisible,
@@ -617,8 +615,7 @@ fun AgentChatScreen(
             }
             FilledTonalButton(
               enabled =
-                modelInitializationStatus?.status == ModelInitializationStatusType.INITIALIZED &&
-                  !uiState.isResettingSession,
+                initStatus is Model.InitializationStatus.Initialized && !uiState.isResettingSession,
               onClick = {
                 // Skill is selected, trigger sending the message.
                 if (skillManagerViewModel.isSkillSelected(promptChip.skillName)) {
@@ -861,8 +858,8 @@ internal fun resetSessionWithCurrentSkillsAndMcps(
     model = model,
     systemInstruction = finalSystemPrompt,
     actionChannel = agentTools.sendActionChannel,
-    supportImage = model.llmSupportImage,
-    supportAudio = model.llmSupportAudio,
+    supportImage = model.supportImage,
+    supportAudio = model.supportAudio,
     onDone = { onDone(model) },
     enableConversationConstrainedDecoding = true,
     initialMessages = litertMessages,

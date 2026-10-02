@@ -102,9 +102,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -115,8 +115,10 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.ai.edge.gallery.GalleryEvent
 import com.google.ai.edge.gallery.R
+import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
 import com.google.ai.edge.gallery.data.Task
+import com.google.ai.edge.gallery.data.resetInitialization
 import com.google.ai.edge.gallery.firebaseAnalytics
 import com.google.ai.edge.gallery.ui.common.MarkdownText
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageWarning
@@ -127,8 +129,6 @@ import com.google.ai.edge.gallery.ui.common.getTaskIconColor
 import com.google.ai.edge.gallery.ui.common.textandvoiceinput.HoldToDictateViewModel
 import com.google.ai.edge.gallery.ui.common.textandvoiceinput.TextAndVoiceInput
 import com.google.ai.edge.gallery.ui.common.textandvoiceinput.VoiceRecognizerOverlay
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatus
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.litertlm.ToolProvider
 import kotlinx.coroutines.Dispatchers
@@ -291,6 +291,8 @@ fun MainUi(
 ) {
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
   val model = modelManagerUiState.selectedModel
+  val initStatus by model.initStatusFlow.collectAsState()
+  val isModelInitialized = initStatus is Model.InitializationStatus.Initialized
   val initialModelConfigValues = remember { model.configValues }
   val holdToDictateUiState by holdToDictateViewModel.uiState.collectAsState()
   val uiState by viewModel.uiState.collectAsState()
@@ -310,17 +312,14 @@ fun MainUi(
   val curDownloadStatus = modelManagerUiState.modelDownloadStatus[model.name]?.status
   setAppBarControlsDisabled(
     curDownloadStatus == ModelDownloadStatusType.SUCCEEDED &&
-      (!modelManagerUiState.isModelInitialized(model = model) || uiState.processing)
+      (!isModelInitialized || uiState.processing)
   )
 
   // Reset states on config changes.
   LaunchedEffect(model.configValues) {
     if (model.configValues != initialModelConfigValues) {
       Log.d(TAG, "model config values changed.")
-      modelManagerViewModel.setInitializationStatus(
-        model = model,
-        status = ModelInitializationStatus(status = ModelInitializationStatusType.NOT_INITIALIZED),
-      )
+      model.resetInitialization()
       viewModel.reset()
     }
   }
@@ -328,7 +327,7 @@ fun MainUi(
   DisposableEffect(Unit) { onDispose { viewModel.cleanUp() } }
 
   // Show a loading indicator before the model is initialized.
-  if (!modelManagerUiState.isModelInitialized(model = model)) {
+  if (!isModelInitialized) {
     Row(
       modifier = Modifier.fillMaxSize(),
       verticalAlignment = Alignment.CenterVertically,
@@ -369,12 +368,15 @@ fun MainUi(
             val errors = mutableListOf<String>()
             for (action in curActions) {
               val curError = viewModel.performAction(action = action, context = context)
-              if (curError.isEmpty()) {
-                viewModel.addFunctionCallDetails(
-                  details = genFormattedFunctionCall(action = action, resources = resources)
-                )
-              } else {
+              // Always show the recognized function call, even if executing it failed, so users
+              // can see what the model attempted.
+              viewModel.addFunctionCallDetails(
+                details =
+                  genFormattedFunctionCall(action = action, resources = resources, error = curError)
+              )
+              if (curError.isNotEmpty()) {
                 errors.add(curError)
+                viewModel.addActionError(error = curError)
               }
             }
             if (errors.isNotEmpty()) {
@@ -577,12 +579,11 @@ fun MainUi(
                 // Model response.
                 if (selectedTabIndex == 0) {
                   Column(modifier = Modifier.fillMaxWidth()) {
-                    val cdResponse = stringResource(R.string.cd_model_response_text)
                     MarkdownText(
                       text = uiState.modelResponse,
                       modifier =
-                        Modifier.semantics(mergeDescendants = true) {
-                            contentDescription = cdResponse
+                        Modifier.testTag("model_response_text")
+                          .semantics(mergeDescendants = true) {
                             // Only announce when message is complete.
                             if (doneGeneratingResponse) {
                               liveRegion = LiveRegionMode.Polite
@@ -595,6 +596,20 @@ fun MainUi(
                       MessageBodyWarning(
                         ChatMessageWarning(
                           content = stringResource(R.string.warning_no_function_call)
+                        )
+                      )
+                    }
+
+                    // The model response is generated before the action is executed, so it may
+                    // claim success even if the action failed. Flag the failure explicitly.
+                    if (uiState.actionErrors.isNotEmpty()) {
+                      MessageBodyWarning(
+                        ChatMessageWarning(
+                          content =
+                            stringResource(
+                              R.string.mobile_actions_warning_action_failed,
+                              uiState.actionErrors.joinToString(separator = "; "),
+                            )
                         )
                       )
                     }
@@ -741,7 +756,11 @@ fun MainUi(
   }
 }
 
-private fun genFormattedFunctionCall(action: Action, resources: Resources): String {
+/**
+ * Formats [action]'s function call as markdown for the "Function(s) called" tab. If [error] is not
+ * empty, the call is annotated as failed with that error.
+ */
+private fun genFormattedFunctionCall(action: Action, resources: Resources, error: String): String {
   val strFunctionName = action.functionCallDetails.functionName
   val functionNameLabel = resources.getString(R.string.function_name)
   var content = "**$functionNameLabel**:\n- $strFunctionName"
@@ -751,6 +770,9 @@ private fun genFormattedFunctionCall(action: Action, resources: Resources): Stri
     val strParameters =
       action.functionCallDetails.parameters.joinToString("\n") { "- ${it.first}: \"${it.second}\"" }
     content += "\n\n**$parametersLabel**:\n$strParameters"
+  }
+  if (error.isNotEmpty()) {
+    content += "\n\n**${resources.getString(R.string.mobile_actions_function_call_failed, error)}**"
   }
   return content
 }

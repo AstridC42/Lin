@@ -125,7 +125,9 @@ not. In each case the extracted function is where being wrong is silent and
 expensive — a forecast about different weather, an appointment on the wrong day,
 a message written to a stranger who shares a phone number.
 
-Run them with `./gradlew :app:testDebugUnitTest` from `Android/src`.
+Run them with `./gradlew :app:testReleaseUnitTest` from `Android/src`. The release variant
+is the only one with unit tests: AGP 9 builds them for a single variant, and `testBuildType`
+names the one that ships.
 
 ## Releases
 

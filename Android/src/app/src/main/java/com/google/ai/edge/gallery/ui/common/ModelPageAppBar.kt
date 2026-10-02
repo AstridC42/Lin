@@ -57,13 +57,13 @@ import com.google.ai.edge.gallery.data.ConfigKeys
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.ModelCapability
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
-import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.data.usesAgentSkills
 import com.google.ai.edge.gallery.data.convertValueToTargetType
 import com.google.ai.edge.gallery.firebaseAnalytics
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
+
+import com.google.ai.edge.litertlm.Capabilities
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,11 +91,9 @@ fun ModelPageAppBar(
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
   val context = LocalContext.current
   val curDownloadStatus = modelManagerUiState.modelDownloadStatus[model.name]
-  val modelInitializationStatus = modelManagerUiState.modelInitializationStatus[model.name]
-  val isModelInitializing =
-    modelInitializationStatus?.status == ModelInitializationStatusType.INITIALIZING
-  val isModelInitialized =
-    modelInitializationStatus?.status == ModelInitializationStatusType.INITIALIZED
+  val initStatus by model.initStatusFlow.collectAsState()
+  val isModelInitializing = initStatus is Model.InitializationStatus.Initializing
+  val isModelInitialized = initStatus is Model.InitializationStatus.Initialized
 
   CenterAlignedTopAppBar(
     title = {
@@ -111,12 +109,10 @@ fun ModelPageAppBar(
           val tintColor =
             if (useThemeColor) MaterialTheme.colorScheme.onSurface
             else getTaskIconColor(task = task)
-          Icon(
-            task.icon ?: ImageVector.vectorResource(task.iconVectorResourceId!!),
-            tint = tintColor,
-            modifier = Modifier.size(24.dp),
-            contentDescription = null,
-          )
+          val icon = task.icon ?: task.iconVectorResourceId?.let { ImageVector.vectorResource(it) }
+          if (icon != null) {
+            Icon(icon, tint = tintColor, modifier = Modifier.size(24.dp), contentDescription = null)
+          }
           Text(task.label, style = MaterialTheme.typography.titleMedium, color = tintColor)
         }
 
@@ -205,7 +201,7 @@ fun ModelPageAppBar(
     var supportsSpeculativeDecoding = false
     // Check if the model file supports speculative decoding.
     try {
-      com.google.ai.edge.litertlm.Capabilities(model.getPath(context)).use {
+      Capabilities(model.getPath(context)).use {
         supportsSpeculativeDecoding = it.hasSpeculativeDecodingSupport()
       }
     } catch (e: Exception) {
@@ -258,7 +254,7 @@ fun ModelPageAppBar(
             Bundle().apply {
               putString("model_id", model.name)
               putString("capability_name", task.id)
-              putString("model_version", model.version)
+              putString("model_version", model.downloadInfo.version)
               putString("app_version", BuildConfig.VERSION_NAME)
             },
           )
@@ -302,8 +298,7 @@ fun ModelPageAppBar(
         }
       },
       // AICore doesn't support system prompt yet.
-      showSystemPromptEditorTab =
-        allowEditingSystemPrompt && model.runtimeType != RuntimeType.AICORE,
+      showSystemPromptEditorTab = allowEditingSystemPrompt && !model.isAiCore,
       defaultSystemPrompt = task.defaultSystemPrompt,
       curSystemPrompt = curSystemPrompt,
     )

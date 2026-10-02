@@ -25,12 +25,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -84,11 +78,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.google.ai.edge.gallery.R
+import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.data.supportModelBenchmark
@@ -99,8 +95,6 @@ import com.google.ai.edge.gallery.ui.common.TaskIcon
 import com.google.ai.edge.gallery.ui.common.isHttpOrHttps
 import com.google.ai.edge.gallery.ui.common.modelitem.ModelItem
 import com.google.ai.edge.gallery.ui.common.tos.TosViewModel
-import kotlin.text.endsWith
-import kotlin.text.lowercase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -115,6 +109,7 @@ fun GlobalModelManager(
   onBenchmarkClicked: (Model) -> Unit,
   modifier: Modifier = Modifier,
   tosViewModel: TosViewModel? = null,
+  initialImportUrl: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val builtInModels = remember { mutableStateListOf<Model>() }
@@ -123,6 +118,7 @@ fun GlobalModelManager(
   var modelForTaskCandidate by remember { mutableStateOf<Model?>(null) }
   var showTaskSelectorBottomSheet by remember { mutableStateOf(false) }
   var showImportModelSheet by remember { mutableStateOf(false) }
+  var showHfExploreScreen by remember { mutableStateOf(false) }
   var showHuggingFaceUrlDialog by remember { mutableStateOf(false) }
   var huggingFaceUrlInput by remember { mutableStateOf("") }
   var showUnsupportedModelDialog by remember { mutableStateOf(false) }
@@ -140,12 +136,6 @@ fun GlobalModelManager(
   val snackbarHostState = remember { SnackbarHostState() }
   val modelItemExpandedStates = remember { mutableStateMapOf<String, Boolean>() }
 
-  val promoId = "gm4_banner"
-  var showPromo by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) {
-    showPromo = !viewModel.dataStoreRepository.hasViewedPromo(promoId = promoId)
-  }
-
   val processModelUri: (Uri, Boolean) -> Unit = { uri, isWebImport ->
     validateAndProcessModelUri(
       uri = uri,
@@ -161,6 +151,47 @@ fun GlobalModelManager(
       },
     )
   }
+
+  val handleImportUrl: (String) -> Unit =
+    remember(context, viewModel) {
+      { rawUrl: String ->
+        val url = rawUrl.trim()
+        if (url.isNotEmpty()) {
+          showHuggingFaceUrlDialog = false
+          val urlInfo = extractHfUrlInfo(url)
+          val targetModelId = urlInfo.modelId
+          when {
+            urlInfo.isDirectModelFile -> {
+              val fileUri =
+                if (targetModelId != null && urlInfo.fileName != null) {
+                  "https://huggingface.co/${targetModelId}/resolve/main/${urlInfo.fileName}?download=true"
+                    .toUri()
+                } else {
+                  url.toUri()
+                }
+              processModelUri(fileUri, /* isWebImport= */ true)
+            }
+            targetModelId != null -> {
+              isLoadingModelCardDetails = true
+              viewModel.fetchModelDetails(targetModelId) { detailedModel ->
+                isLoadingModelCardDetails = false
+                if (detailedModel != null) {
+                  selectedModelForDetails = detailedModel
+                  showModelDetailsSheet = true
+                } else {
+                  unsupportedModelErrorMessage =
+                    getErrorMessage(context, R.string.could_not_fetch_model_details, targetModelId)
+                  showUnsupportedModelDialog = true
+                }
+              }
+            }
+            else -> {
+              processModelUri(url.toUri(), /* isWebImport= */ true)
+            }
+          }
+        }
+      }
+    }
 
   val filePickerLauncher: ActivityResultLauncher<Intent> =
     rememberLauncherForActivityResult(
@@ -182,7 +213,7 @@ fun GlobalModelManager(
       viewModel
         .getAllModels()
         // Filter to include only top-level models (those without a parent).
-        .filter { it.parentModelName.isNullOrEmpty() }
+        .filter { !it.isVariant }
         .sortedWith(
           compareBy<Model> { model ->
               // Sort by the index in allowlistModels. Models not in the allowlist come last.
@@ -194,9 +225,9 @@ fun GlobalModelManager(
             }
         )
     builtInModels.clear()
-    builtInModels.addAll(sortedModels.filter { !it.imported })
+    builtInModels.addAll(sortedModels.filter { !it.downloadInfo.imported })
     importedModels.clear()
-    importedModels.addAll(sortedModels.filter { it.imported })
+    importedModels.addAll(sortedModels.filter { it.downloadInfo.imported })
   }
 
   // Calculate model variants by grouping models with a parentModelName.
@@ -204,7 +235,7 @@ fun GlobalModelManager(
     remember(uiState.modelImportingUpdateTrigger) {
       derivedStateOf {
         val allModels = uiState.tasks.flatMap { it.models }.distinct()
-        allModels.filter { it.parentModelName != null }.groupBy { it.parentModelName!! }
+        allModels.filter { it.isVariant }.groupBy { it.hierarchy.parentModelName.orEmpty() }
       }
     }
 
@@ -249,6 +280,7 @@ fun GlobalModelManager(
                   "${stringResource(R.string.drawer_models_label)} (${builtInModels.size + importedModels.size})",
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
               )
             }
           }
@@ -290,21 +322,6 @@ fun GlobalModelManager(
         contentPadding =
           PaddingValues(top = 16.dp, bottom = innerPadding.calculateBottomPadding() + 80.dp),
       ) {
-        item(key = "promo") {
-          AnimatedVisibility(
-            visible = showPromo,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { -it / 2 }) + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-          ) {
-            PromoBannerGm4(
-              onDismiss = {
-                showPromo = false
-                viewModel.dataStoreRepository.addViewedPromoId(promoId = promoId)
-              }
-            )
-          }
-        }
-
         items(builtInModels) { model ->
           val expanded = modelItemExpandedStates.getOrDefault(model.name, true)
           ModelItem(
@@ -329,7 +346,10 @@ fun GlobalModelManager(
               stringResource(R.string.model_list_imported_models_title),
               color = MaterialTheme.colorScheme.onSurface,
               style = MaterialTheme.typography.labelLarge,
-              modifier = Modifier.padding(horizontal = 16.dp).padding(top = 32.dp, bottom = 8.dp),
+              modifier =
+                Modifier.semantics { heading() }
+                  .padding(horizontal = 16.dp)
+                  .padding(top = 32.dp, bottom = 8.dp),
             )
           }
         }
@@ -402,7 +422,11 @@ fun GlobalModelManager(
                 .padding(horizontal = 16.dp, vertical = 4.dp),
           ) {
             Text(
-              task.label,
+              if (task.id == BuiltInTaskId.LLM_TEST) {
+                stringResource(R.string.test_chat)
+              } else {
+                task.label
+              },
               color = MaterialTheme.colorScheme.onSurface,
               style = MaterialTheme.typography.titleMedium,
             )
@@ -491,6 +515,17 @@ fun GlobalModelManager(
     }
   }
 
+  if (showHfExploreScreen) {
+    HfExploreScreen(
+      onNavigateUp = { showHfExploreScreen = false },
+      onOpenUrlImportDialog = { showHuggingFaceUrlDialog = true },
+      onModelCardSelected = { detailedModel ->
+        selectedModelForDetails = detailedModel
+        showModelDetailsSheet = true
+      },
+    )
+  }
+
   // Import dialog
   if (showImportDialog) {
     selectedLocalModelFileUri.value?.let { uri ->
@@ -501,6 +536,7 @@ fun GlobalModelManager(
         onDone = { info ->
           selectedImportedModelInfo.value = info
           showImportDialog = false
+          showHfExploreScreen = false
           showImportingDialog = true
         },
         accessToken = viewModel.dataStoreRepository.readAccessTokenData()?.accessToken,
@@ -554,49 +590,7 @@ fun GlobalModelManager(
       urlInput = huggingFaceUrlInput,
       onUrlInputChange = { huggingFaceUrlInput = it },
       onDismiss = { showHuggingFaceUrlDialog = false },
-      onConfirm = {
-        val url = huggingFaceUrlInput.trim()
-        if (url.isNotEmpty()) {
-          showHuggingFaceUrlDialog = false
-          val urlInfo = extractHfUrlInfo(url)
-          when {
-            urlInfo.isDirectModelFile -> {
-              val fileUri =
-                if (urlInfo.modelId != null && urlInfo.fileName != null) {
-                  "https://huggingface.co/${urlInfo.modelId}/resolve/main/${urlInfo.fileName}?download=true"
-                    .toUri()
-                } else {
-                  url.toUri()
-                }
-              processModelUri(fileUri, true)
-            }
-            urlInfo.modelId != null -> {
-              val targetModelId = urlInfo.modelId
-              if (targetModelId != null) {
-                isLoadingModelCardDetails = true
-                viewModel.fetchModelDetails(targetModelId) { detailedModel ->
-                  isLoadingModelCardDetails = false
-                  if (detailedModel != null) {
-                    selectedModelForDetails = detailedModel
-                    showModelDetailsSheet = true
-                  } else {
-                    unsupportedModelErrorMessage =
-                      getErrorMessage(
-                        context,
-                        R.string.could_not_fetch_model_details,
-                        targetModelId,
-                      )
-                    showUnsupportedModelDialog = true
-                  }
-                }
-              }
-            }
-            else -> {
-              processModelUri(url.toUri(), true)
-            }
-          }
-        }
-      },
+      onConfirm = { handleImportUrl(huggingFaceUrlInput) },
     )
   }
 

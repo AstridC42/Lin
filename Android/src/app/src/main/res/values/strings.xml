@@ -78,9 +78,9 @@
   <string name="clear" translatable="true" description="Content description for a button to clear text input. [CHAR_LIMIT=9]">Clear</string>
   <string name="collect" translatable="true" description="Action label to collect items. [CHAR_LIMIT=18]">Collect</string>
   <string name="color" translatable="true" description="Label for color picker or color configuration. [CHAR_LIMIT=18]">Color</string>
-  <string name="config_dialog_tab_model_configs" translatable="true" description="Tab label for model-specific configurations. [CHAR_LIMIT=22]">Model configs</string>
+  <string name="config_dialog_tab_model_configs" translatable="false" description="Tab label for model-specific configurations. [CHAR_LIMIT=22]">Model configs</string>
   <string name="config_dialog_tab_system_prompt" translatable="true" description="Tab label for system prompt configuration. [CHAR_LIMIT=22]">System prompt</string>
-  <string name="config_dialog_title" translatable="true" description="Title of the settings/configuration dialog. [CHAR_LIMIT=26]">Configurations</string>
+  <string name="config_dialog_title" translatable="false" description="Title of the settings/configuration dialog. [CHAR_LIMIT=26]">Configurations</string>
   <string name="benchmark_config_dialog_title" translatable="true" description="Title of the benchmark configuration dialog. [CHAR_LIMIT=29]">Benchmark configs</string>
   <string name="start" translatable="true" description="Button label to start benchmarking. [CHAR_LIMIT=9]">Start</string>
   <string name="continue_button_label" translatable="true" description="Button label to proceed to next step. [CHAR_LIMIT=18]">Continue</string>
@@ -113,6 +113,7 @@
   <string name="enter_instruction" translatable="true" description="Placeholder text for instructing the model or agent. [CHAR_LIMIT=30]">Enter instruction</string>
   <string name="expand_all" translatable="true" description="Button label to expand all collapsed sections. [CHAR_LIMIT=20]">Expand all</string>
   <string name="failed_to_save" translatable="true" description="Title of error dialog shown when saving a skill fails. [CHAR_LIMIT=26]">Failed to save</string>
+  <string name="camera_init_failed" translatable="true" description="Toast message shown when the camera fails to initialize. [CHAR_LIMIT=60]">Failed to initialize camera</string>
   <string name="flashlight_off_message" translatable="true" description="Chat message response confirming the flashlight was turned off. [CHAR_LIMIT=110]">I\'ve turned off the flashlight.</string>
   <string name="flashlight_on_message" translatable="true" description="Chat message response confirming the flashlight was turned on. [CHAR_LIMIT=110]">I\'ve turned on the flashlight.</string>
   <string name="function_name" translatable="true" description="Label for the name of a function called by the agent. [CHAR_LIMIT=22]">Function name</string>
@@ -227,6 +228,9 @@
   <string name="warning_no_function_call" translatable="true" description="Fallback response text when the agent model fails to map the user input to a function call or action. [CHAR_LIMIT=135]">I could not quite understand that. Could you try again with more specific details?</string>
   <string name="snackbar_no_function_call" translatable="true" description="Short message shown in a toast/snackbar when the user command didn't trigger any function. [CHAR_LIMIT=45]">No function recognized</string>
   <string name="unknown_error" translatable="true" description="Generic fallback error message text when a more specific error message is not available. [CHAR_LIMIT=22]">Unknown error</string>
+  <string name="mobile_actions_error_no_app_found" translatable="true" description="Error shown in Mobile Actions when no installed app can handle the requested action (e.g. no calendar app is installed to create an event). [CHAR_LIMIT=60]">No app on this device can handle this action</string>
+  <string name="mobile_actions_function_call_failed" translatable="true" description="Line shown under a function call in the Mobile Actions 'Function(s) called' tab when executing that function failed. %1$s is the error message. [CHAR_LIMIT=NONE]">Failed: %1$s</string>
+  <string name="mobile_actions_warning_action_failed" translatable="true" description="Warning shown below the model response in Mobile Actions when the requested action could not be performed on the device, so the model response may not reflect what actually happened. %1$s is the error message. [CHAR_LIMIT=NONE]">The action could not be completed: %1$s</string>
   <string name="view" translatable="true" description="General action label to view details of an item (e.g., tool or skill). [CHAR_LIMIT=18]">View</string>
   <string name="view_in_full_screen" translatable="true" description="Action chip label to expand a web view content into full screen modal. [CHAR_LIMIT=30]">View in full screen</string>
   <string name="snackbar_save_to_album_success" translatable="true" description="Success notification message shown when an image is saved to the gallery. [CHAR_LIMIT=45]">Saved to photo album</string>
@@ -257,6 +261,83 @@
   <string name="mobile_actions_challenge_instruction_4" translatable="true" description="Fourth step of instructions, telling the user to tap the button to load the model. [CHAR_LIMIT=105]">4. Tap <![CDATA[<b>Load Model</b>]]> below to unlock the demo.</string>
   <string name="mobile_actions_challenge_email_colab" translatable="true" description="Button label to send the link to the guide/colab to the user's email. [CHAR_LIMIT=30]">Email guide to myself</string>
   <string name="mobile_actions_challenge_load_model" translatable="true" description="Button label to initiate loading the custom-built model. [CHAR_LIMIT=20]">Load Model</string>
+
+  <!-- Strings for Scrapbook -->
+  <string name="blur_inner_desc" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting description within the blur effects panel. It means the blur effect is applied inside the border only. [CHAR_LIMIT=100]">Blur inside the border, draw nothing outside</string>
+  <string name="blur_inner_label" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting label within the blur effects panel. It means the inner blur effect. [CHAR_LIMIT=30]">Inner</string>
+  <string name="blur_normal_desc" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting description within the blur effects panel. It means the blur effect is applied normally across the border. [CHAR_LIMIT=100]">Blur inside and outside stroke</string>
+  <string name="blur_normal_label" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting label within the blur effects panel. It means the normal blur effect. [CHAR_LIMIT=30]">Normal</string>
+  <string name="blur_outer_desc" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting description within the blur effects panel. It means the blur effect is applied outside the border only. [CHAR_LIMIT=100]">Draw nothing inside the border, blur outside</string>
+  <string name="blur_outer_label" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting label within the blur effects panel. It means the outer blur effect. [CHAR_LIMIT=30]">Outer</string>
+  <string name="blur_solid_desc" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting description within the blur effects panel. It means the border is solid inside and blurred outside. [CHAR_LIMIT=100]">Draw solid inside the border, blur outside</string>
+  <string name="blur_solid_label" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting label within the blur effects panel. It means the solid blur effect. [CHAR_LIMIT=30]">Solid</string>
+  <string name="blur_type" translatable="true" description="This string appears within the Scrapbook cutout editor as a section header within the blur effects panel. It means the category of blur effects. [CHAR_LIMIT=30]">Blur type</string>
+  <string name="border_width" translatable="true" description="This string appears within the Scrapbook cutout editor as a slider label within the stroke settings. It means the width of the border stroke. [CHAR_LIMIT=30]">Border width</string>
+  <string name="brush_size" translatable="true" description="This string appears within the Scrapbook cutout editor as a slider label within the brush settings. It means the size of the drawing brush. [CHAR_LIMIT=30]">Size</string>
+  <string name="brush_softness" translatable="true" description="This string appears within the Scrapbook cutout editor as a slider label within the brush settings. It means the softness of the drawing brush. [CHAR_LIMIT=30]">Softness</string>
+  <string name="change_background" translatable="true" description="This string appears within the Scrapbook collage editor as a button label within the bottom action bar. It means to change the background image of the collage. [CHAR_LIMIT=40]">Change background</string>
+  <string name="change_picture" translatable="true" description="This string appears within the Scrapbook collage editor as a button label within the bottom action bar. It means to change the picture. [CHAR_LIMIT=40]">Change picture</string>
+  <string name="clear_selection" translatable="true" description="This string appears within the Scrapbook collage editor as a button label within the top action bar. It means to clear the currently selected items. [CHAR_LIMIT=40]">Clear selection</string>
+  <string name="clone" translatable="true" description="This string appears within the Scrapbook collage editor as a context menu action within the item selection. It means to duplicate the selected item. [CHAR_LIMIT=30]">Clone</string>
+  <string name="collage" translatable="true" description="This string appears within the Scrapbook main screen as a tab label within the top navigation. It means the collage feature. [CHAR_LIMIT=30]">Collage</string>
+  <string name="collage_editor_instruction" translatable="true" description="This string appears within the Scrapbook collage editor as an instructional text within the empty state canvas. It means to tap to add items or long press to edit. [CHAR_LIMIT=100]">
+    Tap to add · Long press to edit
+  </string>
+  <string name="colored_background" translatable="true" description="This string appears within the Scrapbook collage editor as an item label within the background selection drawer. It means a solid or gradient colored background. [CHAR_LIMIT=50]">Colored background</string>
+  <string name="colorize" translatable="true" description="This string appears within the Scrapbook cutout editor as a toggle label within the editing tools. It means to apply colorization to the cutout. [CHAR_LIMIT=30]">Colorize</string>
+  <string name="columns" translatable="true" description="This string appears within the Scrapbook grid maker as a slider label within the grid settings. It means the number of columns in the grid. [CHAR_LIMIT=30]">Columns</string>
+  <string name="create_horizonal_grid" translatable="true" description="This string appears within the Scrapbook collage editor as a dialog button within the grid maker. It means to create a grid with horizontal layout. [CHAR_LIMIT=50]">Create horizontal grid</string>
+  <string name="create_new_collage_button_label" translatable="true" description="This string appears within the Scrapbook main screen as a primary action button within the Collage tab. It means to start creating a new collage. [CHAR_LIMIT=40]">Create new collage</string>
+  <string name="create_new_cutout_button_label" translatable="true" description="This string appears within the Scrapbook main screen as a primary action button within the Cutout tab. It means to start creating a new cutout. [CHAR_LIMIT=40]">Create new cutout</string>
+  <string name="create_collage_empty_state_info" translatable="true" description="This string appears within the Scrapbook main screen as a heading within the empty Collage tab. It means an invitation to create a collage from cutouts. [CHAR_LIMIT=80]">Create collage from your cutouts</string>
+  <string name="create_collage_empty_state_description" translatable="true" description="This string appears within the Scrapbook main screen as a body text within the empty Collage tab. It means the step by step process to create a scrapbook. [CHAR_LIMIT=120]">Pick a backdrop, layer your cutouts, and create your own scrapbook</string>
+  <string name="create_cutout_empty_state_info" translatable="true" description="This string appears within the Scrapbook main screen as a heading within the empty Cutout tab. It means an invitation to create cutouts from pictures. [CHAR_LIMIT=80]">Create cutouts from your pictures</string>
+  <string name="create_cutout_empty_state_description" translatable="true" description="This string appears within the Scrapbook main screen as a body text within the empty Cutout tab. It means the step by step process to create a cutout. [CHAR_LIMIT=120]">Select a picture and brush over objects to create a cutout</string>
+  <string name="create_vertical_grid" translatable="true" description="This string appears within the Scrapbook collage editor as a dialog button within the grid maker. It means to create a grid with vertical layout. [CHAR_LIMIT=50]">Create vertical grid</string>
+  <string name="cutout_manager_info_message" translatable="true" description="This string appears within the Scrapbook main screen as an informational banner within the Cutout manager. It means instructions on how to select and edit cutouts. [CHAR_LIMIT=100]">Tap to edit · Long press to multi-select</string>
+  <plurals name="cutouts_count_label" translatable="true" description="This string appears within the Scrapbook main screen as a sub title within the Cutout manager. It means the total number of cutouts saved. [CHAR_LIMIT=50]">
+    <item quantity="one">%d Cutout</item>
+    <item quantity="other">%d Cutouts</item>
+  </plurals>
+  <string name="delete_selected_cutouts_msg" translatable="true" description="This string appears within the Scrapbook cutout manager as a dialog message within the delete confirmation. It means to confirm deletion of multiple cutouts. [CHAR_LIMIT=150]">Are you sure you want to delete the selected cutouts? They will also be removed from the \"Collage\" screen.</string>
+  <string name="delete_cutout_msg" translatable="true" description="This string appears within the Scrapbook cutout manager as a dialog message within the delete confirmation. It means to confirm deletion of a single cutout. [CHAR_LIMIT=100]">Are you sure you want to delete the cutout?</string>
+  <string name="delete_selected_cutouts_title" translatable="true" description="This string appears within the Scrapbook cutout manager as a dialog title within the delete confirmation. It means the title for deleting multiple cutouts. [CHAR_LIMIT=50]">Delete selected cutouts</string>
+  <string name="delete_cutout_title" translatable="true" description="This string appears within the Scrapbook cutout manager as a dialog title within the delete confirmation. It means the title for deleting a single cutout. [CHAR_LIMIT=50]">Delete cutout</string>
+  <string name="editor_tab_edit" translatable="true" description="This string appears within the Scrapbook cutout editor as a tab label within the bottom tools. It means the editing tools panel. [CHAR_LIMIT=30]">Edit cutout</string>
+  <string name="editor_tab_draw" translatable="true" description="This string appears within the Scrapbook cutout editor as a tab label within the bottom tools. It means the drawing tools panel. [CHAR_LIMIT=30]">Draw</string>
+  <string name="fill_color" translatable="true" description="This string appears within the Scrapbook colored background settings as a section header within the color picker. It means the fill color to use. [CHAR_LIMIT=40]">Fill color</string>
+  <string name="fill_mode" translatable="true" description="This string appears within the Scrapbook colored background settings as a section header within the fill selection. It means the mode of filling the color. [CHAR_LIMIT=40]">Fill mode</string>
+  <string name="grid_cell_padding" translatable="true" description="This string appears within the Scrapbook grid maker as a slider label within the grid settings. It means the padding around grid cells. [CHAR_LIMIT=30]">Padding</string>
+  <string name="grid_cell_size" translatable="true" description="This string appears within the Scrapbook grid maker as a slider label within the grid settings. It means the size of the grid cells. [CHAR_LIMIT=30]">Cell size</string>
+  <string name="horizontal" translatable="true" description="This string appears within the Scrapbook grid maker as a layout option within the grid generator. It means horizontal orientation. [CHAR_LIMIT=30]">Horizontal</string>
+  <string name="linear_gradient_color" translatable="true" description="This string appears within the Scrapbook colored background settings as a gradient option within the fill mode. It means linear gradient style. [CHAR_LIMIT=40]">Linear gradient</string>
+  <string name="radial_gradient_color" translatable="true" description="This string appears within the Scrapbook colored background settings as a gradient option within the fill mode. It means radial gradient style. [CHAR_LIMIT=40]">Radial gradient</string>
+  <string name="rotate" translatable="true" description="This string appears within the Scrapbook cutout editor as a button label within the bottom tools. It means to rotate the image. [CHAR_LIMIT=30]">Rotate</string>
+  <string name="revert" translatable="true" description="This string appears within the Scrapbook cutout editor as a button label within the top action bar. It means to revert changes. [CHAR_LIMIT=30]">Revert</string>
+  <string name="revert_confirmation_msg" translatable="true" description="This string appears within the Scrapbook cutout editor as a dialog message within the revert confirmation. It means asking if the user wants to revert to the original. [CHAR_LIMIT=100]">Are you sure you want to revert it to original?</string>
+  <string name="revert_to_original" translatable="true" description="This string appears within the Scrapbook cutout editor as a dialog title within the revert confirmation. It means reverting to the original version. [CHAR_LIMIT=50]">Revert to original</string>
+  <string name="rows" translatable="true" description="This string appears within the Scrapbook grid maker as a slider label within the grid settings. It means the number of rows in the grid. [CHAR_LIMIT=30]">Rows</string>
+  <string name="save_cutout" translatable="true" description="This string appears within the Scrapbook cutout editor as a primary button within the bottom action bar. It means to save the edited cutout. [CHAR_LIMIT=40]">Save cutout</string>
+  <string name="segmentation_instruction_add" translatable="true" description="This string appears within the Scrapbook cutout editor as an instructional banner within the segmentation view. It means how to add to the selection. [CHAR_LIMIT=100]">Brush over an area to add to the selection</string>
+  <string name="segmentation_instruction_subtract" translatable="true" description="This string appears within the Scrapbook cutout editor as an instructional banner within the segmentation view. It means how to remove from the selection. [CHAR_LIMIT=100]">Brush over an area to remove from the selection</string>
+  <string name="segmentation_instruction_lasso" translatable="true" description="This string appears within the Scrapbook cutout editor as an instructional banner within the segmentation view. It means how to use the lasso tool. [CHAR_LIMIT=100]">Draw a circle around an area to select</string>
+  <plurals name="snackbar_save_cutouts_to_album_success" translatable="true" description="This string appears within the Scrapbook main screen as a snackbar notification within the cutout manager. It means the cutouts were successfully saved to the device album. [CHAR_LIMIT=100]">
+    <item quantity="one">Saved %d cutout to photo album</item>
+    <item quantity="other">Saved %d cutouts to photo album</item>
+  </plurals>
+  <string name="snackbar_save_to_my_cutouts_success" translatable="true" description="This string appears within the Scrapbook main screen as a snackbar notification within the cutout manager. It means the cutout was successfully saved to the app. [CHAR_LIMIT=150]">Cutout successfully created! To use your new cutout, go to the \"Collage\" tab. </string>
+  <string name="solid" translatable="true" description="This string appears within the Scrapbook cutout editor as a setting label within the fill mode options. It means the cutout will be filled with a solid color. [CHAR_LIMIT=30]">Solid</string>
+  <string name="solid_color" translatable="true" description="This string appears within the Scrapbook colored background as a fill option within the settings. It means a solid color fill. [CHAR_LIMIT=30]">Solid</string>
+  <string name="tab_collage" translatable="true" description="This string appears within the Scrapbook main screen as a navigation tab within the top bar. It means the collage section. [CHAR_LIMIT=30]">Collage</string>
+  <string name="tab_collage_empty_warning" translatable="true" description="This string appears within the Scrapbook main screen as a warning text within a disabled Collage tab. It means the user needs cutouts first. [CHAR_LIMIT=100]">Create some cutouts first before creating collage</string>
+  <string name="tab_my_cutouts_empty_warning" translatable="true" description="This string appears within the Scrapbook main screen as a warning text within an empty My Cutouts tab. It means there are no cutouts yet. [CHAR_LIMIT=100]">No cutouts created yet</string>
+  <string name="tab_create_cutout" translatable="true" description="This string appears within the Scrapbook main screen as a navigation tab within the top bar. It means the create cutout section. [CHAR_LIMIT=40]">Create cutout</string>
+  <string name="tab_my_cutouts" translatable="true" description="This string appears within the Scrapbook main screen as a navigation tab within the top bar. It means the user's cutouts section. [CHAR_LIMIT=40]">My cutouts</string>
+  <string name="unsaved_changes" translatable="true" description="This string appears within the Scrapbook editors as a dialog title within the exit confirmation. It means there are unsaved changes. [CHAR_LIMIT=50]">Unsaved changes</string>
+  <string name="unsaved_changes_message" translatable="true" description="This string appears within the Scrapbook editors as a dialog message within the exit confirmation. It means asking if the user wants to leave without saving. [CHAR_LIMIT=100]">Are you sure you want to exit? You have unsaved changes.</string>
+  <string name="unsaved_changes_stay" translatable="true" description="This string appears within the Scrapbook editors as a dialog button within the exit confirmation. It means to cancel exiting and stay. [CHAR_LIMIT=30]">Stay</string>
+  <string name="unsaved_changes_exit" translatable="true" description="This string appears within the Scrapbook editors as a dialog button within the exit confirmation. It means to confirm exiting and lose changes. [CHAR_LIMIT=30]">Exit</string>
+  <string name="vertical" translatable="true" description="This string appears within the Scrapbook grid maker as a layout option within the grid generator. It means vertical orientation. [CHAR_LIMIT=30]">Vertical</string>
 
   <!-- Strings for skills -->
   <string name="aichat_emptystate_title" translatable="false">AI Chat</string>
@@ -413,6 +494,7 @@
   <string name="enter_hugging_face_url" translatable="true" description="Prompt text to guide the user to enter a Hugging Face model card or model file URL. [CHAR_LIMIT=102]">"Enter a Hugging Face model card or file URL. For example: "</string>
   <string name="enter_hugging_face_url_example_link" translatable="false">https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm</string>
   <string name="hugging_face_url_placeholder" translatable="true" description="Placeholder text shown inside the text field where the user enters the URL. [CHAR_LIMIT=37]">https://huggingface.co/…</string>
+  <string name="previous" translatable="true" description="Button text to navigate to the previous step. [CHAR_LIMIT=18]">Previous</string>
   <string name="next" translatable="true" description="Button text to navigate to the next step. [CHAR_LIMIT=18]">Next</string>
   <string name="unsupported_model_title" translatable="true" description="Title of the dialog showing that the imported model type is unsupported. [CHAR_LIMIT=37]">Unsupported model type</string>
   <string name="unsupported_file_type_error" translatable="true" description="Message informing the user that only .task or .litertlm file formats are supported. [CHAR_LIMIT=94]">Only \".task\" or \".litertlm\" file type is supported.</string>
@@ -430,6 +512,25 @@
   <string name="hf_no_model_files_in_card" translatable="true" description="Error message when no LiteRT model files are found in a Hugging Face repository card. [CHAR_LIMIT=100]">No LiteRT model files (.litertlm) found in this model card.</string>
   <string name="hf_last_updated" translatable="true" description="Label showing when a model was last updated. [CHAR_LIMIT=21]">Updated %1$s</string>
   <string name="could_not_fetch_model_details" translatable="true" description="Error message when fetching Hugging Face model details fails. [CHAR_LIMIT=123]">Unable to load model details for %1$s. Please check the URL and try again.</string>
+  <string name="test_chat" translatable="true" description="Title for the Test chat task screen where side-loaded models are tested. [CHAR_LIMIT=20]">Test chat</string>
+  <string name="task_desc_test" translatable="true" description="Empty state subtitle and description for the Test chat task screen. [CHAR_LIMIT=80]">Try testing a side-loaded model with chat!</string>
+  <string name="test_it" translatable="true" description="Action button label in the Model Manager to open the Test it task for a user-imported OSS model. [CHAR_LIMIT=15]">Test it</string>
+  <string name="test_chat_limited_functionality_note" translatable="true" description="Notice banner shown at the top of the Test chat screen informing users that side-loaded models have limited functionality for chat. [CHAR_LIMIT=80]">Note: side-loaded models have limited functionality for chat.</string>
+  <string name="dont_show_again" translatable="true" description="Action button label on a notice banner to permanently dismiss the banner and not show it again. [CHAR_LIMIT=25]">Don\'t show again</string>
+  <string name="hf_explore_title" translatable="true" description="Title of the Hugging Face Exploration screen. [CHAR_LIMIT=30]">Explore Hugging Face</string>
+  <string name="hf_explore_search_placeholder" translatable="true" description="Placeholder text for the generic search input field (not a product name) on the Hugging Face Exploration screen. [CHAR_LIMIT=35]">Search LiteRT-LM models&#8230;</string>
+  <string name="hf_explore_sort_trending" translatable="true" description="Sort chip label for trending Hugging Face models. [CHAR_LIMIT=16]">Trending</string>
+  <string name="hf_explore_sort_downloads" translatable="true" description="Sort chip label for Hugging Face models ordered by download count. [CHAR_LIMIT=16]">Downloads</string>
+  <string name="hf_explore_sort_likes" translatable="true" description="Sort chip label for Hugging Face models ordered by like count. [CHAR_LIMIT=12]">Likes</string>
+  <string name="hf_explore_sort_recent" translatable="true" description="Sort chip label for recently updated Hugging Face models. [CHAR_LIMIT=12]">Recent</string>
+  <string name="hf_explore_recommended_badge" translatable="true" description="Badge label indicating that a Hugging Face model is recommended by the LiteRT community. [CHAR_LIMIT=18]">Recommended</string>
+  <string name="hf_explore_compatible_badge" translatable="true" description="Badge label indicating that a Hugging Face model card has files compatible with the current device. [CHAR_LIMIT=18]">Compatible</string>
+  <string name="hf_explore_incompatible_badge" translatable="true" description="Badge label indicating that a Hugging Face model card may not be compatible with the current device. [CHAR_LIMIT=30]">May be incompatible</string>
+  <string name="hf_explore_empty_results" translatable="true" description="Message shown when no matching LiteRT-LM models are returned on the Hugging Face Exploration screen. [CHAR_LIMIT=50]">No matching LiteRT-LM models found.</string>
+  <string name="hf_explore_error_loading" translatable="true" description="Message shown when loading models from the Hugging Face API fails. [CHAR_LIMIT=60]">Failed to load models from Hugging Face.</string>
+  <string name="hf_explore_retry" translatable="true" description="Button label to retry fetching models on the Hugging Face Exploration screen. [CHAR_LIMIT=12]">Retry</string>
+  <string name="cd_hf_import_from_url_button" translatable="true" description="Accessibility description for the top-right plus button on the Hugging Face Exploration screen that opens the URL import dialog. [CHAR_LIMIT=40]">Import from Hugging Face URL</string>
+  <string name="cd_clear_search_button" translatable="true" description="Accessibility description for the clear search query button. [CHAR_LIMIT=20]">Clear search</string>
 
   <!-- The following entries are for accessibility -->
 
@@ -533,6 +634,61 @@
   <string name="cd_scroll_to_bottom" translatable="true" description="Content description for the button that scrolls the list/chat to the bottom. [CHAR_LIMIT=29]">Scroll to bottom</string>
   <!-- Content description spoken when the "chat history" icon is focused. -->
   <string name="cd_chat_history" translatable="true" description="Content description for the button that shows the chat history. [CHAR_LIMIT=23]">Chat history</string>
+  <!-- State description spoken when an item is expanded. -->
+  <string name="cd_expanded" translatable="true" description="Accessibility state description indicating that an item or card is currently expanded. [CHAR_LIMIT=18]">Expanded</string>
+  <!-- State description spoken when an item is collapsed. -->
+  <string name="cd_collapsed" translatable="true" description="Accessibility state description indicating that an item or card is currently collapsed. [CHAR_LIMIT=18]">Collapsed</string>
+  <!-- State description spoken when the microphone is muted. -->
+  <string name="cd_mic_muted" translatable="true" description="Accessibility state description indicating that the microphone is currently muted. [CHAR_LIMIT=25]">Microphone muted</string>
+  <!-- State description spoken when the microphone is active and recording. -->
+  <string name="cd_mic_active" translatable="true" description="Accessibility state description indicating that the microphone is currently active. [CHAR_LIMIT=25]">Microphone active</string>
+  <!-- Action label spoken to view the run history of a benchmark metric. -->
+  <string name="cd_view_run_history" translatable="true" description="Accessibility action label to view run history of benchmark results. [CHAR_LIMIT=30]">View run history</string>
+  <!-- Content description for the benchmark aggregation selector dropdown. -->
+  <string name="cd_aggregation_dropdown" translatable="true" description="Accessibility content description for benchmark aggregation selector. [CHAR_LIMIT=35]">Aggregation method: %1$s</string>
+  <!-- Content description for download progress. -->
+  <string name="cd_download_progress" translatable="true" description="Accessibility content description for model download progress percentage. [CHAR_LIMIT=25]">%1$d%% downloaded</string>
+  <!-- Announcement when model download finishes successfully. -->
+  <string name="cd_download_completed" translatable="true" description="Accessibility announcement spoken when model download finishes. [CHAR_LIMIT=30]">Download completed</string>
+  <!-- Action label spoken to zoom into an image. -->
+  <string name="cd_zoom_in" translatable="true" description="Accessibility custom action label to zoom into an image. [CHAR_LIMIT=20]">Zoom in</string>
+  <!-- Action label spoken to zoom out of an image. -->
+  <string name="cd_zoom_out" translatable="true" description="Accessibility custom action label to zoom out of an image. [CHAR_LIMIT=20]">Zoom out</string>
+
+
+  <!-- Content description for scrapbook -->
+  <!-- Content description spoken when the "add border" icon is focused. -->
+  <string name="cd_add_border" translatable="true" description="Content description for the editor control button to add a border to an image cutout. [CHAR_LIMIT=20]">Add border</string>
+  <!-- Content description spoken when the "change picture" button is focused. -->
+  <string name="cd_change_picture" translatable="true" description="Content description for the button to change the selected picture or background. [CHAR_LIMIT=26]">Change picture</string>
+  <!-- Content description spoken when the "create new cutout" button is focused. -->
+  <string name="cd_create_new_cutout" translatable="true" description="Content description for the button to create a new cutout from an image segment. [CHAR_LIMIT=30]">Create new cutout</string>
+  <!-- Content description spoken when the "customize color" button is focused. -->
+  <string name="cd_customize_color" translatable="true" description="Content description for a button to customize or select a color. [CHAR_LIMIT=28]">Customize color</string>
+  <!-- Content description spoken when the "exit multi-select" button is focused. -->
+  <string name="cd_exit_multi_select" translatable="true" description="Content description for the button to exit multi-select mode. [CHAR_LIMIT=30]">Exit multi-select</string>
+  <!-- Content description spoken when the "fill color" option is focused. -->
+  <string name="cd_fill_color" translatable="true" description="Content description for the editor control button to fill a cutout with color. [CHAR_LIMIT=20]">Fill color</string>
+  <!-- Content description spoken when the "free draw" tool is focused. -->
+  <string name="cd_free_draw" translatable="true" description="Content description for a tool or button to draw freely on the screen. [CHAR_LIMIT=18]">Free draw</string>
+  <!-- Content description spoken when a missing cutout is indicated. -->
+  <string name="cd_missing_cutout_with_index" translatable="true" description="Content description for a placeholder icon when a specific cutout image (identified by index) fails to load. [CHAR_LIMIT=30]">Missing cutout %d</string>
+  <!-- Content description spoken when the "redo" button is focused. -->
+  <string name="cd_redo" translatable="true" description="Content description for the redo button to reapply the last undone action. [CHAR_LIMIT=18]">Redo</string>
+  <!-- Content description spoken when the "resize" button is focused. -->
+  <string name="cd_resize" translatable="true" description="Content description for a tool or button to resize an element. [CHAR_LIMIT=18]">Resize</string>
+  <!-- Content description spoken when the "revert to original" button is focused. -->
+  <string name="cd_revert_to_original" translatable="true" description="Content description for the button to revert edits and restore the original image. [CHAR_LIMIT=30]">Revert to original</string>
+  <!-- Content description spoken when the "rotate" button is focused. -->
+  <string name="cd_rotate" translatable="true" description="Content description for the control to rotate an image or cutout. [CHAR_LIMIT=90]">Rotate</string>
+  <!-- Content description spoken when the "save" icon is focused. -->
+  <string name="cd_save_icon" translatable="true" description="Content description for the button to save the current work (e.g., collage) to the device. [CHAR_LIMIT=18]">Save</string>
+  <!-- Content description spoken when the "share" icon is focused. -->
+  <string name="cd_share" translatable="true" description="Content description for the button to share the image. [CHAR_LIMIT=18]">Share</string>
+  <!-- Content description spoken when a cutout with a specific index is focused. -->
+  <string name="cd_cutout_with_index" translatable="true" description="Content description for a specific cutout image in a list, indicating its index. [CHAR_LIMIT=90]">Cutout %d</string>
+  <!-- Content description spoken when the "undo" button is focused. -->
+  <string name="cd_undo" translatable="true" description="Content description for the undo button to revert the last action. [CHAR_LIMIT=18]">Undo</string>
 
   <!-- Strings for HomeScreen, Model Manager, Settings, and Chat -->
   <!-- Title of the dialog for importing a model. -->
@@ -552,11 +708,11 @@
   <!-- Button label to view licenses of third-party libraries. -->
   <string name="view_licenses" translatable="true" description="Label for the button that opens the screen displaying licenses for third-party libraries. [CHAR_LIMIT=49]">View licenses</string>
   <!-- Label for 'Auto' theme option. -->
-  <string name="theme_auto" translatable="true" description="Label for the system-default or automatic theme option, which follows the system settings. [CHAR_LIMIT=16]">Auto</string>
+  <string name="theme_auto" translatable="true" description="Label for the system-default or automatic theme option, which follows the system settings. [CHAR_LIMIT=7]">Auto</string>
   <!-- Label for 'Light' theme option. -->
-  <string name="theme_light" translatable="true" description="Label for the light theme option. [CHAR_LIMIT=16]">Light</string>
+  <string name="theme_light" translatable="true" description="Label for the light theme option. [CHAR_LIMIT=7]">Light</string>
   <!-- Label for 'Dark' theme option. -->
-  <string name="theme_dark" translatable="true" description="Label for the dark theme option. [CHAR_LIMIT=16]">Dark</string>
+  <string name="theme_dark" translatable="true" description="Label for the dark theme option. [CHAR_LIMIT=7]">Dark</string>
   <!-- General fallback label for unknown values. -->
   <string name="unknown" translatable="true" description="Fallback label when the theme state is unknown or undefined. [CHAR_LIMIT=18]">Unknown</string>
   <!-- Label for stats button or section. -->
@@ -612,6 +768,10 @@
   <string name="config_label_enable_thinking" translatable="false">Enable thinking</string>
   <!-- Label for the 'Enable speculative decoding' option in the model configuration dialog. -->
   <string name="config_label_enable_speculative_decoding" translatable="false">Enable speculative decoding</string>
+  <!-- Label for the 'Enable context compression' option in the model configuration dialog. -->
+  <string name="config_label_enable_context_compression" translatable="true" description="This string appears as a switch label in the model configuration dialog, allowing the user to toggle automatic conversation context compression when approaching the token limit. [CHAR_LIMIT=45]">Automatically compress context</string>
+  <!-- Description for the 'Automatically compress context' option in the model configuration dialog. -->
+  <string name="config_desc_enable_context_compression" translatable="true" description="This string appears as helper text below the 'Automatically compress context' switch in the model configuration dialog, explaining that the chat context will be automatically compressed when approaching the token limit. [CHAR_LIMIT=160]">When a chat approaches the token limit, automatically compress the chat context so I can keep chatting.</string>
   <!-- Label for the 'Max result count' option in the model configuration dialog. -->
   <string name="config_label_max_result_count" translatable="false">Max result count</string>
   <!-- Label for the 'Use GPU' option in the model configuration dialog. -->
@@ -733,6 +893,26 @@
   <string name="task_desc_prompt_lab" translatable="true" description="Description for the Prompt Lab task. [CHAR_LIMIT=99]">Single turn use cases with on-device large language models</string>
   <!-- Short description for the Prompt Lab task. [CHAR_LIMIT=35] -->
   <string name="task_short_desc_prompt_lab" translatable="true" description="Short description for the Prompt Lab task. [CHAR_LIMIT=45]">Single turn use cases</string>
+  <!-- Text on a button that removes an optional component or item. [CHAR_LIMIT=15] -->
+  <string name="remove" translatable="true" description="Text on a button that removes an optional component or item. [CHAR_LIMIT=15]">Remove</string>
+  <!-- Title for the optional components section in model details. [CHAR_LIMIT=30] -->
+  <string name="optional_components" translatable="true" description="Title for the optional components section in model details. [CHAR_LIMIT=30]">Optional components</string>
+  <!-- Checkbox label to download sample images with model in Instant Media Search. [CHAR_LIMIT=50] -->
+  <string name="download_sample_images_optional" translatable="true" description="Checkbox label to download sample images with model in Instant Media Search. [CHAR_LIMIT=50]">Download sample images (optional)</string>
+  <!-- Label for sample images optional component in Instant Media Search. [CHAR_LIMIT=30] -->
+  <string name="sample_images" translatable="true" description="Label for sample images optional component in Instant Media Search. [CHAR_LIMIT=30]">Sample images</string>
+  <!-- Download progress display format for optional components showing downloaded size and total size, e.g., '10 MB / 71.9 MB'. First placeholder is the completed size, second is the total size. [CHAR_LIMIT=30] -->
+  <string name="modelitem_optional_components_progress_format" translatable="true" description="Download progress display format for optional components showing downloaded size and total size, e.g., '10 MB / 71.9 MB'. First placeholder is the completed size, second is the total size. [CHAR_LIMIT=30]">%1$s / %2$s</string>
+  <!-- Checkbox label format to download an optional component with a model, where %1$s is the component name. [CHAR_LIMIT=50] -->
+  <string name="download_optional_component_format" translatable="true" description="Checkbox label format to download an optional component with a model, where %1$s is the component name. [CHAR_LIMIT=50]">Download %1$s (optional)</string>
+  <!-- Notification title when an extra data file download succeeds. [CHAR_LIMIT=45] -->
+  <string name="download_extra_data_notification_title_success" translatable="true" description="Title of system notification when an extra data file download succeeds. [CHAR_LIMIT=45]">Extra data file download succeeded</string>
+  <!-- Notification content when an extra data file download succeeds, where %1$s is the component label. [CHAR_LIMIT=60] -->
+  <string name="download_extra_data_notification_content_success" translatable="true" description="Content of system notification when an extra data file download succeeds, where %1$s is the component label. [CHAR_LIMIT=60]">Extra data file \'%1$s\' has been downloaded</string>
+  <!-- Notification title when an extra data file download fails. [CHAR_LIMIT=35] -->
+  <string name="download_extra_data_notification_title_fail" translatable="true" description="Title of system notification when an extra data file download fails. [CHAR_LIMIT=35]">Extra data file download failed</string>
+  <!-- Notification content when an extra data file download fails, where %1$s is the component label. [CHAR_LIMIT=60] -->
+  <string name="download_extra_data_notification_content_fail" translatable="true" description="Content of system notification when an extra data file download fails, where %1$s is the component label. [CHAR_LIMIT=60]">Failed to download extra data file \'%1$s\'</string>
   <!-- Description for the Agent Skills task. [CHAR_LIMIT=100] -->
   <string name="task_desc_agent_skills" translatable="true" description="Description for the Agent Skills task. [CHAR_LIMIT=106]">Chat with on-device large language models with skills and tools</string>
   <!-- Short description for the Agent Skills task. [CHAR_LIMIT=35] -->
@@ -1010,4 +1190,12 @@
   <string name="manual_smart_home_body" translatable="true" description="Explains smart home support. [CHAR_LIMIT=450]">Lights, switches, blinds, locks, thermostats and scenes through Home Assistant. Google Home has no API a sideloaded app can use, so Nest and Cast devices are reached through Home Assistant\u2019s own integrations for them.</string>
   <string name="manual_reminders_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Reminders</string>
   <string name="manual_reminders_body" translatable="true" description="Explains reminders. [CHAR_LIMIT=300]">Ask it to remind you and it keeps the reminder itself, so you can ask what is set and cancel it later. Survives a restart, unlike an alarm handed to the clock app.</string>
+  <!-- Context Compaction / Token Limit Banner strings -->
+  <string name="token_limit_reached_message" translatable="true" description="This string appears within the chat panel above the input box as an informational card banner when the model reaches its token limit. It explains that the token limit has been reached and tells the user they can compress context or start a new chat. [CHAR_LIMIT=200]">You are approaching the token limit for this chat. You can &lt;b&gt;compress context and continue this chat&lt;/b&gt; or start a &lt;b&gt;new chat&lt;/b&gt;.</string>
+  <string name="compress_and_continue_button" translatable="true" description="This string appears within the token limit banner as a button label. When tapped, it triggers conversation context compression and allows the user to continue chatting. [CHAR_LIMIT=30]">Compress and continue</string>
+  <string name="new_chat_button" translatable="true" description="This string appears within the token limit banner as a button label. When tapped, it starts a new chat session with cleared history. [CHAR_LIMIT=20]">New chat</string>
+  <string name="compressing_context" translatable="true" description="This string appears within the chat banner alongside a loading spinner while the conversation context is being summarized and compressed. [CHAR_LIMIT=70]">Token limit approaching. Compressing context…</string>
+  <string name="context_compressed_success" translatable="true" description="This string appears within the chat banner as a confirmation message indicating that conversation context compression completed successfully. [CHAR_LIMIT=70]">Context compressed! You may continue chatting.</string>
+  <string name="token_limit_default_behavior_checkbox" translatable="true" description="This string appears within the token limit banner as a checkbox label, allowing the user to remember this compression behavior for future sessions. [CHAR_LIMIT=80]">Default to this behavior next time I run out of context</string>
+  <string name="context_compaction_failed_message" translatable="true" description="This string appears in an error dialog when compressing the conversation context fails. [CHAR_LIMIT=120]">Failed to compress conversation context. Please try again.</string>
 </resources>

@@ -36,13 +36,12 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.core.net.toUri
 import androidx.exifinterface.media.ExifInterface
 import com.google.ai.edge.gallery.GalleryEvent
 import com.google.ai.edge.gallery.data.SAMPLE_RATE
 import com.google.ai.edge.gallery.firebaseAnalytics
 import com.google.gson.Gson
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
 import java.io.File
 import java.io.FileInputStream
 import java.net.HttpURLConnection
@@ -54,10 +53,25 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 private const val TAG = "AGUtils"
 
 const val LOCAL_URL_BASE = "https://appassets.androidplatform.net"
+
+/**
+ * Parser for [convertStringToJsonObject].
+ *
+ * Lenient because the Gson `JsonParser.parseString` this replaced parsed in lenient mode, and the
+ * input is model-written, so unquoted keys and values are common and used to be accepted. The
+ * default [Json] rejects them.
+ *
+ * This is not full parity: kotlinx leniency has no notion of single-quoted strings, so `{'a':'b'}`
+ * yields the key `'a'` rather than `a`. There is no [Json] option for that.
+ */
+private val lenientJson = Json { isLenient = true }
 
 fun cleanUpMediapipeTaskErrorMessage(message: String): String {
   val index = message.indexOf("=== Source Location Trace")
@@ -361,6 +375,23 @@ fun isPixel10(): Boolean {
   return Build.MODEL != null && Build.MODEL.lowercase().contains("pixel 10")
 }
 
+fun isPixel11(): Boolean {
+  return Build.MODEL != null && Build.MODEL.lowercase().contains("pixel 11")
+}
+
+/**
+ * Returns the base directory for storing models. On Pixel 11 with "CD1A" builds, internal app
+ * storage (filesDir) is used to avoid FUSE filesystem DMA mapping issues.
+ */
+fun getModelStorageDir(context: Context): File {
+  val isCd1aBuild = Build.ID != null && Build.ID.startsWith("CD1A")
+  return if (isPixel11() && isCd1aBuild) {
+    context.filesDir
+  } else {
+    context.getExternalFilesDir(null) ?: context.filesDir
+  }
+}
+
 fun isPixelDevice(): Boolean {
   return Build.MODEL != null && Build.MODEL.lowercase().contains("pixel")
 }
@@ -421,10 +452,31 @@ fun logErrorToFirebase(event: GalleryEvent, errorType: String, errorMessage: Str
   )
 }
 
+/**
+ * Reports a button press to Firebase as a [GalleryEvent.BUTTON_CLICKED] event.
+ *
+ * [eventType] identifies the button and must be unique per button, so that two different buttons
+ * are never distinguished by their parameters alone. Pass [buttonId] only for a single button that
+ * carries a value, such as one segment of a segmented button. Use [extras] to report any further
+ * parameters describing the press; it cannot overwrite the two keys above, which are always written
+ * last.
+ */
+fun logButtonClick(eventType: String, buttonId: String? = null, extras: Bundle.() -> Unit = {}) {
+  firebaseAnalytics?.logEvent(
+    GalleryEvent.BUTTON_CLICKED.id,
+    Bundle().apply {
+      extras()
+      putString("event_type", eventType)
+      buttonId?.let { putString("button_id", it) }
+    },
+  )
+}
+
 fun convertStringToJsonObject(jsonString: String): JsonObject {
   return try {
-    JsonParser.parseString(jsonString).asJsonObject
+    lenientJson.parseToJsonElement(jsonString).jsonObject
   } catch (e: Exception) {
-    JsonObject()
+    Log.w(TAG, "Could not parse JSON string; using an empty object", e)
+    JsonObject(emptyMap())
   }
 }

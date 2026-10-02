@@ -19,7 +19,6 @@ package com.google.ai.edge.gallery.assistant
 import com.google.ai.edge.gallery.agent.AgentRuntimeExecutor
 import com.google.ai.edge.gallery.agent.AssistantExecutor
 import com.google.ai.edge.gallery.agent.sessions.LlmSessionManager
-import com.google.ai.edge.gallery.data.ChatSessionRepository
 import com.google.ai.edge.gallery.data.SystemPromptRepository
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,13 +36,6 @@ class AssistantViewModel
 @Inject
 constructor(
   systemPromptRepository: SystemPromptRepository,
-  chatSessionRepository: ChatSessionRepository,
   @AssistantExecutor runtimeExecutor: AgentRuntimeExecutor,
   llmSessionManager: LlmSessionManager,
-) :
-  LlmChatViewModel(
-    systemPromptRepository,
-    chatSessionRepository,
-    runtimeExecutor,
-    llmSessionManager,
-  )
+) : LlmChatViewModel(systemPromptRepository, runtimeExecutor, llmSessionManager)

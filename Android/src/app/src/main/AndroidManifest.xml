@@ -19,12 +19,9 @@
     package="com.google.ai.edge.gallery"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-sdk
-        android:minSdkVersion="31"
-        android:compileSdkVersion ="37"
-        android:targetSdkVersion="37" />
-
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
@@ -151,9 +148,23 @@
         android:required="false" />
     <uses-feature android:name="android.hardware.npu" android:required="false" />
 
+    <!--
+        Cleartext is permitted here because the two services the user brings themselves - a
+        SearXNG instance and Home Assistant - live on the home network at a plain http:// address,
+        and nobody issues a certificate for 192.168.0.9. Android has refused cleartext by default
+        since API 28, so those requests failed before leaving the phone.
+
+        The platform's own mechanism cannot express "the local network": a network security config
+        lists domains, and the address is only known once the user types it. So the rule lives in
+        LocalNetwork instead and is enforced by SearxngClient and HomeAssistantClient, the only
+        two places that make these requests - plain HTTP to the user's own network, TLS to
+        anything beyond it. Loosening this flag without that check would put a Home Assistant
+        token and a SearXNG Authorization header on the open wire.
+    -->
     <application
         android:name="${applicationName}"
         android:allowBackup="true"
+        android:usesCleartextTraffic="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="${appIcon}"
@@ -337,7 +348,7 @@
         <service
             android:name="com.google.ai.edge.gallery.voice.WakeWordTileService"
             android:exported="true"
-            android:icon="@drawable/ic_launcher_foreground"
+            android:icon="@mipmap/ic_launcher_monochrome"
             android:label="@string/wake_word_tile_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>

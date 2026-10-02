@@ -1,16 +1,21 @@
-# Keeps the CI signing key from being evicted.
+# Owns the CI signing key, and keeps it from being evicted.
 #
-# The key that test builds are signed with lives in the Actions cache and nowhere else, which is a
+# The key that builds are signed with lives in the Actions cache and nowhere else, which is a
 # deliberate trade - a private key does not belong in the repository - but it comes with a deadline.
 # GitHub removes a cache entry that has not been *accessed* for seven days, and a build is the only
 # thing that accesses this one. So a gap of more than a week between pushes silently destroys the
 # key, the next build mints a different one, and the next APK refuses to install over the copy on
 # somebody's phone with nothing to explain why. That is exactly what a five-week gap did.
 #
-# Restoring the cache counts as accessing it, so this does nothing but restore it, twice a week.
-# It also says so when the key has gone, which turns a mystifying "App not installed" weeks later
-# into a warning at the point it happened.
-name: Keep the signing key alive
+# Restoring the cache counts as accessing it, which is why this runs twice a week.
+#
+# It also *creates* the key when it has gone, which the earlier version did not, and that was the
+# second half of the problem. With creation left to whichever build ran first, an empty cache plus
+# two builds starting a minute apart - which is what a push to main does, the test build and a
+# release - means two keys minted against one cache name. One save wins, the other build ships an
+# APK signed with a key that exists nowhere afterwards. Minting here instead means it happens in
+# one place, on a schedule, with nothing racing it.
+name: Own the signing key
 
 on:
   schedule:
@@ -22,11 +27,24 @@ on:
 permissions:
   contents: read
 
+env:
+  # Must match prerelease.yml and release.yml exactly, or the key this creates cannot be opened by
+  # the builds that use it.
+  CI_KEYSTORE_PASSWORD: star-storyteller-ci
+
 jobs:
   touch:
-    name: Touch the signing key cache
+    name: Restore or create the signing key
     runs-on: ubuntu-latest
+    # Shared with prerelease.yml and release.yml so nothing else can be minting a key while this
+    # runs. Queued rather than cancelled: a release half way through a build should finish.
+    concurrency:
+      group: star-signing-key
+      cancel-in-progress: false
     steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
       - name: Restore the CI signing key
         id: signing-cache
         uses: actions/cache/restore@v4
@@ -34,10 +52,41 @@ jobs:
           path: ci-keystore
           key: star-ci-signing-key-v2
 
+      - name: Create the CI signing key
+        if: ${{ steps.signing-cache.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ci-keystore
+          keytool -genkeypair -v \
+            -keystore ci-keystore/star-ci.jks -storetype PKCS12 -alias star \
+            -keyalg RSA -keysize 4096 -validity 10950 \
+            -storepass "$CI_KEYSTORE_PASSWORD" -keypass "$CI_KEYSTORE_PASSWORD" \
+            -dname "CN=Star Storyteller CI, OU=CI, O=Star Storyteller, L=, ST=, C=ZZ"
+
+      - name: Save the CI signing key
+        if: ${{ steps.signing-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ci-keystore
+          key: star-ci-signing-key-v2
+
       - name: Report
         run: |
+          set -euo pipefail
+          # Read from the keystore rather than an APK: this is the certificate builds will sign
+          # with, whether or not anything has been built with it yet.
+          fingerprint="$(keytool -list -v -keystore ci-keystore/star-ci.jks -alias star \
+            -storepass "$CI_KEYSTORE_PASSWORD" 2>/dev/null \
+            | awk '/SHA256:/ { print $2; exit }' | tr -d ':' | tr 'A-F' 'a-f')"
+          recorded="$(tr -d '[:space:]' < .github/ci-signing-fingerprint.txt)"
+
           if [ "${{ steps.signing-cache.outputs.cache-hit }}" = "true" ]; then
-            echo "The CI signing key is still cached. Builds will keep installing over each other."
+            echo "The signing key is still cached. Builds will keep installing over each other."
           else
-            echo "::warning::The CI signing key cache is gone. The next test build will create a new key, and its APK will not install over an existing one without uninstalling first - which loses downloaded models. Set the four signing secrets to make the key permanent; see RELEASING.md."
+            echo "::warning::The signing key cache had gone, so a new key was created. APKs built from now on will not install over a copy already on a phone without uninstalling first, which loses downloaded models."
+          fi
+
+          echo "Signing key: $fingerprint"
+          if [ "$fingerprint" != "$recorded" ]; then
+            echo "::warning::This is not the fingerprint recorded in .github/ci-signing-fingerprint.txt ($recorded). Update that file to $fingerprint so release notes stop reporting a mismatch."
           fi

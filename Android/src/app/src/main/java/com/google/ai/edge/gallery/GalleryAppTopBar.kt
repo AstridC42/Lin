@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -144,6 +145,17 @@ fun GalleryTopAppBar(
               contentDescription = stringResource(R.string.cd_open_assistant),
               tint = MaterialTheme.colorScheme.onSurface,
               modifier = Modifier.size(20.dp),
+            )
+          }
+        }
+
+        // Click an icon to open "import from URL" dialog.
+        AppBarActionType.IMPORT_FROM_URL -> {
+          IconButton(onClick = rightAction.actionFn) {
+            Icon(
+              imageVector = Icons.Rounded.Link,
+              contentDescription = stringResource(R.string.cd_hf_import_from_url_button),
+              tint = MaterialTheme.colorScheme.onSurface,
             )
           }
         }
