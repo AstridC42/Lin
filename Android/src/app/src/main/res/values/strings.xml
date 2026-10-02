@@ -865,6 +865,7 @@
   <string name="assistant_shared_image_prompt" translatable="true" description="Prompt used when an image is shared into the app without a caption. [CHAR_LIMIT=80]">What is in this image?</string>
   <!-- Shown when the assistant has no model to load. [CHAR_LIMIT=200] -->
   <string name="assistant_no_models" translatable="true" description="Shown when the assistant has no model to load. [CHAR_LIMIT=200]">No assistant model is available yet. Open the capability gallery to download one.</string>
+  <string name="assistant_slow_start" translatable="true" description="Shown when the start screen has been loading for a while. [CHAR_LIMIT=250]">This is taking longer than it should. The model list is fetched once and then kept, so a slow or blocked connection can hold it up. Try again, or open the gallery and work from there.</string>
   <!-- Content description of the button that returns to the assistant. [CHAR_LIMIT=40] -->
   <string name="cd_open_assistant" translatable="true" description="Content description of the button that returns to the assistant. [CHAR_LIMIT=40]">Open the assistant</string>
   <!-- Title shown when the model list could not be loaded. [CHAR_LIMIT=60] -->
@@ -935,6 +936,9 @@
   <string name="memory_add_label" translatable="true" description="Label of the field for adding a fact. [CHAR_LIMIT=60]">Something to remember</string>
   <string name="memory_add" translatable="true" description="Button that saves a fact. [CHAR_LIMIT=20]">Remember it</string>
   <string name="memory_forget" translatable="true" description="Content description of the delete button on a remembered fact. [CHAR_LIMIT=30]">Forget this</string>
+  <string name="mcp_manual_button" translatable="true" description="Button opening the MCP server manager. [CHAR_LIMIT=40]">MCP servers</string>
+  <string name="mcp_manual_title" translatable="true" description="Manual section title about MCP servers. [CHAR_LIMIT=30]">MCP servers</string>
+  <string name="mcp_manual_body" translatable="true" description="Manual section about MCP servers. [CHAR_LIMIT=600]">An MCP server is somebody else\'s set of tools, reachable over the network - your own notes, a database, a home server, anything that speaks the Model Context Protocol. Tap MCP servers above, add one by its URL, and pick which of its tools the assistant may use. They then sit alongside the built-in ones and get called the same way. Pick sparingly: every tool offered is described to the model in full, out of the same few thousand tokens that hold the conversation, so twenty of them makes it worse at choosing rather than better.</string>
   <string name="memory_manual_button" translatable="true" description="Button opening the memory list. [CHAR_LIMIT=40]">Memory</string>
   <string name="memory_manual_title" translatable="true" description="Manual section title about memory. [CHAR_LIMIT=30]">Memory</string>
   <string name="memory_manual_body" translatable="true" description="Manual section about memory. [CHAR_LIMIT=400]">Say \"remember that…\" and it keeps that in mind for every conversation afterwards - what you call people, how you travel, anything worth not repeating. Say \"forget that…\" to remove one. Everything it has been told is listed under Memory above, where you can add or delete lines yourself; worth a look now and then, because a fact remembered wrongly gets repeated confidently until someone corrects it.</string>

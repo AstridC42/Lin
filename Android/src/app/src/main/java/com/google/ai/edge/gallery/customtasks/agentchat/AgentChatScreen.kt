@@ -86,6 +86,7 @@ import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.firebaseAnalytics
+import com.google.ai.edge.gallery.proto.Skill
 import com.google.ai.edge.gallery.skills.formatSelectedSkills
 import com.google.ai.edge.gallery.tools.AskInfoToolAction
 import com.google.ai.edge.gallery.tools.AskMcpToolCallPermissionAction
@@ -819,6 +820,22 @@ internal fun resetSessionWithCurrentSkillsAndMcps(
   clearHistory: Boolean = true,
   baseSystemPromptResolver: (currentPrompt: String, hasMcpTools: Boolean) -> String =
     ::getEffectiveBaseSystemPrompt,
+  /**
+   * Narrows the skill list before it goes into the prompt.
+   *
+   * The assistant hides the two built-in calendar skills, which its own tools do better. Without
+   * this that filter applied only to the session built at launch, so the first mode switch or MCP
+   * change quietly put them back.
+   */
+  skillsForPrompt: (List<Skill>) -> List<Skill> = { it },
+  /**
+   * Placeholders this screen's prompt uses that the two below do not cover.
+   *
+   * The assistant's prompt also carries what it has been told to remember. A placeholder nobody
+   * substitutes is not dropped - it is handed to the model as the literal text `___MEMORY___`,
+   * which is worse than an absent section and invisible from the outside.
+   */
+  extraSubstitutions: Map<String, String> = emptyMap(),
 ) {
   val model = modelManagerViewModel.uiState.value.selectedModel
   val litertMessages = initialMessages.mapNotNull { convertToLitertMessage(it) }
@@ -832,10 +849,11 @@ internal fun resetSessionWithCurrentSkillsAndMcps(
       .formatSystemInstructions(
         template = actualSystemPrompt,
         substitutions =
-          mapOf(
-            "___SKILLS___" to formatSelectedSkills(selectedSkills),
-            "___TOOLS___" to toolsPrompt,
-          ),
+          buildMap {
+            put("___SKILLS___", formatSelectedSkills(skillsForPrompt(selectedSkills)))
+            put("___TOOLS___", toolsPrompt)
+            putAll(extraSubstitutions)
+          },
       )
 
   viewModel.resetSession(

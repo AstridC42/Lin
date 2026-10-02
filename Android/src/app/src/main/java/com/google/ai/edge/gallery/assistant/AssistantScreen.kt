@@ -69,11 +69,13 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.customtasks.agentchat.AgentChatScreen
 import com.google.ai.edge.gallery.customtasks.agentchat.AgentTools
+import com.google.ai.edge.gallery.customtasks.agentchat.McpManagerBottomSheet
 import com.google.ai.edge.gallery.customtasks.agentchat.McpManagerViewModel
 import com.google.ai.edge.gallery.customtasks.agentchat.SkillManagerViewModel
 import com.google.ai.edge.gallery.customtasks.agentchat.resetSessionWithCurrentSkillsAndMcps
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.Task
+import com.google.ai.edge.gallery.memory.MemoryBook
 import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageInfo
@@ -142,6 +144,7 @@ fun AssistantScreen(
   var showVoiceSettings by remember { mutableStateOf(false) }
   var showMusicApp by remember { mutableStateOf(false) }
   var showMemory by remember { mutableStateOf(false) }
+  var showMcpServers by remember { mutableStateOf(false) }
   var showWakeWordSettings by remember { mutableStateOf(false) }
   var showSmartHomeSettings by remember { mutableStateOf(false) }
 
@@ -210,36 +213,56 @@ fun AssistantScreen(
       }
     }
 
+  /**
+   * Rebuilds the session so a change to the prompt takes effect.
+   *
+   * Everything that goes into the system prompt - the mode, what is remembered, which MCP tools
+   * are selected - is baked in when the session is built, so changing any of it means building a
+   * new one. History is kept, because from the user's side this is changing a setting mid
+   * conversation rather than starting over.
+   *
+   * It carries the two substitutions the shared helper does not know about on its own: the skill
+   * filter that hides what the assistant's own tools do better, and the memory section. A
+   * placeholder nobody substitutes reaches the model as the literal text `___MEMORY___`.
+   */
+  val rebuildSession: (AssistantMode) -> Unit = { forMode ->
+    resetSessionWithCurrentSkillsAndMcps(
+      viewModel,
+      modelManagerViewModel,
+      skillManagerViewModel,
+      task,
+      uiSystemPrompt,
+      agentTools,
+      initialMessages =
+        viewModel.uiState.value.messagesByModel[selectedModel.name]?.toList() ?: listOf(),
+      clearHistory = false,
+      baseSystemPromptResolver = { prompt, hasMcpTools ->
+        AssistantPrompts.resolve(
+          currentPrompt = prompt,
+          mode = forMode,
+          hasMcpTools = hasMcpTools,
+          webSearchEnabled = webSearchEnabled,
+          webSearchInstance = webSearchHost,
+          smartHomeEnabled = smartHomeEnabled,
+          hasMemory = dataStoreRepository.readAssistantMemory().factCount > 0,
+        )
+      },
+      skillsForPrompt = { skills -> skills.filterNot { it.name in AssistantTask.SUPERSEDED_BY_TOOLS } },
+      extraSubstitutions =
+        mapOf(
+          AssistantPrompts.MEMORY_PLACEHOLDER to
+            MemoryBook.format(dataStoreRepository.readAssistantMemory())
+        ),
+    )
+  }
+
   val applyMode: (AssistantMode) -> Unit = { newMode ->
     if (newMode != mode) {
       mode = newMode
       dataStoreRepository.saveAssistantSettings(
         dataStoreRepository.readAssistantSettings().toBuilder().setModeId(newMode.id).build()
       )
-      // Rebuilding the session is what actually applies the new prompt. History is kept so the
-      // switch feels like changing a setting mid-conversation, not starting over.
-      resetSessionWithCurrentSkillsAndMcps(
-        viewModel,
-        modelManagerViewModel,
-        skillManagerViewModel,
-        task,
-        uiSystemPrompt,
-        agentTools,
-        initialMessages =
-          viewModel.uiState.value.messagesByModel[selectedModel.name]?.toList() ?: listOf(),
-        clearHistory = false,
-        baseSystemPromptResolver = { prompt, hasMcpTools ->
-          AssistantPrompts.resolve(
-            currentPrompt = prompt,
-            mode = newMode,
-            hasMcpTools = hasMcpTools,
-            webSearchEnabled = webSearchEnabled,
-            webSearchInstance = webSearchHost,
-            smartHomeEnabled = smartHomeEnabled,
-            hasMemory = hasMemory,
-          )
-        },
-      )
+      rebuildSession(newMode)
       viewModel.addMessage(
         model = selectedModel,
         message =
@@ -268,6 +291,7 @@ fun AssistantScreen(
         onOpenVoiceSettings = { showVoiceSettings = true },
         onOpenMusicApp = { showMusicApp = true },
         onOpenMemory = { showMemory = true },
+        onOpenMcpServers = { showMcpServers = true },
         onOpenModels = onOpenModels,
       )
     },
@@ -395,6 +419,10 @@ fun AssistantScreen(
         showManual = false
         showMemory = true
       },
+      onOpenMcpServers = {
+        showManual = false
+        showMcpServers = true
+      },
       onOpenModels =
         onOpenModels?.let {
           {
@@ -415,6 +443,18 @@ fun AssistantScreen(
         // Shares the revision counter with web search: both change which tools exist, and the
         // derived values above recompute from it.
         webSearchRevision++
+      },
+    )
+  }
+
+  if (showMcpServers) {
+    McpManagerBottomSheet(
+      mcpManagerViewModel = mcpManagerViewModel,
+      onDismiss = { toolsChanged ->
+        showMcpServers = false
+        // The MCP tools are listed in the system prompt and attached to the session, so a change
+        // to which ones are selected means nothing at all until the session is rebuilt.
+        if (toolsChanged) rebuildSession(mode)
       },
     )
   }

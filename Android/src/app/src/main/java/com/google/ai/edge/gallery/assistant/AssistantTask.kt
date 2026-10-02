@@ -199,8 +199,14 @@ class AssistantTask(
     skillsProvider.getAvailableSkills().filterNot { it.name in SUPERSEDED_BY_TOOLS }
 
   companion object {
-    /** Built-in skills the assistant's own tools do better. */
-    private val SUPERSEDED_BY_TOOLS = setOf("create-calendar-event", "read-calendar-events")
+    /**
+     * Built-in skills the assistant's own tools do better.
+     *
+     * Internal because the screen needs the same filter: it rebuilds the session when the mode or
+     * the MCP selection changes, and a filter applied only at launch is one that comes undone the
+     * first time anything is switched.
+     */
+    internal val SUPERSEDED_BY_TOOLS = setOf("create-calendar-event", "read-calendar-events")
 
     /** The host of [url], or the url itself when it cannot be parsed. */
     fun hostOf(url: String): String =
