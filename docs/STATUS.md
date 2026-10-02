@@ -1,6 +1,9 @@
 # Status
 
-Where the project actually is, as of pre-release `0.3.1-dev.23`.
+Where the project actually is, as of pre-release `0.3.1-dev.25`.
+
+**Upstream base:** `google-ai-edge/gallery` at `70061fd` (version 1.0.20,
+1 October 2026). What that merge brought with it is at the bottom of this file.
 
 Three lists, kept apart on purpose: what has been used and works, what has been
 built but nobody has confirmed on a real phone, and what cannot be done at all.
@@ -183,3 +186,25 @@ The app records the exception that killed it and shows it on the next launch,
 with a **Copy report** button. There is no computer attached to a phone running
 a sideloaded build, so that report is the only account of what happened — and
 the difference between a fix and a guess.
+
+## What the upstream refresh brought
+
+The fork started as a snapshot and was 79 upstream commits behind. Merged now,
+and three of those commits matter here rather than just upstream:
+
+- **Conversation compaction.** Upstream added a summarizing compactor to the
+  session manager, in the inference path and independent of which task is
+  running - so the assistant gets it. It is the first real answer to the token
+  budget problem described under *Proposed next*: a long conversation is now
+  summarized rather than simply running out of room. Still worth doing the tool
+  selection work, which is about the prompt rather than the history.
+- **Model initialization as a flow.** Per-model `initStatusFlow` replaced the
+  map of statuses on the view model. The recovery screen that makes a fatal
+  model load survivable reads that instead, and its test moved with it.
+- **One definition of an imported model's tasks.** Adding and removing an
+  imported model now go through the same set, so the assistant can no longer be
+  left holding a model that every other screen has dropped.
+
+Nothing in the lists above changed behaviour because of the merge. The release
+builds without minification, so upstream's ProGuard work does not apply to this
+fork either way.
