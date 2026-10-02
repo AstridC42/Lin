@@ -15,19 +15,18 @@
  */
 
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
   alias(libs.plugins.android.application)
   // Note: set apply to true to enable google-services (requires google-services.json).
   alias(libs.plugins.google.services) apply false
-  alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.protobuf)
   alias(libs.plugins.hilt.application)
   alias(libs.plugins.oss.licenses)
   alias(libs.plugins.ksp)
-  kotlin("kapt")
 }
 
 /**
@@ -70,6 +69,9 @@ android {
     applicationId = "com.starstoryteller.assistant"
     minSdk = 31
     targetSdk = 37
+    // Driven by the release workflows rather than hardcoded: both pack the semantic version and
+    // a build number into versionCode so test builds and releases keep increasing. Upstream's
+    // literals (45 / "1.0.20") would make every build look identical to Android.
     versionCode = starVersionCode
     versionName = starVersionName
 
@@ -119,13 +121,16 @@ android {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
-  kotlinOptions {
-    jvmTarget = "11"
-    freeCompilerArgs += "-Xcontext-receivers"
-  }
   buildFeatures {
     compose = true
     buildConfig = true
+  }
+}
+
+kotlin {
+  compilerOptions {
+    jvmTarget.set(JvmTarget.JVM_11)
+    freeCompilerArgs.addAll("-Xskip-metadata-version-check")
   }
 }
 
@@ -172,7 +177,9 @@ dependencies {
   implementation(libs.firebase.messaging)
   implementation(libs.androidx.exifinterface)
   implementation(libs.moshi.kotlin)
-  kapt(libs.hilt.android.compiler)
+  ksp(libs.hilt.android.compiler)
+  ksp("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
+  annotationProcessor("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
   testImplementation(libs.junit)
   androidTestImplementation(libs.androidx.junit)
   androidTestImplementation(libs.androidx.espresso.core)
@@ -187,6 +194,10 @@ dependencies {
   implementation(libs.ktor.client.android)
   implementation(libs.ktor.client.core)
   implementation(libs.tasks.vision)
+}
+
+configurations.all {
+  resolutionStrategy.force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
 }
 
 protobuf {

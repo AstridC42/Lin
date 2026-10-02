@@ -15,6 +15,7 @@
  */
 package com.google.ai.edge.gallery.customtasks.mobileactions
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraCharacteristics
@@ -29,10 +30,11 @@ import androidx.lifecycle.viewModelScope
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
+import com.google.ai.edge.gallery.data.markInitializationFailed
+import com.google.ai.edge.gallery.data.markInitialized
+import com.google.ai.edge.gallery.data.resetInitialization
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatModelHelper
 import com.google.ai.edge.gallery.ui.llmchat.LlmModelInstance
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatus
-import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
@@ -63,6 +65,8 @@ data class MobileActionsUiState(
   val modelResponse: String = "",
   val functionCallDetails: List<String> = listOf(),
   val noFunctionRecognized: Boolean = false,
+  // Errors from actions that were recognized but failed to execute on the device.
+  val actionErrors: List<String> = listOf(),
 )
 
 @HiltViewModel
@@ -82,6 +86,7 @@ constructor(@ApplicationContext private val appContext: Context) : ViewModel() {
     setModelResponse(response = "")
     setNoFunctionRecognized(value = false)
     clearFunctionCallDetails()
+    clearActionErrors()
   }
 
   fun cleanUp() {
@@ -124,6 +129,14 @@ constructor(@ApplicationContext private val appContext: Context) : ViewModel() {
     _uiState.update { _uiState.value.copy(noFunctionRecognized = value) }
   }
 
+  fun addActionError(error: String) {
+    _uiState.update { it.copy(actionErrors = it.actionErrors + error) }
+  }
+
+  fun clearActionErrors() {
+    _uiState.update { it.copy(actionErrors = listOf()) }
+  }
+
   fun processUserPrompt(
     model: Model,
     userPrompt: String,
@@ -145,6 +158,7 @@ constructor(@ApplicationContext private val appContext: Context) : ViewModel() {
       setModelResponse(response = "")
       setNoFunctionRecognized(value = false)
       clearFunctionCallDetails()
+      clearActionErrors()
 
       // Set user prompt.
       setUserPrompt(prompt = userPrompt)
@@ -202,10 +216,7 @@ constructor(@ApplicationContext private val appContext: Context) : ViewModel() {
     reset()
 
     viewModelScope.launch(Dispatchers.Default) {
-      modelManagerViewModel.setInitializationStatus(
-        model = model,
-        status = ModelInitializationStatus(status = ModelInitializationStatusType.NOT_INITIALIZED),
-      )
+      model.resetInitialization()
       LlmChatModelHelper.cleanUp(
         model = model,
         onDone = {
@@ -216,13 +227,11 @@ constructor(@ApplicationContext private val appContext: Context) : ViewModel() {
             supportImage = false,
             supportAudio = false,
             onDone = { error ->
-              modelManagerViewModel.setInitializationStatus(
-                model = model,
-                status =
-                  ModelInitializationStatus(status = ModelInitializationStatusType.INITIALIZED),
-              )
               if (error.isNotEmpty()) {
+                model.markInitializationFailed(error)
                 onError(error)
+              } else {
+                model.markInitialized()
               }
             },
             systemInstruction = getSystemPrompt(),
@@ -331,14 +340,7 @@ constructor(@ApplicationContext private val appContext: Context) : ViewModel() {
           )
         }
 
-    try {
-      context.startActivity(intent)
-    } catch (e: Exception) {
-      Log.e(TAG, "Failed to create contact", e)
-      return e.message ?: context.getString(R.string.unknown_error)
-    }
-
-    return ""
+    return startActivityOrError(context = context, intent = intent, actionName = "create contact")
   }
 
   private fun sendEmail(context: Context, to: String, subject: String, body: String): String {
@@ -351,40 +353,27 @@ constructor(@ApplicationContext private val appContext: Context) : ViewModel() {
         putExtra(Intent.EXTRA_TEXT, body)
       }
 
-    try {
-      context.startActivity(intent)
-    } catch (e: Exception) {
-      Log.e(TAG, "Failed to send email", e)
-      return e.message ?: context.getString(R.string.unknown_error)
-    }
-
-    return ""
+    return startActivityOrError(context = context, intent = intent, actionName = "send email")
   }
 
   private fun showLocationOnMap(context: Context, location: String): String {
     val encodedLocation = URLEncoder.encode(location, StandardCharsets.UTF_8.toString())
     val intent = Intent(Intent.ACTION_VIEW).apply { data = "geo:0,0?q=$encodedLocation".toUri() }
 
-    try {
-      context.startActivity(intent)
-    } catch (e: Exception) {
-      Log.e(TAG, "Failed to show location on map", e)
-      return e.message ?: context.getString(R.string.unknown_error)
-    }
-
-    return ""
+    return startActivityOrError(
+      context = context,
+      intent = intent,
+      actionName = "show location on map",
+    )
   }
 
   private fun openWifiSettings(context: Context): String {
     val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
-    try {
-      context.startActivity(intent)
-    } catch (e: Exception) {
-      Log.e(TAG, "Failed to open wifi settings", e)
-      return e.message ?: context.getString(R.string.unknown_error)
-    }
-
-    return ""
+    return startActivityOrError(
+      context = context,
+      intent = intent,
+      actionName = "open wifi settings",
+    )
   }
 
   private fun createCalendarEvent(context: Context, datetime: String, title: String): String {
@@ -407,10 +396,33 @@ constructor(@ApplicationContext private val appContext: Context) : ViewModel() {
         putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, ms)
         putExtra(CalendarContract.EXTRA_EVENT_END_TIME, ms + 3600000)
       }
+    return startActivityOrError(
+      context = context,
+      intent = intent,
+      actionName = "create calendar event",
+    )
+  }
+
+  /**
+   * Starts the activity for [intent] and returns an empty string on success, or a user-facing error
+   * message on failure.
+   *
+   * [ActivityNotFoundException] is reported with a dedicated message because it is an expected
+   * device-configuration case (e.g. no calendar app installed or the OEM calendar app disabled)
+   * rather than an app bug, and the raw exception message is an unreadable intent dump.
+   */
+  private fun startActivityOrError(context: Context, intent: Intent, actionName: String): String {
     try {
       context.startActivity(intent)
+    } catch (e: ActivityNotFoundException) {
+      // Exception messages embed the intent (including data derived from the model output, such as
+      // a location query), so only log the details at debug level.
+      Log.w(TAG, "No activity found to $actionName")
+      Log.d(TAG, "No activity found to $actionName", e)
+      return context.getString(R.string.mobile_actions_error_no_app_found)
     } catch (e: Exception) {
-      Log.e(TAG, "Failed to create calendar event", e)
+      Log.e(TAG, "Failed to $actionName: ${e.javaClass.simpleName}")
+      Log.d(TAG, "Failed to $actionName", e)
       return e.message ?: context.getString(R.string.unknown_error)
     }
 

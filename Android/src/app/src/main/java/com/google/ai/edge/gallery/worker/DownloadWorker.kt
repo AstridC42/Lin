@@ -16,6 +16,7 @@
 
 package com.google.ai.edge.gallery.worker
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -28,6 +29,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import com.google.ai.edge.gallery.common.getModelStorageDir
 import com.google.ai.edge.gallery.data.KEY_MODEL_COMMIT_HASH
 import com.google.ai.edge.gallery.data.KEY_MODEL_DOWNLOAD_ACCESS_TOKEN
 import com.google.ai.edge.gallery.data.KEY_MODEL_DOWNLOAD_ERROR_MESSAGE
@@ -37,6 +39,7 @@ import com.google.ai.edge.gallery.data.KEY_MODEL_DOWNLOAD_RATE
 import com.google.ai.edge.gallery.data.KEY_MODEL_DOWNLOAD_RECEIVED_BYTES
 import com.google.ai.edge.gallery.data.KEY_MODEL_DOWNLOAD_REMAINING_MS
 import com.google.ai.edge.gallery.data.KEY_MODEL_EXTRA_DATA_DOWNLOAD_FILE_NAMES
+import com.google.ai.edge.gallery.data.KEY_MODEL_EXTRA_DATA_ONLY
 import com.google.ai.edge.gallery.data.KEY_MODEL_EXTRA_DATA_URLS
 import com.google.ai.edge.gallery.data.KEY_MODEL_IS_IMPORTED
 import com.google.ai.edge.gallery.data.KEY_MODEL_IS_ZIP
@@ -56,6 +59,7 @@ import java.net.URL
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 private const val TAG = "AGDownloadWorker"
@@ -67,7 +71,7 @@ private var channelCreated = false
 
 class DownloadWorker(context: Context, params: WorkerParameters) :
   CoroutineWorker(context, params) {
-  private val externalFilesDir = context.getExternalFilesDir(null)
+  private val modelsDir = getModelStorageDir(context)
 
   private val notificationManager =
     context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -92,6 +96,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
   }
 
   override suspend fun doWork(): Result {
+    val isExtraDataOnly = inputData.getBoolean(KEY_MODEL_EXTRA_DATA_ONLY, false)
     val fileUrl = inputData.getString(KEY_MODEL_URL)
     val modelName = inputData.getString(KEY_MODEL_NAME) ?: "Model"
     val version = inputData.getString(KEY_MODEL_COMMIT_HASH)!!
@@ -107,7 +112,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
     val accessToken = inputData.getString(KEY_MODEL_DOWNLOAD_ACCESS_TOKEN)
 
     return withContext(Dispatchers.IO) {
-      if (fileUrl == null || fileName == null) {
+      if (!isExtraDataOnly && (fileUrl == null || fileName == null)) {
         Result.failure()
       } else {
         return@withContext try {
@@ -116,7 +121,9 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
 
           // Collect data for all files.
           val allFiles: MutableList<UrlAndFileName> = mutableListOf()
-          allFiles.add(UrlAndFileName(url = fileUrl, fileName = fileName))
+          if (!isExtraDataOnly && fileUrl != null && fileName != null) {
+            allFiles.add(UrlAndFileName(url = fileUrl, fileName = fileName))
+          }
           for (index in extraDataFileUrls.indices) {
             allFiles.add(
               UrlAndFileName(url = extraDataFileUrls[index], fileName = extraDataFileNames[index])
@@ -141,12 +148,9 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
             // Prepare output file's dir.
             val outputDir =
               if (isModelImported) {
-                File(applicationContext.getExternalFilesDir(null), modelDir)
+                File(modelsDir, modelDir)
               } else {
-                File(
-                  applicationContext.getExternalFilesDir(null),
-                  listOf(modelDir, version).joinToString(separator = File.separator),
-                )
+                File(modelsDir, listOf(modelDir, version).joinToString(separator = File.separator))
               }
             if (!outputDir.exists()) {
               outputDir.mkdirs()
@@ -156,13 +160,13 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
             val outputTmpFile =
               if (isModelImported) {
                 File(
-                  applicationContext.getExternalFilesDir(null),
+                  modelsDir,
                   listOf(modelDir, "${file.fileName}.$TMP_FILE_EXT")
                     .joinToString(separator = File.separator),
                 )
               } else {
                 File(
-                  applicationContext.getExternalFilesDir(null),
+                  modelsDir,
                   listOf(modelDir, version, "${file.fileName}.$TMP_FILE_EXT")
                     .joinToString(separator = File.separator),
                 )
@@ -214,6 +218,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
             var lastSetProgressTs: Long = 0
             var deltaBytes = 0L
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+              coroutineContext.ensureActive()
               outputStream.write(buffer, 0, bytesRead)
               downloadedBytes += bytesRead
               deltaBytes += bytesRead
@@ -274,54 +279,80 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
             Log.d(TAG, "Download done")
 
             // Unzip if the downloaded file is a zip.
-            if (isZip && unzippedDir != null) {
+            val shouldUnzip =
+              (file.fileName == fileName && isZip) ||
+                file.fileName.endsWith(".zip", ignoreCase = true)
+            if (shouldUnzip && originalFile.exists()) {
               setProgress(Data.Builder().putBoolean(KEY_MODEL_START_UNZIPPING, true).build())
 
               // Prepare target dir.
               val destDir =
-                File(
-                  externalFilesDir,
-                  listOf(modelDir, version, unzippedDir).joinToString(File.separator),
-                )
+                if (file.fileName == fileName && !unzippedDir.isNullOrEmpty()) {
+                  File(outputDir, unzippedDir)
+                } else if (file.fileName != fileName) {
+                  val folderName = file.fileName.substringBeforeLast(".")
+                  var hasPrefix = false
+                  try {
+                    ZipInputStream(BufferedInputStream(FileInputStream(originalFile))).use {
+                      checkZipIn ->
+                      var checkEntry = checkZipIn.nextEntry
+                      while (checkEntry != null) {
+                        if (checkEntry.name.startsWith("$folderName/")) {
+                          hasPrefix = true
+                          break
+                        }
+                        checkEntry = checkZipIn.nextEntry
+                      }
+                    }
+                  } catch (e: Exception) {
+                    Log.w(TAG, "Failed to inspect zip entries for prefix: ${e.message}")
+                  }
+                  if (hasPrefix) outputDir else File(outputDir, folderName)
+                } else {
+                  outputDir
+                }
               if (!destDir.exists()) {
                 destDir.mkdirs()
               }
 
               // Unzip.
-              val unzipBuffer = ByteArray(4096)
-              val zipFilePath =
-                "${externalFilesDir}${File.separator}$modelDir${File.separator}$version${File.separator}${fileName}"
-              val zipIn = ZipInputStream(BufferedInputStream(FileInputStream(zipFilePath)))
-              var zipEntry: ZipEntry? = zipIn.nextEntry
-
-              while (zipEntry != null) {
-                val filePath = destDir.absolutePath + File.separator + zipEntry.name
-
-                // Extract files.
-                if (!zipEntry.isDirectory) {
-                  // extract file
-                  val bos = FileOutputStream(filePath)
-                  bos.use { curBos ->
-                    var len: Int
-                    while (zipIn.read(unzipBuffer).also { len = it } > 0) {
-                      curBos.write(unzipBuffer, 0, len)
+              val unzipBuffer = ByteArray(8192)
+              ZipInputStream(BufferedInputStream(FileInputStream(originalFile))).use { zipIn ->
+                var zipEntry: ZipEntry? = zipIn.nextEntry
+                while (zipEntry != null) {
+                  coroutineContext.ensureActive()
+                  val outFile = File(destDir, zipEntry.name)
+                  // Guard against Zip Slip.
+                  if (
+                    outFile.canonicalPath.startsWith(destDir.canonicalPath + File.separator) ||
+                      outFile.canonicalPath == destDir.canonicalPath
+                  ) {
+                    // Extract files.
+                    if (!zipEntry.isDirectory) {
+                      outFile.parentFile?.mkdirs()
+                      FileOutputStream(outFile).use { fos ->
+                        var len: Int
+                        while (zipIn.read(unzipBuffer).also { len = it } > 0) {
+                          coroutineContext.ensureActive()
+                          fos.write(unzipBuffer, 0, len)
+                        }
+                      }
+                    } else {
+                      outFile.mkdirs()
                     }
+                  } else {
+                    throw SecurityException(
+                      "Zip entry is outside of the target dir: ${zipEntry.name}"
+                    )
                   }
-                }
-                // Create dir.
-                else {
-                  val dir = File(filePath)
-                  dir.mkdirs()
-                }
 
-                zipIn.closeEntry()
-                zipEntry = zipIn.nextEntry
+                  zipIn.closeEntry()
+                  zipEntry = zipIn.nextEntry
+                }
               }
-              zipIn.close()
 
-              // Delete the original file.
-              val zipFile = File(zipFilePath)
-              zipFile.delete()
+              // Delete the original zip file.
+              originalFile.delete()
             }
           }
           Result.success()
@@ -345,6 +376,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
    * notification is used to keep the worker running in the foreground, indicating to the user that
    * an active download is in progress.
    */
+  @SuppressLint("PendingIntentMutability")
   private fun createForegroundInfo(progress: Int, modelName: String? = null): ForegroundInfo {
     // Create a notification for the foreground service
     var title = "Downloading model"

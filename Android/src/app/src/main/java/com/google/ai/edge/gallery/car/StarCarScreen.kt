@@ -50,7 +50,7 @@ class StarCarScreen(carContext: CarContext) : Screen(carContext) {
           Row.Builder()
             .setTitle(carContext.getString(R.string.car_talk_title))
             .addText(carContext.getString(R.string.car_talk_subtitle))
-            .setImage(icon(R.drawable.ic_launcher_foreground))
+            .setImage(icon(R.mipmap.ic_launcher))
             .setOnClickListener { startListening() }
             .setBrowsable(false)
             .build()

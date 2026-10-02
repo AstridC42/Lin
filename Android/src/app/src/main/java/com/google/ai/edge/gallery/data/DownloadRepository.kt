@@ -17,12 +17,15 @@
 package com.google.ai.edge.gallery.data
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -30,6 +33,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.core.os.bundleOf
+import androidx.lifecycle.Observer
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -54,6 +58,7 @@ interface DownloadRepository {
   fun downloadModel(
     task: Task?,
     model: Model,
+    includeExtraDataFiles: Boolean = true,
     onStatusUpdated: (model: Model, status: ModelDownloadStatus) -> Unit,
   )
 
@@ -67,7 +72,17 @@ interface DownloadRepository {
     model: Model,
     onStatusUpdated: (model: Model, status: ModelDownloadStatus) -> Unit,
   )
+
+  fun downloadExtraDataFiles(
+    task: Task?,
+    model: Model,
+    onStatusUpdated: (model: Model, status: ModelDownloadStatus) -> Unit,
+  )
+
+  fun cancelDownloadExtraDataFiles(model: Model)
 }
+
+private const val EXTRA_DATA_SUFFIX = "_extra_data"
 
 private const val DOWNLOAD_FROM_GLOBAL_MODEL_MANAGER_TASK_ID = "___"
 
@@ -96,36 +111,39 @@ class DefaultDownloadRepository(
   override fun downloadModel(
     task: Task?,
     model: Model,
+    includeExtraDataFiles: Boolean,
     onStatusUpdated: (model: Model, status: ModelDownloadStatus) -> Unit,
   ) {
     // Create input data.
     val builder = Data.Builder()
-    val totalBytes = model.totalBytes + model.extraDataFiles.sumOf { it.sizeInBytes }
+    val extraFiles =
+      if (includeExtraDataFiles) model.downloadInfo.extraDataFiles(task?.id) else emptyList()
+    val totalBytes = model.downloadInfo.sizeInBytes + extraFiles.sumOf { it.sizeInBytes }
     val inputDataBuilder =
       builder
         .putString(KEY_MODEL_NAME, model.name)
-        .putString(KEY_MODEL_URL, model.url)
-        .putString(KEY_MODEL_COMMIT_HASH, model.version)
+        .putString(KEY_MODEL_URL, model.downloadInfo.url)
+        .putString(KEY_MODEL_COMMIT_HASH, model.downloadInfo.version)
         .putString(
           KEY_MODEL_DOWNLOAD_MODEL_DIR,
-          if (model.imported) IMPORTS_DIR else model.normalizedName,
+          if (model.downloadInfo.imported) IMPORTS_DIR else model.normalizedName,
         )
-        .putString(KEY_MODEL_DOWNLOAD_FILE_NAME, model.downloadFileName)
-        .putBoolean(KEY_MODEL_IS_ZIP, model.isZip)
-        .putString(KEY_MODEL_UNZIPPED_DIR, model.unzipDir)
+        .putString(KEY_MODEL_DOWNLOAD_FILE_NAME, model.downloadInfo.downloadFileName)
+        .putBoolean(KEY_MODEL_IS_ZIP, model.downloadInfo.isZip)
+        .putString(KEY_MODEL_UNZIPPED_DIR, model.downloadInfo.unzipDir)
         .putLong(KEY_MODEL_TOTAL_BYTES, totalBytes)
-        .putBoolean(KEY_MODEL_IS_IMPORTED, model.imported)
+        .putBoolean(KEY_MODEL_IS_IMPORTED, model.downloadInfo.imported)
 
-    if (model.extraDataFiles.isNotEmpty()) {
+    if (extraFiles.isNotEmpty()) {
       inputDataBuilder
-        .putString(KEY_MODEL_EXTRA_DATA_URLS, model.extraDataFiles.joinToString(",") { it.url })
+        .putString(KEY_MODEL_EXTRA_DATA_URLS, extraFiles.joinToString(",") { it.url })
         .putString(
           KEY_MODEL_EXTRA_DATA_DOWNLOAD_FILE_NAMES,
-          model.extraDataFiles.joinToString(",") { it.downloadFileName },
+          extraFiles.joinToString(",") { it.downloadFileName },
         )
     }
-    if (model.accessToken != null) {
-      inputDataBuilder.putString(KEY_MODEL_DOWNLOAD_ACCESS_TOKEN, model.accessToken)
+    if (model.downloadInfo.accessToken != null) {
+      inputDataBuilder.putString(KEY_MODEL_DOWNLOAD_ACCESS_TOKEN, model.downloadInfo.accessToken)
     }
     val inputData = inputDataBuilder.build()
 
@@ -149,11 +167,75 @@ class DefaultDownloadRepository(
       task = task,
       model = model,
       onStatusUpdated = onStatusUpdated,
+      isExtraDataOnly = false,
+      expectedTotalBytes = totalBytes,
     )
+  }
+
+  override fun downloadExtraDataFiles(
+    task: Task?,
+    model: Model,
+    onStatusUpdated: (model: Model, status: ModelDownloadStatus) -> Unit,
+  ) {
+    val extraFiles = model.downloadInfo.extraDataFiles(task?.id)
+    if (extraFiles.isEmpty()) return
+    val totalBytes = extraFiles.sumOf { it.sizeInBytes }
+
+    val inputData =
+      Data.Builder()
+        .putString(KEY_MODEL_NAME, model.name)
+        .putString(KEY_MODEL_COMMIT_HASH, model.downloadInfo.version)
+        .putString(
+          KEY_MODEL_DOWNLOAD_MODEL_DIR,
+          if (model.downloadInfo.imported) IMPORTS_DIR else model.normalizedName,
+        )
+        .putLong(KEY_MODEL_TOTAL_BYTES, totalBytes)
+        .putBoolean(KEY_MODEL_IS_IMPORTED, model.downloadInfo.imported)
+        .putBoolean(KEY_MODEL_EXTRA_DATA_ONLY, true)
+        .putString(KEY_MODEL_EXTRA_DATA_URLS, extraFiles.joinToString(",") { it.url })
+        .putString(
+          KEY_MODEL_EXTRA_DATA_DOWNLOAD_FILE_NAMES,
+          extraFiles.joinToString(",") { it.downloadFileName },
+        )
+        .apply {
+          if (model.downloadInfo.accessToken != null) {
+            putString(KEY_MODEL_DOWNLOAD_ACCESS_TOKEN, model.downloadInfo.accessToken)
+          }
+        }
+        .build()
+
+    val downloadWorkRequest =
+      OneTimeWorkRequestBuilder<DownloadWorker>()
+        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+        .setInputData(inputData)
+        .addTag("$MODEL_NAME_TAG:${model.name}$EXTRA_DATA_SUFFIX")
+        .addTag("$TASK_ID_TAG:${task?.id ?: ""}")
+        .build()
+
+    val workerId = downloadWorkRequest.id
+    workManager.enqueueUniqueWork(
+      "${model.name}$EXTRA_DATA_SUFFIX",
+      ExistingWorkPolicy.REPLACE,
+      downloadWorkRequest,
+    )
+
+    observerWorkerProgress(
+      workerId = workerId,
+      task = task,
+      model = model,
+      onStatusUpdated = onStatusUpdated,
+      isExtraDataOnly = true,
+      expectedTotalBytes = totalBytes,
+    )
+  }
+
+  override fun cancelDownloadExtraDataFiles(model: Model) {
+    workManager.cancelAllWorkByTag("$MODEL_NAME_TAG:${model.name}$EXTRA_DATA_SUFFIX")
   }
 
   override fun cancelDownloadModel(model: Model) {
     workManager.cancelAllWorkByTag("$MODEL_NAME_TAG:${model.name}")
+    workManager.cancelAllWorkByTag("$MODEL_NAME_TAG:${model.name}$EXTRA_DATA_SUFFIX")
   }
 
   override fun cancelAll(onComplete: () -> Unit) {
@@ -169,112 +251,185 @@ class DefaultDownloadRepository(
     model: Model,
     onStatusUpdated: (model: Model, status: ModelDownloadStatus) -> Unit,
   ) {
-    workManager.getWorkInfoByIdLiveData(workerId).observeForever { workInfo ->
-      if (workInfo != null) {
-        when (workInfo.state) {
-          WorkInfo.State.ENQUEUED -> {
-            downloadStartTimeSharedPreferences.edit {
-              putLong(model.name, System.currentTimeMillis())
-            }
-            firebaseAnalytics?.logEvent(
-              GalleryEvent.MODEL_DOWNLOAD.id,
-              bundleOf("event_type" to "start", "model_id" to model.name),
-            )
-          }
+    observerWorkerProgress(
+      workerId = workerId,
+      task = task,
+      model = model,
+      onStatusUpdated = onStatusUpdated,
+      isExtraDataOnly = false,
+      expectedTotalBytes = 0L,
+    )
+  }
 
-          WorkInfo.State.RUNNING -> {
-            val receivedBytes = workInfo.progress.getLong(KEY_MODEL_DOWNLOAD_RECEIVED_BYTES, 0L)
-            val downloadRate = workInfo.progress.getLong(KEY_MODEL_DOWNLOAD_RATE, 0L)
-            val remainingSeconds = workInfo.progress.getLong(KEY_MODEL_DOWNLOAD_REMAINING_MS, 0L)
-            val startUnzipping = workInfo.progress.getBoolean(KEY_MODEL_START_UNZIPPING, false)
-
-            if (!startUnzipping) {
-              if (receivedBytes != 0L) {
-                onStatusUpdated(
-                  model,
-                  ModelDownloadStatus(
-                    status = ModelDownloadStatusType.IN_PROGRESS,
-                    totalBytes = model.totalBytes,
-                    receivedBytes = receivedBytes,
-                    bytesPerSecond = downloadRate,
-                    remainingMs = remainingSeconds,
-                  ),
+  private fun observerWorkerProgress(
+    workerId: UUID,
+    task: Task?,
+    model: Model,
+    onStatusUpdated: (model: Model, status: ModelDownloadStatus) -> Unit,
+    isExtraDataOnly: Boolean,
+    expectedTotalBytes: Long = 0L,
+  ) {
+    val liveData = workManager.getWorkInfoByIdLiveData(workerId)
+    val observer =
+      object : Observer<WorkInfo?> {
+        override fun onChanged(workInfo: WorkInfo?) {
+          if (workInfo != null) {
+            when (workInfo.state) {
+              WorkInfo.State.ENQUEUED -> {
+                downloadStartTimeSharedPreferences.edit {
+                  putLong(model.name, System.currentTimeMillis())
+                }
+                firebaseAnalytics?.logEvent(
+                  GalleryEvent.MODEL_DOWNLOAD.id,
+                  bundleOf("event_type" to "start", "model_id" to model.name),
                 )
               }
-            } else {
-              onStatusUpdated(
-                model,
-                ModelDownloadStatus(status = ModelDownloadStatusType.UNZIPPING),
-              )
+
+              WorkInfo.State.RUNNING -> {
+                val receivedBytes = workInfo.progress.getLong(KEY_MODEL_DOWNLOAD_RECEIVED_BYTES, 0L)
+                val downloadRate = workInfo.progress.getLong(KEY_MODEL_DOWNLOAD_RATE, 0L)
+                val remainingSeconds =
+                  workInfo.progress.getLong(KEY_MODEL_DOWNLOAD_REMAINING_MS, 0L)
+                val startUnzipping = workInfo.progress.getBoolean(KEY_MODEL_START_UNZIPPING, false)
+
+                if (!startUnzipping) {
+                  if (receivedBytes != 0L) {
+                    val totalBytes =
+                      if (expectedTotalBytes > 0L) expectedTotalBytes
+                      else if (isExtraDataOnly)
+                        model.downloadInfo.extraDataFiles(task?.id).sumOf { it.sizeInBytes }
+                      else model.downloadInfo.totalBytes
+                    onStatusUpdated(
+                      model,
+                      ModelDownloadStatus(
+                        status = ModelDownloadStatusType.IN_PROGRESS,
+                        totalBytes = totalBytes,
+                        receivedBytes = receivedBytes,
+                        bytesPerSecond = downloadRate,
+                        remainingMs = remainingSeconds,
+                      ),
+                    )
+                  }
+                } else {
+                  onStatusUpdated(
+                    model,
+                    ModelDownloadStatus(status = ModelDownloadStatusType.UNZIPPING),
+                  )
+                }
+              }
+
+              WorkInfo.State.SUCCEEDED -> {
+                liveData.removeObserver(this)
+                Log.d("repo", "worker $workerId success")
+                onStatusUpdated(
+                  model,
+                  ModelDownloadStatus(status = ModelDownloadStatusType.SUCCEEDED),
+                )
+                if (isExtraDataOnly) {
+                  sendNotification(
+                    title =
+                      context.getString(R.string.download_extra_data_notification_title_success),
+                    text =
+                      context
+                        .getString(R.string.download_extra_data_notification_content_success)
+                        .format(
+                          model.downloadInfo.optionalComponentsLabel(context, task?.id).ifEmpty {
+                            model.name
+                          }
+                        ),
+                    taskId = task?.id ?: DOWNLOAD_FROM_GLOBAL_MODEL_MANAGER_TASK_ID,
+                    modelName = model.name,
+                  )
+                } else {
+                  sendNotification(
+                    title = context.getString(R.string.notification_title_success),
+                    text =
+                      context.getString(R.string.notification_content_success).format(model.name),
+                    taskId = task?.id ?: DOWNLOAD_FROM_GLOBAL_MODEL_MANAGER_TASK_ID,
+                    modelName = model.name,
+                  )
+                }
+
+                val startTime = downloadStartTimeSharedPreferences.getLong(model.name, 0L)
+                val duration = System.currentTimeMillis() - startTime
+                firebaseAnalytics?.logEvent(
+                  GalleryEvent.MODEL_DOWNLOAD.id,
+                  bundleOf(
+                    "event_type" to "success",
+                    "model_id" to model.name,
+                    "duration_ms" to duration,
+                  ),
+                )
+                downloadStartTimeSharedPreferences.edit { remove(model.name) }
+              }
+
+              WorkInfo.State.FAILED,
+              WorkInfo.State.CANCELLED -> {
+                liveData.removeObserver(this)
+                var status = ModelDownloadStatusType.FAILED
+                val errorMessage =
+                  workInfo.outputData.getString(KEY_MODEL_DOWNLOAD_ERROR_MESSAGE) ?: ""
+                Log.d("repo", "worker $workerId FAILED or CANCELLED: $errorMessage")
+                if (workInfo.state == WorkInfo.State.CANCELLED) {
+                  status = ModelDownloadStatusType.NOT_DOWNLOADED
+                } else {
+                  if (isExtraDataOnly) {
+                    sendNotification(
+                      title =
+                        context.getString(R.string.download_extra_data_notification_title_fail),
+                      text =
+                        context
+                          .getString(R.string.download_extra_data_notification_content_fail)
+                          .format(
+                            model.downloadInfo.optionalComponentsLabel(context, task?.id).ifEmpty {
+                              model.name
+                            }
+                          ),
+                      taskId = "",
+                      modelName = "",
+                    )
+                  } else {
+                    sendNotification(
+                      title = context.getString(R.string.notification_title_fail),
+                      text =
+                        context.getString(R.string.notification_content_fail).format(model.name),
+                      taskId = "",
+                      modelName = "",
+                    )
+                  }
+                }
+                onStatusUpdated(
+                  model,
+                  ModelDownloadStatus(status = status, errorMessage = errorMessage),
+                )
+
+                val startTime = downloadStartTimeSharedPreferences.getLong(model.name, 0L)
+                val duration = System.currentTimeMillis() - startTime
+                firebaseAnalytics?.logEvent(
+                  GalleryEvent.MODEL_DOWNLOAD.id,
+                  bundleOf(
+                    "event_type" to "failure",
+                    "model_id" to model.name,
+                    "duration_ms" to duration,
+                  ),
+                )
+                downloadStartTimeSharedPreferences.edit { remove(model.name) }
+              }
+
+              else -> {}
             }
           }
-
-          WorkInfo.State.SUCCEEDED -> {
-            Log.d("repo", "worker %s success".format(workerId.toString()))
-            onStatusUpdated(model, ModelDownloadStatus(status = ModelDownloadStatusType.SUCCEEDED))
-            sendNotification(
-              title = context.getString(R.string.notification_title_success),
-              text = context.getString(R.string.notification_content_success).format(model.name),
-              taskId = task?.id ?: DOWNLOAD_FROM_GLOBAL_MODEL_MANAGER_TASK_ID,
-              modelName = model.name,
-            )
-
-            val startTime = downloadStartTimeSharedPreferences.getLong(model.name, 0L)
-            val duration = System.currentTimeMillis() - startTime
-            firebaseAnalytics?.logEvent(
-              GalleryEvent.MODEL_DOWNLOAD.id,
-              bundleOf(
-                "event_type" to "success",
-                "model_id" to model.name,
-                "duration_ms" to duration,
-              ),
-            )
-            downloadStartTimeSharedPreferences.edit { remove(model.name) }
-          }
-
-          WorkInfo.State.FAILED,
-          WorkInfo.State.CANCELLED -> {
-            var status = ModelDownloadStatusType.FAILED
-            val errorMessage = workInfo.outputData.getString(KEY_MODEL_DOWNLOAD_ERROR_MESSAGE) ?: ""
-            Log.d(
-              "repo",
-              "worker %s FAILED or CANCELLED: %s".format(workerId.toString(), errorMessage),
-            )
-            if (workInfo.state == WorkInfo.State.CANCELLED) {
-              status = ModelDownloadStatusType.NOT_DOWNLOADED
-            } else {
-              sendNotification(
-                title = context.getString(R.string.notification_title_fail),
-                text = context.getString(R.string.notification_content_fail).format(model.name),
-                taskId = "",
-                modelName = "",
-              )
-            }
-            onStatusUpdated(
-              model,
-              ModelDownloadStatus(status = status, errorMessage = errorMessage),
-            )
-
-            val startTime = downloadStartTimeSharedPreferences.getLong(model.name, 0L)
-            val duration = System.currentTimeMillis() - startTime
-            // TODO: Add failure reasons
-            firebaseAnalytics?.logEvent(
-              GalleryEvent.MODEL_DOWNLOAD.id,
-              bundleOf(
-                "event_type" to "failure",
-                "model_id" to model.name,
-                "duration_ms" to duration,
-              ),
-            )
-            downloadStartTimeSharedPreferences.edit { remove(model.name) }
-          }
-
-          else -> {}
         }
       }
+
+    if (Looper.myLooper() == Looper.getMainLooper()) {
+      liveData.observeForever(observer)
+    } else {
+      Handler(Looper.getMainLooper()).post { liveData.observeForever(observer) }
     }
   }
 
+  @SuppressLint("PendingIntentMutability")
   private fun sendNotification(title: String, text: String, taskId: String, modelName: String) {
     // Don't send notification if app is in foreground.
     if (lifecycleProvider.isAppInForeground) {
@@ -341,7 +496,9 @@ class DefaultDownloadRepository(
         // Permission not granted, return or handle accordingly. In real app, request permission.
         return
       }
-      notify(1, builder.build())
+      val notificationId =
+        (modelName.hashCode() xor taskId.hashCode()).let { if (it == 0) 1 else it }
+      notify(notificationId, builder.build())
     }
   }
 }

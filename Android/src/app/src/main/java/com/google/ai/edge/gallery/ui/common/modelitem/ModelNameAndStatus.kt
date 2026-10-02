@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,7 +52,6 @@ import com.google.ai.edge.gallery.data.MODEL_INFO_ICON_SIZE
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.ModelDownloadStatus
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
-import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.ui.common.ClickableLink
 import com.google.ai.edge.gallery.ui.common.humanReadableSize
@@ -104,15 +104,15 @@ fun ModelNameAndStatus(
 
     // Show "Update available" info message label if the model is updatable.
     // Tap to show the detailed update info in a dialog.
-    if (model.updatable) {
+    if (downloadStatus?.isUpdatable == true) {
       Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier =
           Modifier.padding(bottom = 10.dp)
             .then(
-              if (model.updateInfo.isNotEmpty()) {
-                Modifier.clickable { showUpdateDialog = true }
+              if (model.downloadInfo.updateInfo.isNotEmpty()) {
+                Modifier.clickable(role = Role.Button) { showUpdateDialog = true }
               } else {
                 Modifier
               }
@@ -136,7 +136,7 @@ fun ModelNameAndStatus(
       AlertDialog(
         onDismissRequest = { showUpdateDialog = false },
         title = { Text(stringResource(R.string.about_this_update)) },
-        text = { Text(model.updateInfo) },
+        text = { Text(model.downloadInfo.updateInfo) },
         confirmButton = {
           TextButton(onClick = { showUpdateDialog = false }) {
             Text(stringResource(android.R.string.ok))
@@ -155,7 +155,7 @@ fun ModelNameAndStatus(
     )
 
     // Status icon + size + download progress details.
-    if (model.runtimeType != RuntimeType.AICORE && showModelSizeAndDownloadProgressLabel) {
+    if (!model.isAiCore && showModelSizeAndDownloadProgressLabel) {
       ModelStatusDetails(
         model = model,
         task = task,
@@ -166,7 +166,7 @@ fun ModelNameAndStatus(
     }
 
     // Learn more url.
-    if (!model.imported && model.learnMoreUrl.isNotEmpty()) {
+    if (!model.downloadInfo.imported && model.learnMoreUrl.isNotEmpty()) {
       Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -221,9 +221,9 @@ fun ModelStatusDetails(
     }
     // Status label
     else {
-      var sizeLabel = model.totalBytes.humanReadableSize()
-      if (model.localFileRelativeDirPathOverride.isNotEmpty()) {
-        sizeLabel = "{ext_files_dir}/${model.localFileRelativeDirPathOverride}"
+      var sizeLabel = model.downloadInfo.totalBytes.humanReadableSize()
+      if (model.downloadInfo.localRelativeDirPathOverride.isNotEmpty()) {
+        sizeLabel = "{ext_files_dir}/${model.downloadInfo.localRelativeDirPathOverride}"
       }
 
       // Populate the status label.
@@ -232,7 +232,7 @@ fun ModelStatusDetails(
         if (inProgress || isPartiallyDownloaded) {
           var totalSize = downloadStatus.totalBytes
           if (totalSize == 0L) {
-            totalSize = model.totalBytes
+            totalSize = model.downloadInfo.totalBytes
           }
           sizeLabel =
             "${downloadStatus.receivedBytes.humanReadableSize(extraDecimalForGbAndAbove = true)} of ${totalSize.humanReadableSize()}"

@@ -25,6 +25,7 @@ enum class AppBarActionType {
   MENU,
   /** Returns to the assistant, which is the app's start destination. */
   ASSISTANT,
+  IMPORT_FROM_URL,
 }
 
 class AppBarAction(val actionType: AppBarActionType, val actionFn: () -> Unit)
