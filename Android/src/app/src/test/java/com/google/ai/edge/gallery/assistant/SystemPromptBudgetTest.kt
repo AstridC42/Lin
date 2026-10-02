@@ -16,6 +16,7 @@
 
 package com.google.ai.edge.gallery.assistant
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -113,6 +114,37 @@ class SystemPromptBudgetTest {
     assertTrue("the memory section must be present", memory >= 0)
     assertTrue("the routing must be present", routing >= 0)
     assertTrue("what is remembered must come before the routing", memory < routing)
+  }
+
+  /**
+   * Every placeholder the prompt uses is one somebody has to fill in.
+   *
+   * There are two places that do the filling - AssistantTask, for the session built at launch, and
+   * the assistant screen, for the one rebuilt when the mode, the memory or the MCP selection
+   * changes - and they are not the same code. Adding a third placeholder to the prompt and
+   * updating only one of them is invisible: the other hands the model the literal text
+   * `___WHATEVER___`, which is worse than an absent section and shows up nowhere. That has already
+   * happened once, with memory.
+   *
+   * So this pins the set. A new placeholder fails here, and the failure is the reminder to teach
+   * both substituters about it.
+   */
+  @Test
+  fun thePromptUsesOnlyPlaceholdersThatAreSubstituted() {
+    val found =
+      Regex("___[A-Z_]+___")
+        .findAll(prompt(AssistantMode.AUTO, everything = true))
+        .map { it.value }
+        .toSet()
+    assertEquals(
+      "a placeholder here must be filled in by both AssistantTask and AssistantScreen",
+      setOf(
+        AssistantPrompts.SKILLS_PLACEHOLDER,
+        AssistantPrompts.TOOLS_PLACEHOLDER,
+        AssistantPrompts.MEMORY_PLACEHOLDER,
+      ),
+      found,
+    )
   }
 
   companion object {

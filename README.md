@@ -12,6 +12,8 @@ in the same message.
 [docs/STATUS.md](docs/STATUS.md) is where the project actually is: what works,
 what is built but unconfirmed, what cannot be done at all, and what is worth
 doing next. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the map of the code.
+[docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) is the attack surface an
+assistant with this much reach actually has, and what is done about it.
 
 ## What is different from upstream
 

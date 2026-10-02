@@ -94,6 +94,7 @@ fun AssistantManual(
   onOpenVoiceSettings: () -> Unit,
   onOpenMusicApp: () -> Unit,
   onOpenMemory: () -> Unit,
+  onOpenMcpServers: () -> Unit,
   onOpenModels: (() -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
@@ -306,6 +307,9 @@ fun AssistantManual(
           OutlinedButton(onClick = onOpenMemory) {
             Text(stringResource(R.string.memory_manual_button))
           }
+          OutlinedButton(onClick = onOpenMcpServers) {
+            Text(stringResource(R.string.mcp_manual_button))
+          }
           if (onOpenModels != null) {
             OutlinedButton(onClick = onOpenModels) {
               Text(stringResource(R.string.manual_models_button))
@@ -378,6 +382,10 @@ private fun manualSections(): List<ManualSection> = listOf(
     ),
   ),
   ManualSection(
+    stringResource(R.string.mcp_manual_title),
+    listOf(stringResource(R.string.mcp_manual_body)),
+  ),
+  ManualSection(
     stringResource(R.string.manual_skills_title),
     listOf(stringResource(R.string.manual_skills_body)),
   ),
@@ -422,6 +430,7 @@ fun AssistantManualPane(
   onOpenVoiceSettings: () -> Unit,
   onOpenMusicApp: () -> Unit,
   onOpenMemory: () -> Unit,
+  onOpenMcpServers: () -> Unit,
   onOpenModels: (() -> Unit)? = null,
 ) {
   Surface(
@@ -437,6 +446,7 @@ fun AssistantManualPane(
       onOpenVoiceSettings = onOpenVoiceSettings,
       onOpenMusicApp = onOpenMusicApp,
       onOpenMemory = onOpenMemory,
+      onOpenMcpServers = onOpenMcpServers,
       onOpenModels = onOpenModels,
       modifier = Modifier.fillMaxHeight(),
     )
@@ -480,6 +490,7 @@ fun AssistantManualSheet(
   onOpenVoiceSettings: () -> Unit,
   onOpenMusicApp: () -> Unit,
   onOpenMemory: () -> Unit,
+  onOpenMcpServers: () -> Unit,
   onOpenModels: (() -> Unit)? = null,
   onDismiss: () -> Unit,
 ) {
@@ -493,6 +504,7 @@ fun AssistantManualSheet(
       onOpenVoiceSettings = onOpenVoiceSettings,
       onOpenMusicApp = onOpenMusicApp,
       onOpenMemory = onOpenMemory,
+      onOpenMcpServers = onOpenMcpServers,
       onOpenModels = onOpenModels,
     )
   }

@@ -60,6 +60,9 @@ import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.voice.WakeWordService
 import com.google.ai.edge.gallery.voice.WakeWordSettings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /**
  * The app's start destination.
@@ -88,25 +91,55 @@ fun AssistantRoute(
   tosViewModel: TosViewModel = hiltViewModel(),
 ) {
   val context = LocalContext.current
-  var showTosDialog by remember { mutableStateOf(!tosViewModel.getIsTosAccepted()) }
   val uiState by modelManagerViewModel.uiState.collectAsState()
   val assistantTask = modelManagerViewModel.getCustomTaskByTaskId(BuiltInTaskId.ASSISTANT)
   val models = assistantTask?.task?.models ?: listOf()
   val repository = modelManagerViewModel.dataStoreRepository
 
-  // A crash recorded by the previous run, shown once and then discarded.
-  var lastCrash by remember { mutableStateOf(CrashReport.read(context)) }
+  var showTosDialog by remember { mutableStateOf(false) }
 
-  // The model the previous launch began loading and never finished. Read once, before anything
-  // clears it: a value here means that launch died mid-load, and loading the same model again
-  // would simply repeat it. See AssistantSettings.loading_model_name.
-  var interruptedModel by remember { mutableStateOf(repository.readAssistantSettings().loadingModelName) }
+  /** A crash recorded by the previous run, shown once and then discarded. */
+  var lastCrash by remember { mutableStateOf<String?>(null) }
+
+  /**
+   * The model the previous launch began loading and never finished. Read before anything clears
+   * it: a value here means that launch died mid-load, and loading the same model again would
+   * simply repeat it. See AssistantSettings.loading_model_name.
+   */
+  var interruptedModel by remember { mutableStateOf("") }
+
+  var checksDone by remember { mutableStateOf(false) }
   var memoryWarningModel by remember { mutableStateOf<Model?>(null) }
+
+  /**
+   * The three things that have to be known before the chat may render, read off the main thread.
+   *
+   * Every one of them used to be read inside composition: the terms-accepted flag and the
+   * interrupted-model marker are settings reads, which go to disk behind `runBlocking`, and the
+   * crash report is a file. Composition runs on the main thread, so each was a chance for the
+   * launch to stall with the spinner already drawn and nothing able to redraw it - an app stuck on
+   * "Loading model list" while the model list had in fact loaded. Nothing in here is urgent enough
+   * to be worth that.
+   */
+  LaunchedEffect(Unit) {
+    val accepted: Boolean
+    val crash: String?
+    val interrupted: String
+    withContext(Dispatchers.IO) {
+      accepted = tosViewModel.getIsTosAccepted()
+      crash = CrashReport.read(context)
+      interrupted = repository.readAssistantSettings().loadingModelName
+    }
+    showTosDialog = !accepted
+    lastCrash = crash
+    interruptedModel = interrupted
+    checksDone = true
+  }
 
   // Loading a model is only safe to start once nothing above is holding the screen. Anything that
   // needs the user to act first has to keep the chat from rendering, because rendering it is what
-  // starts the load.
-  val blockedBeforeLoading = lastCrash != null || interruptedModel.isNotEmpty()
+  // starts the load - and that includes not yet knowing whether any of them apply.
+  val blockedBeforeLoading = !checksDone || lastCrash != null || interruptedModel.isNotEmpty()
 
   // Pick a model as soon as the allowlist is in: the one used last if it is still around,
   // otherwise the first one already on the device, otherwise the first one at all so the chat can
@@ -188,6 +221,16 @@ fun AssistantRoute(
   }
 
   when {
+    // Before the checks come back there is nothing safe to show: the chat would start loading a
+    // model, and any of the three could still turn out to be a reason not to.
+    !checksDone ->
+      AssistantStartupState(
+        loading = true,
+        error = "",
+        onRetry = { modelManagerViewModel.loadModelAllowlist() },
+        onOpenGallery = onOpenGallery,
+      )
+
     showTosDialog ->
       AppTosDialog(
         onTosAccepted = {
@@ -380,6 +423,14 @@ private fun AssistantCrashState(report: String, onDismiss: () -> Unit) {
 }
 
 /**
+ * How long the start screen waits before admitting something is wrong.
+ *
+ * Long enough that a slow network on a cold start does not look broken, short enough that nobody
+ * sits in front of a spinner wondering whether to force-quit.
+ */
+private const val SLOW_START_MILLIS = 8_000L
+
+/**
  * Shown while the model list is loading, when loading it failed, or when it came back empty.
  *
  * The failure case has to be visible here. This is the app's first screen, so a state that only
@@ -400,6 +451,16 @@ private fun AssistantStartupState(
   ) {
     when {
       loading -> {
+        // An escape hatch, because this branch used to be a spinner and nothing else. Whatever
+        // the cause - a network that accepts connections and never answers, a disk read that does
+        // not come back - the result was an app with no way out and nothing to report, on the one
+        // screen standing between the user and everything else.
+        var waitedTooLong by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+          delay(SLOW_START_MILLIS)
+          waitedTooLong = true
+        }
+
         CircularProgressIndicator(
           trackColor = MaterialTheme.colorScheme.surfaceVariant,
           strokeWidth = 3.dp,
@@ -409,6 +470,18 @@ private fun AssistantStartupState(
           stringResource(R.string.loading_model_list),
           style = MaterialTheme.typography.bodyMedium,
         )
+        if (waitedTooLong) {
+          Text(
+            stringResource(R.string.assistant_slow_start),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+          )
+          Button(onClick = onRetry) { Text(stringResource(R.string.assistant_retry)) }
+          TextButton(onClick = onOpenGallery) {
+            Text(stringResource(R.string.assistant_open_gallery))
+          }
+        }
       }
 
       error.isNotEmpty() -> {
