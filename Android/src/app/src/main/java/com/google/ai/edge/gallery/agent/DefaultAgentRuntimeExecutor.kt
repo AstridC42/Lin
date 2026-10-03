@@ -181,7 +181,9 @@ open class DefaultAgentRuntimeExecutor(
 
     val onError = { errorMsg: String ->
       Log.e(TAG, "Error in AgentLoop inference: $errorMsg")
-      emitEvent(AgentEvent.Error(errorMessage = errorMsg))
+      // Explained before it is shown. The engine's wording is written for whoever is debugging
+      // the engine, and it arrives in the middle of somebody's conversation.
+      emitEvent(AgentEvent.Error(errorMessage = EngineErrors.explain(errorMsg)))
       close()
       Unit
     }

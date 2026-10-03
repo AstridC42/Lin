@@ -1,6 +1,6 @@
 # Status
 
-Where the project actually is, as of `0.5.1`.
+Where the project actually is, as of `0.5.2`.
 
 **Upstream base:** `google-ai-edge/gallery` at `70061fd` (version 1.0.20,
 1 October 2026). What that merge brought with it is at the bottom of this file.
@@ -168,6 +168,14 @@ Raising the context to 8,192 (the model advertises 32,000) buys room now. It
 does not change the arithmetic: every capability added still makes the model
 slightly worse at choosing between them, and the overhead is still most of a
 small model's budget.
+
+Past that limit the next thing to go wrong was the tool call itself. Upstream
+sets TopK to 1 for agent chat - greedy decoding, "for better tool call quality"
+- from a screen effect, which for this app runs after the conversation has
+already been built with the allowlist's TopK of 64 at temperature 1.0. Sampling
+64 candidates at full temperature while emitting an exact grammar produced
+`call:web_search{query:doctor who lego}`, which is not a valid call, and the
+turn died in the parser. It is now set where the conversation is created.
 
 The fix is to stop sending all of them every turn and send the handful the
 message plausibly needs. A lexical first pass — the message against each tool's
