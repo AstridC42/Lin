@@ -145,25 +145,33 @@ fun ModelPageAppBar(
     },
     // The config button for the model (if existed).
     actions = {
-      // Ahead of the box below rather than inside it: that box positions its two icons with
-      // hand-computed offsets, and a third would mean redoing arithmetic that has nothing to do
-      // with this button.
-      if (onSettingsClicked != null) {
-        IconButton(onClick = onSettingsClicked) {
-          Icon(
-            imageVector = Icons.Rounded.Settings,
-            contentDescription = stringResource(R.string.cd_app_settings_icon),
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(20.dp),
-          )
-        }
-      }
       val downloadSucceeded = curDownloadStatus?.status == ModelDownloadStatusType.SUCCEEDED
       val showConfigButton = model.configs.isNotEmpty() && downloadSucceeded
+      val showHistoryButton = downloadSucceeded && shouldShowHistoryButton
+
+      // Every icon here lives inside this 42dp box and is placed by a negative offset, so the
+      // box is 42dp wide and what it draws is as much as 122dp. Anything put in the Row ahead of
+      // it is drawn over - which is what a settings gear beside the box did, and why it appeared
+      // on top of the others.
+      //
+      // So the offsets are counted rather than hand-written: each icon steps one slot left for
+      // every icon to its right. Adding a fourth is then a matter of counting, not of noticing
+      // which constant to change.
       Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) {
-        var configButtonOffset = 0.dp
-        if (showConfigButton && shouldShowHistoryButton) {
-          configButtonOffset = (-40).dp
+        val slot = 40.dp
+        val configButtonOffset = if (showHistoryButton) -slot else 0.dp
+        val settingsButtonOffset =
+          -slot * ((if (showHistoryButton) 1 else 0) + (if (showConfigButton) 1 else 0))
+
+        if (onSettingsClicked != null) {
+          IconButton(onClick = onSettingsClicked, modifier = Modifier.offset(x = settingsButtonOffset)) {
+            Icon(
+              imageVector = Icons.Rounded.Settings,
+              contentDescription = stringResource(R.string.cd_app_settings_icon),
+              tint = MaterialTheme.colorScheme.onSurface,
+              modifier = Modifier.size(20.dp),
+            )
+          }
         }
         if (showConfigButton) {
           val enableConfigButton = !isModelInitializing && !inProgress && isModelInitialized
@@ -181,7 +189,7 @@ fun ModelPageAppBar(
             )
           }
         }
-        if (downloadSucceeded && shouldShowHistoryButton) {
+        if (showHistoryButton) {
           val enableHistoryButton =
             !isModelInitializing && !modelPreparing && !inProgress && isModelInitialized
           IconButton(
