@@ -148,6 +148,7 @@ fun AgentChatScreen(
     ::getEffectiveBaseSystemPrompt,
   /** Extra controls rendered between the message list and the text field. */
   aboveInputContent: @Composable () -> Unit = {},
+  onSettingsClicked: (() -> Unit)? = null,
   /** Replaces the headline of the empty state, keeping the "try this" chips below it. */
   emptyStateHeadline: (@Composable () -> Unit)? = null,
   /** Called after a full turn - model output plus any tool side effects - has been rendered. */
@@ -651,6 +652,7 @@ fun AgentChatScreen(
     },
     sendMessageTrigger = sendMessageTrigger,
     aboveInputContent = aboveInputContent,
+    onSettingsClicked = onSettingsClicked,
   )
 
   if (showAskInfoDialog && currentAskInfoAction != null) {

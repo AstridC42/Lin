@@ -1110,6 +1110,24 @@
   <string name="voice_settings_try" translatable="true" description="Button that speaks a sample line. [CHAR_LIMIT=30]">Hear it</string>
   <string name="voice_settings_manual_title" translatable="true" description="Manual entry for the voice settings. [CHAR_LIMIT=40]">Assistant voice</string>
   <string name="voice_settings_manual_body" translatable="true" description="Manual entry describing voice settings. [CHAR_LIMIT=200]">Pick which voice reads replies out loud, and how fast and how high it speaks. Long-press Speak on the chat screen to get here quickly.</string>
+  <string name="settings_title" translatable="true" description="Title of the settings screen. [CHAR_LIMIT=30]">Settings</string>
+  <string name="settings_section_assistant" translatable="true" description="Heading for assistant settings. [CHAR_LIMIT=30]">Assistant</string>
+  <string name="settings_section_memory" translatable="true" description="Heading for memory settings. [CHAR_LIMIT=30]">Memory</string>
+  <string name="settings_section_connections" translatable="true" description="Heading for connection settings. [CHAR_LIMIT=30]">Connections</string>
+  <string name="settings_section_phone" translatable="true" description="Heading for phone settings. [CHAR_LIMIT=30]">Phone</string>
+  <string name="settings_section_model" translatable="true" description="Heading for model settings. [CHAR_LIMIT=30]">Model</string>
+  <string name="settings_mode" translatable="true" description="Row that opens the assistant mode picker. [CHAR_LIMIT=30]">Mode</string>
+  <string name="settings_on" translatable="true" description="Value shown when a setting is on. [CHAR_LIMIT=16]">On</string>
+  <string name="settings_off" translatable="true" description="Value shown when a setting is off. [CHAR_LIMIT=16]">Off</string>
+  <string name="settings_speaking" translatable="true" description="Value shown when replies are spoken. [CHAR_LIMIT=20]">Spoken</string>
+  <string name="settings_silent" translatable="true" description="Value shown when replies are not spoken. [CHAR_LIMIT=20]">Silent</string>
+  <string name="settings_not_set_up" translatable="true" description="Value shown when an optional feature has not been configured. [CHAR_LIMIT=20]">Not set up</string>
+  <string name="settings_memory_value" translatable="true" description="Counts of notes and conversations held in memory. [CHAR_LIMIT=40]">%1$d notes, %2$d talks</string>
+  <string name="settings_memory_detail" translatable="true" description="Explains the memory row. [CHAR_LIMIT=120]">What Lin has learned about you, and every past conversation</string>
+  <string name="settings_music_ask" translatable="true" description="Value shown when no default music app is chosen. [CHAR_LIMIT=30]">Ask each time</string>
+  <string name="settings_permissions" translatable="true" description="Row that opens the setup guide. [CHAR_LIMIT=40]">Permissions and setup</string>
+  <string name="settings_permissions_detail" translatable="true" description="Explains the permissions row. [CHAR_LIMIT=120]">Calendar, notifications, location, Android Auto, and setting Lin as your assistant</string>
+  <string name="settings_gallery_detail" translatable="true" description="Explains the gallery row. [CHAR_LIMIT=120]">The original Edge Gallery screens, still here</string>
   <string name="memory_title" translatable="true" description="Title of the dialog listing what the assistant remembers. [CHAR_LIMIT=40]">What Lin knows</string>
   <string name="memory_explainer" translatable="true" description="Explains the memory list. [CHAR_LIMIT=300]">These go into every conversation, so Lin knows them without being told again. Anything not mentioned for %1$d days cools off on its own, but stays searchable. Delete anything wrong - it will be repeated confidently until you do.</string>
   <string name="memory_empty" translatable="true" description="Shown when nothing is remembered yet. [CHAR_LIMIT=200]">Nothing yet. Lin writes notes after each conversation, or you can add one below.</string>

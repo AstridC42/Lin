@@ -140,6 +140,7 @@ fun ChatView(
   sendMessageTrigger: SendMessageTrigger? = null,
   /** Extra controls rendered between the message list and the text input. */
   aboveInputContent: @Composable () -> Unit = {},
+  onSettingsClicked: (() -> Unit)? = null,
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
@@ -326,6 +327,7 @@ fun ChatView(
               allowEditingSystemPrompt = allowEditingSystemPrompt,
               curSystemPrompt = curSystemPrompt,
               onSystemPromptChanged = onSystemPromptChanged,
+              onSettingsClicked = onSettingsClicked,
               onHistoryClicked = {
                 Log.d(
                   TAG,

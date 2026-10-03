@@ -142,8 +142,12 @@ data class AllowedModel(
       val defaultTopK: Int = defaultConfig?.topK ?: DEFAULT_TOPK
       val defaultTopP: Float = defaultConfig?.topP ?: DEFAULT_TOPP
       val defaultTemperature: Float = defaultConfig?.temperature ?: DEFAULT_TEMPERATURE
-      llmMaxToken = defaultConfig?.maxTokens?.takeIf { it > 0 } ?: DEFAULT_MAX_TOKEN
       llmMaxContextLength = defaultConfig?.maxContextLength
+      llmMaxToken =
+        contextForAssistant(
+          allowlistDefault = defaultConfig?.maxTokens?.takeIf { it > 0 } ?: DEFAULT_MAX_TOKEN,
+          maxContextLength = defaultConfig?.maxContextLength,
+        )
       val npuOnly =
         accelerators.size == 1 &&
           (accelerators[0] == Accelerator.NPU || accelerators[0] == Accelerator.TPU)
@@ -247,6 +251,39 @@ data class AllowedModel(
     return "$modelId/$modelFile"
   }
 }
+
+/**
+ * How much context to ask a model for, rather than what the allowlist suggests.
+ *
+ * The allowlist's `maxTokens` is upstream's default for a chat app with no tools: 4,000, for a
+ * model that advertises a 32,000 token context. This assistant does not fit in 4,000. Its system
+ * prompt and the schemas of the forty-odd tools it offers come to about 4,200 before the user has
+ * typed anything, so the first message of a brand new conversation failed with "Input token ids
+ * are too long: 4230 >= 4000" and the session was thrown away and rebuilt, over and over.
+ *
+ * That is the bug behind several separate reports - web search not working, replies never
+ * arriving, a loop after a search - because the turn died before any of it ran.
+ *
+ * So where a model says how much context it really has, take more of it. Not all of it: the
+ * key-value cache grows with the context length and this is a phone already holding several
+ * gigabytes of weights, so asking for 32,000 would trade a failure the user can see for one they
+ * cannot. [ASSISTANT_CONTEXT_TOKENS] leaves roughly as much room for the conversation as the
+ * fixed overhead takes, which is the smallest amount that actually works.
+ *
+ * It only ever raises. A model whose allowlist entry already asks for more keeps it.
+ */
+internal fun contextForAssistant(allowlistDefault: Int, maxContextLength: Int?): Int {
+  if (maxContextLength == null || maxContextLength <= 0) return allowlistDefault
+  return maxOf(allowlistDefault, minOf(maxContextLength, ASSISTANT_CONTEXT_TOKENS))
+}
+
+/**
+ * The context this app asks for when the model can give it.
+ *
+ * Twice the fixed overhead, near enough. Raising it further is cheap in code and expensive in
+ * memory, so it moves when there is a measurement saying it should.
+ */
+internal const val ASSISTANT_CONTEXT_TOKENS = 8192
 
 /**
  * Mirrors an `llm_chat` entry onto Lin's unified assistant task.

@@ -104,13 +104,18 @@ class MemoryTool(
 
   @Tool(
     description =
-      "Search everything remembered from past conversations - older notes and the summaries of " +
-        "previous conversations. Use when the user refers to something from before that is not " +
-        "already in front of you: 'what did we decide about', 'the thing I mentioned last week'."
+      "Search what was remembered from past conversations, or read one back. Use when the user " +
+        "refers to something from before that is not already in front of you."
   )
   fun searchMemory(
-    @ToolParam(description = "What to look for, in a few words.") query: String
+    @ToolParam(description = "What to look for, in a few words.") query: String,
+    @ToolParam(
+      description =
+        "Optional conversation_id from an earlier result, to read what was actually said in it."
+    )
+    conversationId: String = "",
   ): Map<String, Any> {
+    if (conversationId.isNotBlank()) return readPastConversation(conversationId)
     return runBlocking(Dispatchers.Default) {
       if (query.isBlank()) return@runBlocking failure("No search terms were given.")
       sendProgress("Searching memory", inProgress = true)
@@ -142,21 +147,21 @@ class MemoryTool(
             }
           },
         "hint" to
-          "These are summaries. To read what was actually said in one of the conversations, " +
-            "call readPastConversation with its conversation_id.",
+          "These are summaries. To read what was actually said in one of them, call searchMemory " +
+            "again with its conversation_id.",
       )
     }
   }
 
-  @Tool(
-    description =
-      "Read what was actually said in a past conversation, by its id from searchMemory. Use only " +
-        "when the summary is not enough, because transcripts are long."
-  )
-  fun readPastConversation(
-    @ToolParam(description = "The conversation_id from a searchMemory result.")
-    conversationId: String
-  ): Map<String, Any> {
+  /**
+   * Reading a transcript back is a parameter on the search rather than a tool of its own.
+   *
+   * Every tool offered costs its schema out of the same budget as the conversation, on every
+   * single turn - and the fixed overhead of this assistant had already reached the point where a
+   * brand new conversation could not start. Two tools where one will do is a cost paid on every
+   * turn to save the model one call on the rare turn that needs it.
+   */
+  private fun readPastConversation(conversationId: String): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
       val digest =
         vault.digest(conversationId)

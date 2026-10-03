@@ -167,6 +167,7 @@ fun AssistantScreen(
   // again.
   var listenTurn by remember { mutableIntStateOf(0) }
   var showManual by remember { mutableStateOf(false) }
+  var showSettings by remember { mutableStateOf(false) }
 
   // Bumped whenever the web search settings are edited, so the derived values below recompute
   // without having to observe the whole DataStore.
@@ -361,6 +362,7 @@ fun AssistantScreen(
       initialQuery = dictatedQuery ?: initialQuery,
       initialImageUris = initialImageUris,
       baseSystemPromptResolver = systemPromptResolver,
+      onSettingsClicked = { showSettings = true },
       emptyStateHeadline = {
         AssistantEmptyStateHeadline(
           webSearchEnabled = webSearchEnabled,
@@ -547,6 +549,164 @@ fun AssistantScreen(
     WakeWordSettingsDialog(
       dataStoreRepository = dataStoreRepository,
       onDismiss = { showWakeWordSettings = false },
+    )
+  }
+
+  if (showSettings) {
+    // Values read here rather than inside the list, so a row says what the setting is now and
+    // not what it was when the screen was first composed.
+    val current = dataStoreRepository.readAssistantSettings()
+    LinSettings(
+      onDismiss = { showSettings = false },
+      sections =
+        listOf(
+          SettingsSection(
+            title = stringResource(R.string.settings_section_assistant),
+            rows =
+              listOf(
+                SettingsRow(
+                  title = stringResource(R.string.settings_mode),
+                  value = stringResource(mode.labelRes),
+                  onClick = {
+                    showSettings = false
+                    showModeSheet = true
+                  },
+                ),
+                SettingsRow(
+                  title = stringResource(R.string.voice_settings_title),
+                  value =
+                    stringResource(
+                      if (speakReplies) R.string.settings_speaking else R.string.settings_silent
+                    ),
+                  onClick = {
+                    showSettings = false
+                    showVoiceSettings = true
+                  },
+                ),
+                SettingsRow(
+                  title = stringResource(R.string.wake_word_tile_label),
+                  value =
+                    stringResource(
+                      if (current.wakeWordEnabled) R.string.settings_on else R.string.settings_off
+                    ),
+                  done = current.wakeWordEnabled,
+                  onClick = {
+                    showSettings = false
+                    showWakeWordSettings = true
+                  },
+                ),
+              )
+          ),
+          SettingsSection(
+            title = stringResource(R.string.settings_section_memory),
+            rows =
+              listOf(
+                SettingsRow(
+                  title = stringResource(R.string.memory_title),
+                  value =
+                    stringResource(
+                      R.string.settings_memory_value,
+                      vaultState.noteCount,
+                      vaultState.digestCount,
+                    ),
+                  detail = stringResource(R.string.settings_memory_detail),
+                  onClick = {
+                    showSettings = false
+                    showMemory = true
+                  },
+                )
+              )
+          ),
+          SettingsSection(
+            title = stringResource(R.string.settings_section_connections),
+            rows =
+              listOf(
+                SettingsRow(
+                  title = stringResource(R.string.web_search_settings_title),
+                  value = webSearchHost.ifEmpty { stringResource(R.string.settings_not_set_up) },
+                  done = webSearchEnabled,
+                  onClick = {
+                    showSettings = false
+                    showWebSearchSettings = true
+                  },
+                ),
+                SettingsRow(
+                  title = stringResource(R.string.smart_home_short),
+                  value =
+                    stringResource(
+                      if (smartHomeEnabled) R.string.settings_on else R.string.settings_not_set_up
+                    ),
+                  done = smartHomeEnabled,
+                  onClick = {
+                    showSettings = false
+                    showSmartHomeSettings = true
+                  },
+                ),
+                SettingsRow(
+                  title = stringResource(R.string.mcp_manual_button),
+                  onClick = {
+                    showSettings = false
+                    showMcpServers = true
+                  },
+                ),
+              )
+          ),
+          SettingsSection(
+            title = stringResource(R.string.settings_section_phone),
+            rows =
+              listOf(
+                SettingsRow(
+                  title = stringResource(R.string.manual_music_app_button),
+                  value =
+                    current.preferredMusicApp.ifEmpty {
+                      stringResource(R.string.settings_music_ask)
+                    },
+                  onClick = {
+                    showSettings = false
+                    showMusicApp = true
+                  },
+                ),
+                SettingsRow(
+                  title = stringResource(R.string.settings_permissions),
+                  detail = stringResource(R.string.settings_permissions_detail),
+                  onClick = {
+                    showSettings = false
+                    showManual = true
+                  },
+                ),
+              )
+          ),
+          SettingsSection(
+            title = stringResource(R.string.settings_section_model),
+            rows =
+              buildList {
+                if (onOpenModels != null) {
+                  add(
+                    SettingsRow(
+                      title = stringResource(R.string.manual_models_button),
+                      value = modelManagerUiState.selectedModel.name,
+                      onClick = {
+                        showSettings = false
+                        onOpenModels()
+                      },
+                    )
+                  )
+                }
+                if (onOpenGallery != null) {
+                  add(
+                    SettingsRow(
+                      title = stringResource(R.string.assistant_open_gallery),
+                      detail = stringResource(R.string.settings_gallery_detail),
+                      onClick = {
+                        showSettings = false
+                        onOpenGallery()
+                      },
+                    )
+                  )
+                }
+              }
+          ),
+        ),
     )
   }
 

@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -86,6 +87,8 @@ fun ModelPageAppBar(
   onSystemPromptChanged: (String) -> Unit = {},
   shouldShowHistoryButton: Boolean = false,
   onHistoryClicked: (Model) -> Unit = {},
+  /** Opens the app's settings. Null leaves the gear out, which is every screen but the chat. */
+  onSettingsClicked: (() -> Unit)? = null,
 ) {
   var showConfigDialog by remember { mutableStateOf(false) }
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
@@ -142,6 +145,19 @@ fun ModelPageAppBar(
     },
     // The config button for the model (if existed).
     actions = {
+      // Ahead of the box below rather than inside it: that box positions its two icons with
+      // hand-computed offsets, and a third would mean redoing arithmetic that has nothing to do
+      // with this button.
+      if (onSettingsClicked != null) {
+        IconButton(onClick = onSettingsClicked) {
+          Icon(
+            imageVector = Icons.Rounded.Settings,
+            contentDescription = stringResource(R.string.cd_app_settings_icon),
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(20.dp),
+          )
+        }
+      }
       val downloadSucceeded = curDownloadStatus?.status == ModelDownloadStatusType.SUCCEEDED
       val showConfigButton = model.configs.isNotEmpty() && downloadSucceeded
       Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) {
