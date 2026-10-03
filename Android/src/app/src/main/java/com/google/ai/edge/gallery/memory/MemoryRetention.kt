@@ -98,11 +98,19 @@ object MemoryRetention {
       if (note.cold == shouldBeCold) note else note.toBuilder().setCold(shouldBeCold).build()
     }
 
-  /** How many characters of the system prompt the memory section may occupy. */
-  const val MAX_PROMPT_CHARS = 1_400
+  /**
+   * How many characters of the system prompt the memory section may occupy.
+   *
+   * Halved from 1,400 after the fixed overhead - prompt plus forty-odd tool schemas - came to
+   * 4,230 tokens against a 4,000 limit and killed the first message of every conversation. This
+   * was not the largest part of that, but it was the part added most recently and the easiest to
+   * give back. Seven hundred characters is still a dozen notes, and everything else is a
+   * searchMemory call away.
+   */
+  const val MAX_PROMPT_CHARS = 700
 
   /** And how many notes, however short they are. A long list reads as noise whatever it costs. */
-  const val MAX_PROMPT_NOTES = 24
+  const val MAX_PROMPT_NOTES = 12
 
   /**
    * Which notes go in front of the model this turn, in the order they should be read.
