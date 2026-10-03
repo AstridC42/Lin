@@ -135,7 +135,7 @@ data class Task(
 
 object BuiltInTaskId {
   /**
-   * Star Storyteller's unified assistant: one chat screen that reaches every capability. It is
+   * Lin's unified assistant: one chat screen that reaches every capability. It is
    * the app's start destination and the only task that is offered every general-purpose LLM in
    * the allowlist.
    */
@@ -172,7 +172,7 @@ fun isLegacyTasks(id: String): Boolean {
 /**
  * Whether a task runs the agent loop with skills and MCP tools.
  *
- * Both the upstream Agent Chat screen and Star Storyteller's unified assistant do, so anything
+ * Both the upstream Agent Chat screen and Lin's unified assistant do, so anything
  * that special-cases the agent - the skills and MCP pickers in the input bar, the agent-specific
  * top-K handling - has to apply to both.
  */

@@ -133,7 +133,7 @@ jobs:
             -keystore ci-keystore/star-ci.jks -storetype PKCS12 -alias star \
             -keyalg RSA -keysize 4096 -validity 10950 \
             -storepass "$CI_KEYSTORE_PASSWORD" -keypass "$CI_KEYSTORE_PASSWORD" \
-            -dname "CN=Star Storyteller Test Builds, OU=CI, O=Star Storyteller"
+            -dname "CN=Lin Test Builds, OU=CI, O=Lin"
         env:
           CI_KEYSTORE_PASSWORD: ${{ env.CI_KEYSTORE_PASSWORD }}
 
@@ -235,7 +235,7 @@ jobs:
             base="$(basename "$apk" .apk)"
             abi="${base#app-}"
             abi="${abi%-release}"
-            cp "$apk" "dist/star-storyteller-${VERSION}-${abi}.apk"
+            cp "$apk" "dist/lin-${VERSION}-${abi}.apk"
           done
           if [ -z "$(ls -A dist)" ]; then
             echo "::error::No APKs were produced"
@@ -259,14 +259,14 @@ jobs:
           set -euo pipefail
           base="https://github.com/${REPO}/releases/download/dev"
           size_of() {
-            local file="dist/star-storyteller-${VERSION}-$1.apk"
+            local file="dist/lin-${VERSION}-$1.apk"
             if [ -f "$file" ]; then
               echo "$(( ( $(stat -c%s "$file") + 524288 ) / 1048576 )) MB"
             else
               echo "-"
             fi
           }
-          link() { echo "[star-storyteller-${VERSION}-$1.apk](${base}/star-storyteller-${VERSION}-$1.apk)"; }
+          link() { echo "[lin-${VERSION}-$1.apk](${base}/lin-${VERSION}-$1.apk)"; }
 
           {
             echo "The newest build of \`main\`, rebuilt on every change. **\`${VERSION}\`**, from"

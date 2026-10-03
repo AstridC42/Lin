@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ data class NotificationSummary(
  * The service instance is held statically because that is the only way to reach it: Android
  * constructs and binds it, so the tools cannot be given a reference any other way.
  */
-class StarNotificationListener : NotificationListenerService() {
+class LinNotificationListener : NotificationListenerService() {
 
   override fun onListenerConnected() {
     super.onListenerConnected()
@@ -84,7 +84,7 @@ class StarNotificationListener : NotificationListenerService() {
   override fun onNotificationRemoved(sbn: StatusBarNotification?) = Unit
 
   companion object {
-    @Volatile private var instance: StarNotificationListener? = null
+    @Volatile private var instance: LinNotificationListener? = null
 
     /**
      * Whether the user has granted notification access *and* the service is connected.
@@ -100,7 +100,7 @@ class StarNotificationListener : NotificationListenerService() {
         Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
           .orEmpty()
       if (enabled.isEmpty()) return false
-      val expected = ComponentName(context, StarNotificationListener::class.java)
+      val expected = ComponentName(context, LinNotificationListener::class.java)
       return enabled.split(":").any {
         ComponentName.unflattenFromString(it)?.let { c ->
           c.packageName == expected.packageName && c.className == expected.className

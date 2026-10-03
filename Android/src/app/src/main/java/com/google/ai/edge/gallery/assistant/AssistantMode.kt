@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import com.google.ai.edge.gallery.R
  * The modes of the single assistant chat screen.
  *
  * Upstream Edge Gallery exposes one screen per capability: a text chat, an "ask image" screen, an
- * "ask audio" screen, mobile actions, and the skills/MCP agent. Star Storyteller merges all of
+ * "ask audio" screen, mobile actions, and the skills/MCP agent. Lin merges all of
  * them into one conversation, and a mode is the *bias* applied to that conversation rather than a
  * separate screen.
  *

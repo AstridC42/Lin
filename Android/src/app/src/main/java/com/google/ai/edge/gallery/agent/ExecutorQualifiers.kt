@@ -25,7 +25,7 @@ import javax.inject.Qualifier
 @Qualifier @Retention(AnnotationRetention.RUNTIME) annotation class AgentChatExecutor
 
 /**
- * Qualifier for the Star Storyteller assistant runtime executor.
+ * Qualifier for the Lin assistant runtime executor.
  *
  * Same machinery as [AgentChatExecutor] but bound to its own tool set (skills, MCP, device
  * actions and SearXNG web search) and its own session, so the unified assistant screen and the

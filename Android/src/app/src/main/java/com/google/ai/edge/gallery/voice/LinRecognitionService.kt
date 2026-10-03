@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ private const val TAG = "AGRecognitionService"
  *
  * This exists because a voice interaction service is not allowed to omit one: the platform parses
  * `recognitionService` out of the service's XML and rejects the whole configuration when it is
- * missing, which would leave Star Storyteller unselectable as the digital assistant. It is a
+ * missing, which would leave Lin unselectable as the digital assistant. It is a
  * requirement to satisfy rather than a recognizer worth writing - the app does its own listening
  * inside the chat, where it can show what it heard.
  *
@@ -40,7 +40,7 @@ private const val TAG = "AGRecognitionService"
  * anything itself. If that recognizer turns out to be this one, it reports an error instead of
  * calling itself forever.
  */
-class StarRecognitionService : RecognitionService() {
+class LinRecognitionService : RecognitionService() {
 
   private var delegate: SpeechRecognizer? = null
 

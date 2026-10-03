@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Copyright 2026 The Star Storyteller Authors
+  Copyright 2026 The Lin Authors
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  What makes Star Storyteller selectable under
+  What makes Lin selectable under
   Settings > Apps > Default apps > Digital assistant app.
 
   recognitionService is not optional: the platform parses this file when the app is offered as an
@@ -23,7 +23,7 @@
 -->
 <voice-interaction-service
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:sessionService="com.google.ai.edge.gallery.voice.StarVoiceInteractionSessionService"
-    android:recognitionService="com.google.ai.edge.gallery.voice.StarRecognitionService"
+    android:sessionService="com.google.ai.edge.gallery.voice.LinVoiceInteractionSessionService"
+    android:recognitionService="com.google.ai.edge.gallery.voice.LinRecognitionService"
     android:supportsAssist="true"
     android:supportsLaunchVoiceAssistFromKeyguard="true" />

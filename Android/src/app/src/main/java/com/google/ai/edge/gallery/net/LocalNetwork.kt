@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,6 +105,28 @@ object LocalNetwork {
       octets[i] = value
     }
     return octets
+  }
+
+  /**
+   * Why [url] is not somewhere to go looking for public content, or null when it is.
+   *
+   * The mirror of [cleartextRefusal], and needed for the same reason from the other side. The
+   * instance address is one the user typed, so the rule there is about protecting the credential
+   * sent with it. A page or picture URL is chosen by the model out of a search result - which is
+   * to say, by content from outside - and the one place it must not be pointed is the user's own
+   * network. Without this, "read this page for me" reaches the router's admin panel, the printer
+   * and anything else on the LAN, and hands what it finds back to a model that can be talked into
+   * repeating it.
+   */
+  fun privateTargetRefusal(url: String): String? {
+    val parsed = try {
+      URL(url)
+    } catch (e: Exception) {
+      return null
+    }
+    val host = parsed.host.orEmpty()
+    if (!isPrivateHost(host)) return null
+    return "$host is on your own network, not the public web, so it was not opened."
   }
 
   /**

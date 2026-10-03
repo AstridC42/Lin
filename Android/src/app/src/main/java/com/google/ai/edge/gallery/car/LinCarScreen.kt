@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import com.google.ai.edge.gallery.voice.WakeWordSettings
  * Nothing here renders a conversation. Replies are spoken by the phone; the car screen is how you
  * start one without picking the phone up.
  */
-class StarCarScreen(carContext: CarContext) : Screen(carContext) {
+class LinCarScreen(carContext: CarContext) : Screen(carContext) {
 
   override fun onGetTemplate(): Template {
     val items =

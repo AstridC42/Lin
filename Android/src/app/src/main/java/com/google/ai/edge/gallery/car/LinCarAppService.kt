@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import androidx.car.app.SessionInfo
 import androidx.car.app.validation.HostValidator
 
 /**
- * Makes Star Storyteller appear on the car's screen under Android Auto.
+ * Makes Lin appear on the car's screen under Android Auto.
  *
  * ### What a car app is allowed to be
  *
@@ -43,7 +43,7 @@ import androidx.car.app.validation.HostValidator
  * developer mode turned on and "Unknown sources" enabled. That is a property of Android Auto for
  * apps outside the Play Store, not something the app can arrange for itself.
  */
-class StarCarAppService : CarAppService() {
+class LinCarAppService : CarAppService() {
 
   /**
    * Only the real Android Auto and Automotive hosts may connect.
@@ -58,12 +58,12 @@ class StarCarAppService : CarAppService() {
       .addAllowedHosts(androidx.car.app.R.array.hosts_allowlist_sample)
       .build()
 
-  override fun onCreateSession(sessionInfo: SessionInfo): Session = StarCarSession()
+  override fun onCreateSession(sessionInfo: SessionInfo): Session = LinCarSession()
 
-  override fun onCreateSession(): Session = StarCarSession()
+  override fun onCreateSession(): Session = LinCarSession()
 }
 
 /** One connection to the car. */
-class StarCarSession : Session() {
-  override fun onCreateScreen(intent: Intent) = StarCarScreen(carContext)
+class LinCarSession : Session() {
+  override fun onCreateScreen(intent: Intent) = LinCarScreen(carContext)
 }

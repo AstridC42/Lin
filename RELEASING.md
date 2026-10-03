@@ -1,4 +1,4 @@
-# Releasing Star Storyteller
+# Releasing Lin
 
 Every version from `v0.2.0` on is published on the repository's
 [Releases page](https://github.com/AstridC42/Star-Storyteller-/releases) with prebuilt APKs
@@ -65,10 +65,10 @@ rather than silently wrapping if it ever gets there.
 
 | Asset | For |
 | --- | --- |
-| `star-storyteller-<version>-arm64-v8a.apk` | Nearly every phone made since 2018 |
-| `star-storyteller-<version>-armeabi-v7a.apk` | Older 32-bit phones |
-| `star-storyteller-<version>-x86_64.apk` | Emulators and x86 tablets |
-| `star-storyteller-<version>-universal.apk` | Any phone; roughly three times the size |
+| `lin-<version>-arm64-v8a.apk` | Nearly every phone made since 2018 |
+| `lin-<version>-armeabi-v7a.apk` | Older 32-bit phones |
+| `lin-<version>-x86_64.apk` | Emulators and x86 tablets |
+| `lin-<version>-universal.apk` | Any phone; roughly three times the size |
 | `SHA256SUMS.txt` | Checksums for all of the above |
 
 The split exists because the LiteRT and MediaPipe native libraries dominate the download. A

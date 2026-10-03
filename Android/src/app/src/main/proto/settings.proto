@@ -81,20 +81,20 @@ message Settings {
   repeated string viewed_promo_id = 10;
   bool disable_firebase_analytics = 11;
 
-  // Star Storyteller: connection settings for a self-hosted SearXNG instance
+  // Lin: connection settings for a self-hosted SearXNG instance
   // used by the assistant's web_search / open_web_page tools.
   WebSearchSettings web_search_settings = 12;
 
-  // Star Storyteller: assistant preferences (last used mode, spoken replies...).
+  // Lin: assistant preferences (last used mode, spoken replies...).
   AssistantSettings assistant_settings = 13;
 
-  // Star Storyteller: reminders the assistant delivers itself.
+  // Lin: reminders the assistant delivers itself.
   Reminders reminders = 14;
 
-  // Star Storyteller: Home Assistant connection for smart home control.
+  // Lin: Home Assistant connection for smart home control.
   SmartHomeSettings smart_home_settings = 15;
 
-  // Star Storyteller: what the assistant has been told to remember about the
+  // Lin: what the assistant has been told to remember about the
   // user, so a conversation does not start from nothing every time.
   AssistantMemory assistant_memory = 16;
 }

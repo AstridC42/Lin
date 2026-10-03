@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.google.ai.edge.gallery.assistant
 
 import com.google.ai.edge.gallery.customtasks.agentchat.AgentToolsImpl
 import com.google.ai.edge.gallery.data.DataStoreRepository
+import com.google.ai.edge.gallery.memory.MemoryVaultRepository
 import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.tools.CallJsSkillResultImage
@@ -26,11 +27,12 @@ import com.google.ai.edge.gallery.tools.DeviceActionsTool
 import com.google.ai.edge.gallery.tools.CalendarTool
 import com.google.ai.edge.gallery.tools.MediaControlTool
 import com.google.ai.edge.gallery.tools.MemoryTool
-import com.google.ai.edge.gallery.notifications.StarNotificationListener
+import com.google.ai.edge.gallery.notifications.LinNotificationListener
 import com.google.ai.edge.gallery.tools.NotificationAccessSetupTool
 import com.google.ai.edge.gallery.tools.NotificationsTool
 import com.google.ai.edge.gallery.tools.RemindersTool
 import com.google.ai.edge.gallery.tools.SmartHomeTool
+import com.google.ai.edge.gallery.tools.ToolCallGuard
 import com.google.ai.edge.gallery.tools.ToolDefinition
 import com.google.ai.edge.gallery.tools.WeatherTool
 import com.google.ai.edge.gallery.tools.WebSearchSetupTool
@@ -51,10 +53,15 @@ class AssistantTools(
   private val searxngClient: SearxngClient,
   private val homeAssistantClient: HomeAssistantClient,
   private val settingsRepository: DataStoreRepository,
+  private val memoryVault: MemoryVaultRepository,
 ) : AgentToolsImpl() {
+
+  /** Shared by the web tools, so "the same call three times" is counted across all of them. */
+  private val toolCallGuard = ToolCallGuard()
 
   private val webSearchTool by lazy {
     WebSearchTool(
+      guard = toolCallGuard,
       searxngClient = searxngClient,
       showImageInChat = { base64 -> resultImageToShow = CallJsSkillResultImage(base64 = base64) },
       showPageInChat = { url ->
@@ -86,7 +93,7 @@ class AssistantTools(
 
   private val calendarTool by lazy { CalendarTool(context = context) }
 
-  private val memoryTool by lazy { MemoryTool(repository = settingsRepository) }
+  private val memoryTool by lazy { MemoryTool(context = context, vault = memoryVault) }
 
   private val smartHomeTool by lazy { SmartHomeTool(client = homeAssistantClient) }
 
@@ -104,7 +111,7 @@ class AssistantTools(
     // the model saying there are no notifications, which is indistinguishable from an empty shade.
     // Until it is granted, though, one tool says that as well as five do, and the four it replaces
     // cost tokens the conversation needs.
-    if (StarNotificationListener.isGranted(context)) {
+    if (LinNotificationListener.isGranted(context)) {
       tools.add(notificationsTool)
     } else {
       tools.add(notificationSetupTool)

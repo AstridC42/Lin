@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ class WebSearchSetupTool : ToolDefinition {
       "status" to "failed",
       "error" to
         "Web search is not set up yet, so \"$query\" could not be searched for. Tell the user " +
-          "that Star Storyteller searches through their own SearXNG instance and needs its " +
+          "that Lin searches through their own SearXNG instance and needs its " +
           "address, which they can add under Web search in the Guide panel. Do not answer the " +
           "question from memory as though a search had been done.",
     )

@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.car.AndroidAutoStatus
 import com.google.ai.edge.gallery.data.DataStoreRepository
-import com.google.ai.edge.gallery.notifications.StarNotificationListener
+import com.google.ai.edge.gallery.notifications.LinNotificationListener
 import com.google.ai.edge.gallery.voice.AssistantRole
 
 /** How wide the manual is when it sits beside the chat. */
@@ -104,7 +104,7 @@ fun AssistantManual(
   // app and the answer would otherwise be stale exactly when the user came back to check it.
   var roleHeld by remember { mutableStateOf(AssistantRole.isHeld(context)) }
   var notificationsGranted by remember {
-    mutableStateOf(StarNotificationListener.isGranted(context))
+    mutableStateOf(LinNotificationListener.isGranted(context))
   }
   var locationGranted by remember {
     mutableStateOf(
@@ -136,7 +136,7 @@ fun AssistantManual(
     val observer = LifecycleEventObserver { _, event ->
       if (event == Lifecycle.Event.ON_RESUME) {
         roleHeld = AssistantRole.isHeld(context)
-        notificationsGranted = StarNotificationListener.isGranted(context)
+        notificationsGranted = LinNotificationListener.isGranted(context)
       }
     }
     lifecycleOwner.lifecycle.addObserver(observer)
@@ -238,7 +238,7 @@ fun AssistantManual(
         if (!notificationsGranted) {
           OutlinedButton(
             onClick = {
-              runCatching { context.startActivity(StarNotificationListener.settingsIntent()) }
+              runCatching { context.startActivity(LinNotificationListener.settingsIntent()) }
             },
             modifier = Modifier.fillMaxWidth(),
           ) {

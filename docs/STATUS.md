@@ -1,6 +1,6 @@
 # Status
 
-Where the project actually is, as of `0.4.0`.
+Where the project actually is, as of `0.5.0`.
 
 **Upstream base:** `google-ai-edge/gallery` at `70061fd` (version 1.0.20,
 1 October 2026). What that merge brought with it is at the bottom of this file.
@@ -35,10 +35,8 @@ Confirmed on a real phone.
   "summarise this" work without copying anything. Whether either is offered is
   the system's decision — a secure screen withholds both — so the button only
   appears when there is something to ask about.
-- **Remembering you.** Twenty durable facts, written by the model when you tell
-  it to remember something or by you directly, injected into every prompt.
-  Capped and listed under **Memory** in the Guide panel, because a fact
-  remembered wrongly is repeated confidently until somebody corrects it.
+- **Remembering you.** Superseded by the memory vault - see below. The old twenty-fact list is
+  carried over on first launch and its contents become notes you wrote yourself.
 - **Staying loaded.** An opt-in foreground service keeps the model in memory
   after the chat is closed, so everything that summons the assistant can answer
   in place instead of apologising and opening the app. It costs the model's
@@ -86,6 +84,32 @@ list, so reconnect the phone after changing anything.
 
 The one remaining variable under this app's control is the declared category.
 If the settings are right and it is still absent, that is the next thing to try.
+
+## The memory vault
+
+The newest part, and the least confirmed on a phone. Three layers:
+
+- **Notes.** What Lin knows about you. Written by the model after a conversation, or by you in the
+  **Memory** panel. A couple of dozen go into every prompt; the rest wait behind a search.
+- **Conversation summaries.** One paragraph per conversation, linked to the notes it produced and
+  to the full transcript.
+- **The archive.** Every conversation in full, on the phone, read only when a tool asks for it.
+
+Notes cool rather than expire. Anything not mentioned for three weeks drops out of the prompt and
+stays searchable; identity lasts a year, and what you wrote yourself never cools. Repetition buys
+time, so what keeps coming up keeps being known.
+
+The summarising happens in the background, a few minutes after a conversation ends, and again
+once a day. It borrows the model only when one is loaded and you are not mid-turn; when it cannot,
+it writes a placeholder marked in italics in the Memory panel and upgrades it later.
+
+**What to try:** have a conversation, close it, wait a few minutes, then open **Memory** in the
+Guide panel. The conversation should be listed, and anything durable you said should have become
+a note. Then start a fresh conversation and see whether it knows.
+
+**What would show it is wrong:** a note that is subtly not what you said, a summary written about
+a conversation you did not have, or the panel staying empty an hour after several conversations.
+The first is the one to look hardest for - a wrong note is repeated with complete confidence.
 
 ## Not possible
 

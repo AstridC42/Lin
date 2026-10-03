@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -126,6 +126,51 @@ class LocalNetworkTest {
   fun neverObjectsToHttps() {
     assertNull(LocalNetwork.cleartextRefusal("https://searx.be/search"))
     assertNull(LocalNetwork.cleartextRefusal("https://192.168.0.9:8081"))
+  }
+
+  // ---------------------------------------------------------------- the other direction
+
+  /**
+   * The rule for content the model went looking for, which is the opposite rule.
+   *
+   * The instance address is one the user typed, so the question there is whether a credential
+   * would travel in the clear. A page or picture URL comes out of a search result - content from
+   * outside - and the question is whether the assistant can be aimed at the user's own network.
+   * "Read this page for me" must not reach the router's admin panel and hand what it finds back
+   * to a model that can be talked into repeating it.
+   */
+  @Test
+  fun refusesToFetchContentFromTheHomeNetwork() {
+    for (url in
+      listOf(
+        "http://192.168.0.1/admin",
+        "http://10.0.0.5:631/printer",
+        "https://192.168.1.1/",
+        "http://localhost:8080/",
+        "http://nas.lan/files",
+        "http://[::1]/",
+      )) {
+      assertNotNull("$url is not public content", LocalNetwork.privateTargetRefusal(url))
+    }
+  }
+
+  /** Plain http on the open web is most of what an image index returns, and must go through. */
+  @Test
+  fun fetchesOrdinaryPublicContentWhateverTheScheme() {
+    assertNull(LocalNetwork.privateTargetRefusal("http://example.com/photo.jpg"))
+    assertNull(LocalNetwork.privateTargetRefusal("https://en.wikipedia.org/wiki/Fuji"))
+    assertNull(LocalNetwork.privateTargetRefusal("http://8.8.8.8/"))
+  }
+
+  /** The two rules are opposites, and neither may quietly become the other. */
+  @Test
+  fun theTwoRulesPointOppositeWays() {
+    val home = "http://192.168.0.9:8081"
+    val web = "http://searx.be/search"
+    assertNull("the instance may be plain http on the LAN", LocalNetwork.cleartextRefusal(home))
+    assertNotNull("but content from the LAN is not public", LocalNetwork.privateTargetRefusal(home))
+    assertNotNull("a public instance needs TLS for its credential", LocalNetwork.cleartextRefusal(web))
+    assertNull("yet a public page is fine to read", LocalNetwork.privateTargetRefusal(web))
   }
 
   /** A malformed address is the caller's error to report, with its own wording. */

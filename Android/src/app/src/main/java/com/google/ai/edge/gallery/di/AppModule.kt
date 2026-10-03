@@ -26,6 +26,7 @@ import com.google.ai.edge.gallery.BenchmarkResultsSerializer
 import com.google.ai.edge.gallery.BuildConfig
 import com.google.ai.edge.gallery.CutoutsSerializer
 import com.google.ai.edge.gallery.GalleryLifecycleProvider
+import com.google.ai.edge.gallery.MemoryVaultSerializer
 import com.google.ai.edge.gallery.SettingsSerializer
 import com.google.ai.edge.gallery.SkillsSerializer
 import com.google.ai.edge.gallery.UserDataSerializer
@@ -37,6 +38,7 @@ import com.google.ai.edge.gallery.data.DefaultDownloadRepository
 import com.google.ai.edge.gallery.data.DownloadRepository
 import com.google.ai.edge.gallery.proto.BenchmarkResults
 import com.google.ai.edge.gallery.proto.CutoutCollection
+import com.google.ai.edge.gallery.proto.MemoryVault
 import com.google.ai.edge.gallery.proto.Settings
 import com.google.ai.edge.gallery.proto.Skills
 import com.google.ai.edge.gallery.proto.UserData
@@ -149,6 +151,28 @@ internal object AppModule {
     return DataStoreFactory.create(
       serializer = skillsSerializer,
       produceFile = { context.dataStoreFile("skills.pb") },
+    )
+  }
+
+  // Provides the MemoryVaultSerializer
+  @Provides
+  @Singleton
+  fun provideMemoryVaultSerializer(): Serializer<MemoryVault> {
+    return MemoryVaultSerializer
+  }
+
+  // Provides DataStore<MemoryVault>. Its own store rather than a field on settings: the vault is
+  // written by a background worker while the user is changing settings in front of it, and a
+  // proto store is rewritten whole on every change.
+  @Provides
+  @Singleton
+  fun provideMemoryVaultDataStore(
+    @ApplicationContext context: Context,
+    memoryVaultSerializer: Serializer<MemoryVault>,
+  ): DataStore<MemoryVault> {
+    return DataStoreFactory.create(
+      serializer = memoryVaultSerializer,
+      produceFile = { context.dataStoreFile("memory_vault.pb") },
     )
   }
 
