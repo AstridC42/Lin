@@ -401,18 +401,59 @@ class SkillManagerViewModel @Inject constructor(val skillManager: SkillManager) 
   }
 }
 
-fun decodeBase64ToBitmap(base64String: String): Bitmap? {
+/**
+ * Decodes a base64 image for display in the chat, at a size a phone can hold.
+ *
+ * Two things here are not decoration.
+ *
+ * It measures before it decodes. A three-megabyte JPEG off the web is routinely five thousand
+ * pixels wide, and decoded whole that is seventy megabytes of ARGB_8888 - requested on a device
+ * already holding a multi-gigabyte language model in RAM. The picture is going into a chat
+ * bubble a few hundred pixels across, so full resolution buys nothing and costs the process.
+ *
+ * And it catches [Throwable], not [Exception]. The failure this runs into is `OutOfMemoryError`,
+ * which is an `Error`: the previous `catch (Exception)` did not catch it, so a large image did
+ * not degrade to "no picture" - it took the app down. That is a crash with no stack in the chat
+ * and nothing on screen to connect it to the picture that caused it.
+ */
+fun decodeBase64ToBitmap(base64String: String, maxDimension: Int = MAX_CHAT_IMAGE_DIMENSION): Bitmap? {
   return try {
-    // 1. Clean the string (remove headers if present)
+    // Remove a data: header if present.
     val pureBase64 = base64String.substringAfter(",")
-
-    // 2. Decode the Base64 string into a byte array
     val imageBytes = Base64.decode(pureBase64)
 
-    // 3. Convert the byte array into a Bitmap
-    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-  } catch (e: java.lang.Exception) {
-    e.printStackTrace()
+    // Measure first: inJustDecodeBounds allocates nothing.
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
+
+    val options =
+      BitmapFactory.Options().apply {
+        inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, maxDimension)
+      }
+    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
+  } catch (e: Throwable) {
+    Log.e(TAG, "Could not decode an image for the chat", e)
     null
   }
+}
+
+/** The largest edge, in pixels, worth decoding for a picture shown in a chat bubble. */
+const val MAX_CHAT_IMAGE_DIMENSION = 2048
+
+/**
+ * The power-of-two subsampling that brings a [width] x [height] image under [maxDimension].
+ *
+ * BitmapFactory only honours powers of two, and rounds down - so this must too, or the result is
+ * a decode larger than asked for, which is the whole thing being avoided.
+ */
+fun sampleSizeFor(width: Int, height: Int, maxDimension: Int): Int {
+  if (width <= 0 || height <= 0 || maxDimension <= 0) return 1
+  var sample = 1
+  // Tested against the size this sample actually produces, not the next one along. Checking the
+  // next step leaves the result one power of two too large - 6000px came back as 3000px against
+  // a 2048 cap, which is most of the memory the cap exists to save.
+  while (width / sample > maxDimension || height / sample > maxDimension) {
+    sample *= 2
+  }
+  return sample
 }

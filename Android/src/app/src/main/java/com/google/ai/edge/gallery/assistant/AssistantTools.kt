@@ -32,6 +32,7 @@ import com.google.ai.edge.gallery.tools.NotificationAccessSetupTool
 import com.google.ai.edge.gallery.tools.NotificationsTool
 import com.google.ai.edge.gallery.tools.RemindersTool
 import com.google.ai.edge.gallery.tools.SmartHomeTool
+import com.google.ai.edge.gallery.tools.ToolCallGuard
 import com.google.ai.edge.gallery.tools.ToolDefinition
 import com.google.ai.edge.gallery.tools.WeatherTool
 import com.google.ai.edge.gallery.tools.WebSearchSetupTool
@@ -55,8 +56,12 @@ class AssistantTools(
   private val memoryVault: MemoryVaultRepository,
 ) : AgentToolsImpl() {
 
+  /** Shared by the web tools, so "the same call three times" is counted across all of them. */
+  private val toolCallGuard = ToolCallGuard()
+
   private val webSearchTool by lazy {
     WebSearchTool(
+      guard = toolCallGuard,
       searxngClient = searxngClient,
       showImageInChat = { base64 -> resultImageToShow = CallJsSkillResultImage(base64 = base64) },
       showPageInChat = { url ->

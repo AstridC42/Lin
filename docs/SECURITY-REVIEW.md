@@ -91,7 +91,19 @@ to this one), which is what would have made it serious.
 Not changed: the WebView is shared upstream code and narrowing it needs a flag
 plumbed through the chat message type. Noted rather than fixed.
 
-### 5. Cleartext HTTP is permitted, and narrowed in code
+### 5a. The SearXNG credential was sent to every page the assistant read — fixed
+
+**High, and mine.** One request helper served both jobs: talking to the user's SearXNG instance,
+and fetching whatever page or picture a search turned up. It attached the configured
+`Authorization` header to all of them. So asking Lin to read a link handed the user's own instance
+credential to that site — and the address came from a search result, which is to say from outside.
+
+Now split in two. `getFromInstance` carries the credential and insists on TLS unless the instance
+is on the user's own network. `getPublicContent` sends nothing, and is what fetches pages and
+images. Separate functions rather than a flag, because a flag at six call sites is a bug waiting
+for the seventh.
+
+### 5b. Cleartext HTTP is permitted, and narrowed in code
 
 **Accepted, with the narrowing as the mitigation.** `usesCleartextTraffic` is on. Without it the
 two services a user brings themselves — a SearXNG instance and Home Assistant — cannot be reached
@@ -112,7 +124,19 @@ anybody already on that network can read their searches and see the Home Assista
 the same exposure as using those services from a browser on the same network, and it is the
 exposure the user chose by running them without TLS.
 
-`LocalNetworkTest` holds the boundary down, including the case a prefix check gets wrong —
+The rule runs in both directions, and the second direction was missing at first. The instance
+address is one the user typed, so the question there is whether a secret would travel in the
+clear. A page or image URL is chosen by the model out of a search result, so the question is the
+opposite one — whether the assistant can be aimed at the user's own network. Without
+`privateTargetRefusal`, "read this page for me" reaches the router's admin panel and hands what it
+finds to a model that can be talked into repeating it. That is server-side request forgery with
+the phone as the server.
+
+An over-broad first version of this cost the feature: requiring TLS for public fetches too meant
+every `http://` image URL — most of what an image index returns — was refused, reported as "none
+of them could be downloaded".
+
+`LocalNetworkTest` holds both boundaries down, including the case a prefix check gets wrong —
 `192.168.0.9.example.com` resolves on the internet.
 
 ### 6. Exported components
@@ -145,6 +169,8 @@ Security properties worth asserting rather than reviewing once, all in
 | `McpPromptSafetyTest` | A third-party MCP server forging prompt structure: twelve injection attempts, including Unicode line breaks and invisible characters. |
 | `MessagingAppsTest` | A local phone number opening a WhatsApp conversation with a stranger who happens to share those digits. |
 | `SystemPromptBudgetTest` | A prompt placeholder reaching the model unsubstituted, and a capability that is off being described anyway. |
+| `ToolCallGuardTest` | A model looping on a tool that fails structurally, which has no cap anywhere else: the tool-call loop runs inside the engine. |
+| `ImageDecodeTest` | A multi-megapixel web image decoded whole, which is an `OutOfMemoryError` — an `Error`, so the `catch (Exception)` around it never fired and the app went down. |
 | `LocalNetworkTest` | Cleartext carrying a Home Assistant token or a SearXNG `Authorization` header to a host on the internet, now that the platform's own ban had to be lifted. |
 | `DeviceActionsToolTest` (garbled copy) | A call placed to a stranger because the model wrote a contact's digits out in the wrong order. |
 | `MemoryBookTest` | Unbounded growth of what is injected into every prompt, and a deletion taking the wrong line when the instruction is ambiguous. |

@@ -53,9 +53,15 @@ class WebSearchTool(
   private val showImageInChat: (base64: String) -> Unit = {},
   /** Puts a web page into the conversation, through the same slot. */
   private val showPageInChat: (url: String) -> Unit = {},
+  /**
+   * Shared with the other tools on this screen, so "the same call three times" is counted across
+   * the turn rather than per tool instance.
+   */
+  private val guard: ToolCallGuard = ToolCallGuard(),
 ) : ToolDefinition {
   override val alwaysAllow: Boolean = true
   override var executionContext: ToolExecutionContext? = null
+
 
   @Tool(
     description =
@@ -74,7 +80,9 @@ class WebSearchTool(
     categories: String = "",
     @ToolParam(description = "Optional recency: day, week, month or year.") timeRange: String = "",
   ): Map<String, Any> {
+    val call = "$query|$categories|$timeRange"
     return runBlocking(Dispatchers.Default) {
+      guard.loopBreaker("webSearch", call)?.let { return@runBlocking it }
       Log.d(TAG, "webSearch(query='$query', categories='$categories', timeRange='$timeRange')")
       sendProgress(
         label = "Searching the web for \"$query\"",
@@ -93,6 +101,7 @@ class WebSearchTool(
       ) {
         is WebSearchOutcome.Failure -> {
           sendProgress(label = "Web search failed", inProgress = false)
+          guard.recordFailure("webSearch", call, outcome.message)
           mapOf("status" to "failed", "error" to outcome.message)
         }
         is WebSearchOutcome.Success -> {
@@ -146,10 +155,12 @@ class WebSearchTool(
     query: String
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
+      guard.loopBreaker("showImageFromWeb", query)?.let { return@runBlocking it }
       sendProgress("Looking for a picture of \"$query\"", inProgress = true)
       when (val outcome = searxngClient.searchImages(query)) {
         is ImageSearchOutcome.Failure -> {
           sendProgress("No picture found", inProgress = false)
+          guard.recordFailure("showImageFromWeb", query, outcome.message)
           failure(outcome.message)
         }
         is ImageSearchOutcome.Success -> {
@@ -167,6 +178,7 @@ class WebSearchTool(
           }
           if (shown == null) {
             sendProgress("No picture could be loaded", inProgress = false)
+            guard.recordFailure("showImageFromWeb", query, "no candidate could be downloaded")
             return@runBlocking failure(
               "Pictures were found but none of them could be downloaded. Offer the user the link " +
                 "instead: ${outcome.images.firstOrNull()?.sourceUrl.orEmpty()}"
@@ -218,6 +230,7 @@ class WebSearchTool(
     @ToolParam(description = "The full http or https URL of the page to read.") url: String
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
+      guard.loopBreaker("openWebPage", url)?.let { return@runBlocking it }
       Log.d(TAG, "openWebPage(url='$url')")
       sendProgress(
         label = "Reading $url",
@@ -229,6 +242,7 @@ class WebSearchTool(
       when (val outcome = searxngClient.fetchPageText(url = url)) {
         is PageFetchOutcome.Failure -> {
           sendProgress(label = "Could not read the page", inProgress = false)
+          guard.recordFailure("openWebPage", url, outcome.message)
           mapOf("status" to "failed", "error" to outcome.message)
         }
         is PageFetchOutcome.Success -> {

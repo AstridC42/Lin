@@ -167,7 +167,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
 
       val body =
         try {
-          httpGet(requestUrl, settings, accept = "application/json")
+          getFromInstance(requestUrl, settings, accept = "application/json")
         } catch (e: SearxngHttpException) {
           return@withContext WebSearchOutcome.Failure(describeHttpFailure(e, baseUrl))
         } catch (e: IOException) {
@@ -220,7 +220,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
 
       val body =
         try {
-          httpGet("$baseUrl/search?$params", settings, accept = "application/json")
+          getFromInstance("$baseUrl/search?$params", settings, accept = "application/json")
         } catch (e: SearxngHttpException) {
           return@withContext ImageSearchOutcome.Failure(describeHttpFailure(e, baseUrl))
         } catch (e: IOException) {
@@ -269,7 +269,10 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
   suspend fun downloadImage(url: String, maxBytes: Int = MAX_IMAGE_BYTES): ImageDownloadOutcome =
     withContext(Dispatchers.IO) {
       if (url.isBlank()) return@withContext ImageDownloadOutcome.Failure("No picture URL.")
-      LocalNetwork.cleartextRefusal(url)?.let {
+      // No cleartext check: an image index returns mostly http:// urls, nothing of ours is sent
+      // with the request, and refusing them turned every picture search into "none of them could
+      // be downloaded". The LAN is still off limits - that address came from outside.
+      LocalNetwork.privateTargetRefusal(url)?.let {
         return@withContext ImageDownloadOutcome.Failure(it)
       }
       val settings = readSettings()
@@ -355,7 +358,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
 
       val html =
         try {
-          httpGet(url, settings, accept = "text/html,application/xhtml+xml")
+          getPublicContent(url, settings, accept = "text/html,application/xhtml+xml")
         } catch (e: SearxngHttpException) {
           return@withContext PageFetchOutcome.Failure(
             "The page returned HTTP ${e.statusCode} (${e.statusMessage})."
@@ -439,8 +442,48 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
     )
   }
 
-  private fun httpGet(url: String, settings: WebSearchSettings, accept: String): String {
+  /**
+   * A request to the user's own SearXNG instance.
+   *
+   * Carries the configured `Authorization` header, and so insists on TLS unless the instance is
+   * on the user's own network. Those two facts belong together: the header is the only secret
+   * this client holds, and the reason the cleartext rule exists at all.
+   */
+  private fun getFromInstance(url: String, settings: WebSearchSettings, accept: String): String {
     LocalNetwork.cleartextRefusal(url)?.let { throw InsecureTargetException(it) }
+    return get(url, settings, accept, credentials = settings.authHeader)
+  }
+
+  /**
+   * A request for something public that a search turned up - a page, a picture.
+   *
+   * Two differences from the above, and both were bugs the first time this was written as one
+   * function.
+   *
+   * It sends no credentials. The instance's `Authorization` header went onto every request this
+   * client made, including fetching whatever page the model picked out of a search result - so
+   * the user's own instance credential was handed to any site the assistant read, chosen by
+   * content from outside. That is the leak; this is the fix.
+   *
+   * And it does not insist on TLS. The cleartext rule protects the secret above; a page or an
+   * image found on the open web carries no secret of ours, is public already, and is read
+   * exactly as a browser would read it. Refusing plain http here broke every `http://` result -
+   * which is most of what an image index returns - and reported it as "none of them could be
+   * downloaded".
+   */
+  private fun getPublicContent(url: String, settings: WebSearchSettings, accept: String): String {
+    // The address came from a search result or from the model, so the one thing it must not be
+    // is the user's own network. Public content is on the public web by definition.
+    LocalNetwork.privateTargetRefusal(url)?.let { throw InsecureTargetException(it) }
+    return get(url, settings, accept, credentials = "")
+  }
+
+  private fun get(
+    url: String,
+    settings: WebSearchSettings,
+    accept: String,
+    credentials: String,
+  ): String {
     val timeoutMs = (settings.timeoutSeconds.takeIf { it > 0 } ?: DEFAULT_TIMEOUT_SECONDS) * 1000
     var connection: HttpURLConnection? = null
     try {
@@ -452,8 +495,8 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
       connection.setRequestProperty("Accept", accept)
       connection.setRequestProperty("Accept-Encoding", "gzip")
       connection.setRequestProperty("User-Agent", USER_AGENT)
-      if (settings.authHeader.isNotBlank()) {
-        connection.setRequestProperty("Authorization", settings.authHeader)
+      if (credentials.isNotBlank()) {
+        connection.setRequestProperty("Authorization", credentials)
       }
 
       val status = connection.responseCode
