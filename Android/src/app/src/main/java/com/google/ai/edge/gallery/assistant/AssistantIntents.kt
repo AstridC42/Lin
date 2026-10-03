@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ data class AssistantLaunchRequest(
 }
 
 /**
- * Translates the intents that make Star Storyteller usable as the phone's assistant into a first
+ * Translates the intents that make Lin usable as the phone's assistant into a first
  * message.
  *
  * Handled:

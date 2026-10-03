@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 private const val TAG = "AGVoiceSession"
 
 /** Extra set on the launch intent when the assistant was summoned hands-free. */
-const val EXTRA_START_LISTENING = "com.starstoryteller.assistant.START_LISTENING"
+const val EXTRA_START_LISTENING = "com.lin.assistant.START_LISTENING"
 
 /**
  * One summoning of the assistant.
@@ -76,7 +76,7 @@ const val EXTRA_START_LISTENING = "com.starstoryteller.assistant.START_LISTENING
  * continuously from a foreground service, which is a different bargain in battery and privacy and
  * is offered separately and explicitly rather than pretended to be a wake word here.
  */
-class StarVoiceInteractionSession(private val serviceContext: Context) :
+class LinVoiceInteractionSession(private val serviceContext: Context) :
   VoiceInteractionSession(serviceContext) {
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

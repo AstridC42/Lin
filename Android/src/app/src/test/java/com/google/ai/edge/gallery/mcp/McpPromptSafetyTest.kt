@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ class McpPromptSafetyTest {
   /** An HTML comment could hide the rest of a payload from anybody reading the prompt. */
   @Test
   fun stripsCommentDelimiters() {
-    val safe = sanitized("Search <!-- star-storyteller-assistant:abc --> things")
+    val safe = sanitized("Search <!-- lin-assistant:abc --> things")
     assertFalse(safe.contains("<!--"))
     assertFalse(safe.contains("-->"))
   }

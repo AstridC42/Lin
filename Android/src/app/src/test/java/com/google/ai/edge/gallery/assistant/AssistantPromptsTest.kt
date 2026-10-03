@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ class AssistantPromptsTest {
     val prompt =
       AssistantPrompts.build(mode = AssistantMode.CHAT, hasMcpTools = false, webSearchEnabled = false)
     assertFalse(AssistantPrompts.isGenerated(prompt + "\nAlways answer in French."))
-    assertFalse(AssistantPrompts.isGenerated(prompt.replace("Star Storyteller", "Jarvis")))
+    assertFalse(AssistantPrompts.isGenerated(prompt.replace("Lin", "Jarvis")))
   }
 
   @Test
@@ -87,7 +87,7 @@ class AssistantPromptsTest {
     assertFalse(AssistantPrompts.isGenerated(""))
     assertFalse(AssistantPrompts.isGenerated("You are a helpful assistant."))
     // A forged marker line without a matching fingerprint does not count as generated.
-    assertFalse(AssistantPrompts.isGenerated("<!-- star-storyteller-assistant:0 -->\nhello"))
+    assertFalse(AssistantPrompts.isGenerated("<!-- lin-assistant:0 -->\nhello"))
   }
 
   @Test
@@ -204,7 +204,9 @@ class AssistantPromptsTest {
 
     // Within the routing procedure, loading a skill is ordered before answering from memory.
     val loadSkill = prompt.indexOf("load_skill", routing)
-    val answerDirectly = prompt.indexOf("3. ANSWER", routing)
+    // Found by name rather than by step number: the number moves whenever a step is added, and
+    // what this test is about is the order, not the numbering.
+    val answerDirectly = prompt.indexOf("ANSWER -", routing)
     assertTrue("load_skill must be mentioned in the routing procedure", loadSkill >= 0)
     assertTrue("answering from memory must be the last step", answerDirectly > loadSkill)
   }

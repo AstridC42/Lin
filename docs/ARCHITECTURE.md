@@ -10,7 +10,7 @@ tells you nothing about who wrote a file — this document does.
 ## The shape of it
 
 Upstream Edge Gallery is a gallery of demos: one screen per capability, each
-with its own model list, its own prompt, its own tools. Star Storyteller puts a
+with its own model list, its own prompt, its own tools. Lin puts a
 single conversation in front of all of them. That one decision is what every
 directory below exists to serve.
 
@@ -25,6 +25,8 @@ attached to it.
 ```
 Android/src/app/src/main/java/com/google/ai/edge/gallery/
 ├── assistant/        the screen, and everything that configures it
+├── memory/           the vault: notes, conversation digests, cold storage
+├── net/              what counts as the user's own network
 ├── tools/            what the model can actually do  (shared with upstream)
 ├── voice/            being summoned, listening, speaking, the pop-up
 ├── car/              Android Auto
@@ -65,6 +67,36 @@ skill list was positioned where a small model had stopped reading. Both looked
 like the model being stupid. `SystemPromptBudgetTest` guards the first; the
 ordering assertions in `AssistantPromptsTest` guard the second.
 
+### `memory/`
+
+Three layers, which is the whole design, and they exist because they have different costs.
+
+**Notes** are what Lin knows about the user. A couple of hundred may be stored; a selection of
+around two dozen goes into the system prompt on every turn, chosen by `MemoryRetention.forPrompt`
+and capped at `MAX_PROMPT_CHARS`. That cap is the load-bearing number in this directory: every
+character is charged against the same budget as the tool schemas and the conversation, so the
+prompt gets what is worth saying and nothing else.
+
+Notes cool. A note not said, implied or acted on inside its window is flagged cold - never
+deleted - and drops out of the prompt while staying searchable. Windows run from three weeks for
+passing context to a year for identity, and `MINIMUM_WARM_DAYS` is the floor nothing falls below.
+Confirmation resets the clock and adds a week per repetition; what the user wrote themselves, and
+anything pinned, never cools.
+
+**Digests** are one paragraph per conversation, with links in both directions: to the notes it
+produced, and to the transcript it came from. This is the index, and it is cheap enough to keep
+hundreds of.
+
+**The archive** is every conversation in full, as Markdown under `files/memory/archive`. Cold by
+design: nothing reads it until a tool asks. Files rather than the proto store, because the store
+is rewritten whole on every change and transcripts only grow.
+
+`MemoryDigestWorker` is the background half. After a conversation ends it writes the transcript,
+borrows the loaded engine through a *scratch conversation* - never the user's own, which would
+append a summarisation request to the chat they come back to - extracts notes, and files the
+digest. With no engine loaded it writes an extractive placeholder and marks it, so a later pass
+can replace it: a conversation is never only in the queue.
+
 ### `tools/`
 
 One class per capability, each a LiteRT-LM `ToolSet` whose `@Tool` methods are
@@ -87,7 +119,7 @@ every schema is charged against that same budget.
 
 ### `voice/`
 
-Everything about being talked to. `StarVoiceInteractionService` and its session
+Everything about being talked to. `LinVoiceInteractionService` and its session
 are what make the app selectable as the phone's assistant; the session is the
 pop-up that appears when the power button is held. `WakeWordService` is the
 always-listening option, kept separate and explicit because it holds the
@@ -109,7 +141,7 @@ Kept as few as possible. The ones that matter:
 | `ui/navigation/GalleryNavGraph.kt` | The assistant is the start destination; the gallery is one tap away. |
 | `skills/SkillExtensions.kt` | The skill list is written as the call that loads it, one line each. |
 | `tools/LoadSkillTool.kt` | A description that says when to use it. "Loads a skill" did not. |
-| `data/DataStoreRepository.kt` | The four Star Storyteller settings readers share one snapshot instead of going to disk on every call. |
+| `data/DataStoreRepository.kt` | The four Lin settings readers share one snapshot instead of going to disk on every call. |
 | `proto/settings.proto` | `AssistantSettings`, `WebSearchSettings`, `SmartHomeSettings`, `Reminders`. |
 
 ## Tests
@@ -124,6 +156,12 @@ not; `MessagingApps.whatsAppNumber` is tested and the intent that uses it is
 not. In each case the extracted function is where being wrong is silent and
 expensive — a forecast about different weather, an appointment on the wrong day,
 a message written to a stranger who shares a phone number.
+
+`MemoryRetentionTest` and `NoteMergeTest` hold the two halves of remembering, both of which fail
+silently: forget too eagerly and the assistant stops knowing you with no error anywhere; select
+too generously and every turn carries a recitation out of the budget the conversation needed.
+`DigestParserTest` covers what comes back from a small model asked for structured output in the
+background, where a mis-parse becomes something Lin believes about somebody for ever.
 
 Run them with `./gradlew :app:testReleaseUnitTest` from `Android/src`. The release variant
 is the only one with unit tests: AGP 9 builds them for a single variant, and `testBuildType`

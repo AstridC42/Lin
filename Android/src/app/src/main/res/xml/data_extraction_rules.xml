@@ -2,7 +2,7 @@
 <!--
   What leaves the device in a backup or a device-to-device transfer.
 
-  Star Storyteller: the app's settings hold credentials the user typed in - a Home Assistant
+  Lin: the app's settings hold credentials the user typed in - a Home Assistant
   long-lived access token, an Authorization header for a SearXNG instance behind a proxy - and
   everything the assistant has been told to remember about them. None of that needs to be in a
   cloud backup to make a restored phone usable: the app works without it and asks again.

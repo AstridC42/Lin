@@ -71,7 +71,7 @@ jobs:
             base="$(basename "$apk" .apk)"
             abi="${base#app-}"
             abi="${abi%-release}"
-            cp "$apk" "$RUNNER_TEMP/apks/star-storyteller-${short}-${abi}.apk"
+            cp "$apk" "$RUNNER_TEMP/apks/lin-${short}-${abi}.apk"
           done
           if [ -z "$(ls -A "$RUNNER_TEMP/apks")" ]; then
             echo "::error::No APKs were produced"

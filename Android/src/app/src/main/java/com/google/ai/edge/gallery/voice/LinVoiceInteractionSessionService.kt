@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package com.google.ai.edge.gallery.voice
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSessionService
 
-/** Hands the system a fresh [StarVoiceInteractionSession] each time the assistant is summoned. */
-class StarVoiceInteractionSessionService : VoiceInteractionSessionService() {
-  override fun onNewSession(args: Bundle?) = StarVoiceInteractionSession(this)
+/** Hands the system a fresh [LinVoiceInteractionSession] each time the assistant is summoned. */
+class LinVoiceInteractionSessionService : VoiceInteractionSessionService() {
+  override fun onNewSession(args: Bundle?) = LinVoiceInteractionSession(this)
 }

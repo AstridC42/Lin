@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import dagger.hilt.components.SingletonComponent
 private const val TAG = "AGReminders"
 private const val CHANNEL_ID = "star_reminders"
 
-const val EXTRA_REMINDER_ID = "com.starstoryteller.assistant.REMINDER_ID"
+const val EXTRA_REMINDER_ID = "com.lin.assistant.REMINDER_ID"
 
 /**
  * Reminders the assistant owns, rather than ones it hands away.

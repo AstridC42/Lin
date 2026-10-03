@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ object CrashReport {
     val stackTrace = StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
     val when_ = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
     val report = buildString {
-      appendLine("Star Storyteller crashed at $when_")
+      appendLine("Lin crashed at $when_")
       appendLine("App version: ${BuildConfigVersion.name} (${BuildConfigVersion.code})")
       appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}")
       appendLine("Thread: ${thread.name}")

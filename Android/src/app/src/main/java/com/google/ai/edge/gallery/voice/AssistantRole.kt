@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ private const val TAG = "AGAssistantRole"
  */
 object AssistantRole {
 
-  /** Whether Star Storyteller is currently the device's digital assistant. */
+  /** Whether Lin is currently the device's digital assistant. */
   fun isHeld(context: Context): Boolean {
     // The role API knows for certain from Android 10 on. Below that, and on manufacturer builds
     // that do not implement the role, fall back to reading the setting the assistant is stored in.

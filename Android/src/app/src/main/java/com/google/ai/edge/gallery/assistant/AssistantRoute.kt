@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,7 @@ import com.google.ai.edge.gallery.customtasks.common.CustomTaskDataForBuiltinTas
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
+import com.google.ai.edge.gallery.memory.rememberLoadedModelRegistry
 import com.google.ai.edge.gallery.ui.common.MemoryWarningAlert
 import com.google.ai.edge.gallery.ui.common.isMemoryLow
 import com.google.ai.edge.gallery.ui.common.tos.AppTosDialog
@@ -90,6 +91,7 @@ fun AssistantRoute(
   tosViewModel: TosViewModel = hiltViewModel(),
 ) {
   val context = LocalContext.current
+  val loadedModelRegistry = rememberLoadedModelRegistry()
   val uiState by modelManagerViewModel.uiState.collectAsState()
   val assistantTask = modelManagerViewModel.getCustomTaskByTaskId(BuiltInTaskId.ASSISTANT)
   val models = assistantTask?.task?.models ?: listOf()
@@ -193,8 +195,13 @@ fun AssistantRoute(
   LaunchedEffect(initializationStatus, selectedName) {
     if (initializationStatus is Model.InitializationStatus.Initialized) {
       ResidentAssistantService.startIfEnabled(context)
+      // The background digester cannot reach a ViewModel, and the engine is the one thing it
+      // cannot do without. This is how it learns there is one to borrow - and, below, that there
+      // is not. A stale reference would have it try to summarise against a closed engine.
+      loadedModelRegistry.setLoaded(uiState.selectedModel)
     } else {
       ResidentAssistantService.stop(context)
+      loadedModelRegistry.setLoaded(null)
     }
   }
 

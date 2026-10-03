@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -355,7 +355,7 @@ class CalendarTool(
     val WHEN_FORMAT = SimpleDateFormat("EEE d MMM HH:mm", Locale.getDefault())
 
     const val PERMISSION_MESSAGE =
-      "Star Storyteller has not been allowed to use the calendar. Tell the user to allow it from " +
+      "Lin has not been allowed to use the calendar. Tell the user to allow it from " +
         "the Guide panel in the app. Do not claim the calendar is empty."
   }
 }

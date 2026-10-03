@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,8 @@ import com.google.ai.edge.gallery.data.Category
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
-import com.google.ai.edge.gallery.memory.MemoryBook
+import com.google.ai.edge.gallery.memory.MemoryRetention
+import com.google.ai.edge.gallery.memory.MemoryVaultRepository
 import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.skills.SkillsProvider
 import com.google.ai.edge.gallery.skills.formatSelectedSkills
@@ -60,6 +61,7 @@ class AssistantTask(
   private val dataStoreRepository: DataStoreRepository,
   private val searxngClient: SearxngClient,
   private val homeAssistantClient: HomeAssistantClient,
+  private val memoryVault: MemoryVaultRepository,
 ) : CustomTask {
 
   override val task: Task by lazy {
@@ -142,6 +144,7 @@ class AssistantTask(
       dataStoreRepository = dataStoreRepository,
       searxngClient = searxngClient,
       homeAssistantClient = homeAssistantClient,
+      memoryVault = memoryVault,
       initialQuery = myData.initialQuery,
       initialImageUris = myData.initialImageUris,
       startListening = myData.startListening,
@@ -156,13 +159,15 @@ class AssistantTask(
    * @param currentPrompt what the system prompt repository has for this task; empty on a fresh
    *   install and replaced wholesale whenever it is still the generated one.
    */
-  private fun buildSystemPrompt(
+  private suspend fun buildSystemPrompt(
     currentPrompt: String,
     toolsPrompt: String,
     availableSkills: String,
   ): String {
     val settings = dataStoreRepository.readAssistantSettings()
-    val memory = MemoryBook.format(dataStoreRepository.readAssistantMemory())
+    // Only the warm, selected notes: the vault can hold hundreds, and what goes in front of the
+    // model each turn is the handful worth the budget. The rest is a searchMemory call away.
+    val memory = MemoryRetention.format(memoryVault.notesForPrompt(System.currentTimeMillis()))
     val template =
       AssistantPrompts.resolve(
         currentPrompt = currentPrompt,
