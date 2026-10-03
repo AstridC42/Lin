@@ -136,7 +136,7 @@ fun AgentChatScreen(
   initialQuery: String? = null,
   /**
    * Images to attach to the first message, as content URIs. Used when another app shares a picture
-   * into Star Storyteller.
+   * into Lin.
    */
   initialImageUris: List<String> = listOf(),
   /**

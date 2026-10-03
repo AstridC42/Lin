@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +16,37 @@
 
 package com.google.ai.edge.gallery.tools
 
-import com.google.ai.edge.gallery.data.DataStoreRepository
-import com.google.ai.edge.gallery.memory.MemoryBook
+import android.content.Context
+import com.google.ai.edge.gallery.memory.ConversationArchive
+import com.google.ai.edge.gallery.memory.MemoryHit
+import com.google.ai.edge.gallery.memory.MemoryVaultRepository
 import com.google.ai.edge.litertlm.Tool
 import com.google.ai.edge.litertlm.ToolParam
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
 /**
- * Remembering and forgetting things about the user.
+ * Reaching the vault from inside a conversation.
  *
- * What is remembered is already in the model's system prompt, so there is no tool for reading it
- * back - asking "what do you know about me" is answered from the prompt without a call. These two
- * exist only to change it.
+ * Warm memory is already in the system prompt, so "what do you know about me" needs no call at
+ * all. These tools are for the three things the prompt cannot do: change what is remembered,
+ * and reach the two layers that are deliberately *not* in the prompt - notes that have cooled,
+ * and the conversations themselves.
  *
- * Saving is not silent by design. The tool's description says to say what was remembered, because
- * a fact stored wrongly is repeated confidently for as long as it sits there, and the moment it is
- * saved is the only moment the user is in a position to correct it.
+ * That split is the whole design. Warm notes cost prompt budget on every single turn, so there
+ * are few of them and they are short. Everything else is free until it is asked for. An
+ * assistant that can look something up is worth more than one that recites.
+ *
+ * Saving is not silent, by instruction in the description: a fact stored wrongly is repeated
+ * with confidence for as long as it sits there, and the moment it is saved is the only moment
+ * the user is positioned to correct it.
  */
 class MemoryTool(
-  private val repository: DataStoreRepository,
+  private val context: Context,
+  private val vault: MemoryVaultRepository,
   /** Overridable so tests do not depend on the wall clock. */
   private val now: () -> Long = { System.currentTimeMillis() },
 ) : ToolDefinition {
@@ -55,14 +66,13 @@ class MemoryTool(
     fact: String
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
-      val updated =
-        MemoryBook.remember(repository.readAssistantMemory(), fact, now())
+      val note =
+        vault.addUserNote(text = fact, nowMillis = now())
           ?: return@runBlocking failure("There was nothing in that worth remembering.")
-      repository.saveAssistantMemory(updated)
       sendProgress("Remembered", inProgress = false)
       mapOf(
         "status" to "succeeded",
-        "remembered" to updated.getFact(0).text,
+        "remembered" to note.text,
         "hint" to
           "Tell the user what you have remembered, in one line, so they can correct it now if it " +
             "is wrong.",
@@ -80,20 +90,102 @@ class MemoryTool(
     fact: String
   ): Map<String, Any> {
     return runBlocking(Dispatchers.Default) {
-      val current = repository.readAssistantMemory()
-      val updated =
-        MemoryBook.forgetMatching(current, fact)
-          ?: return@runBlocking failure(
-            // Two candidates and none are removed, which is the right failure: erasing the wrong
-            // memory is not something the user can see has happened.
-            "Nothing matched \"$fact\" closely enough to be sure which memory to remove. Read " +
-              "back what is remembered and ask which one they mean."
-          )
-      repository.saveAssistantMemory(updated)
+      vault.forgetMatching(fact)
+        ?: return@runBlocking failure(
+          // Nothing is removed when two notes match, which is the right failure: erasing the
+          // wrong memory is not something the user can see has happened.
+          "Nothing matched \"$fact\" closely enough to be sure which memory to remove. Read back " +
+            "what is remembered and ask which one they mean."
+        )
       sendProgress("Forgotten", inProgress = false)
       mapOf("status" to "succeeded", "hint" to "Confirm in one line that it is forgotten.")
     }
   }
+
+  @Tool(
+    description =
+      "Search everything remembered from past conversations - older notes and the summaries of " +
+        "previous conversations. Use when the user refers to something from before that is not " +
+        "already in front of you: 'what did we decide about', 'the thing I mentioned last week'."
+  )
+  fun searchMemory(
+    @ToolParam(description = "What to look for, in a few words.") query: String
+  ): Map<String, Any> {
+    return runBlocking(Dispatchers.Default) {
+      if (query.isBlank()) return@runBlocking failure("No search terms were given.")
+      sendProgress("Searching memory", inProgress = true)
+      val hits = vault.search(query)
+      if (hits.isEmpty()) {
+        return@runBlocking mapOf(
+          "status" to "succeeded",
+          "results" to emptyList<Any>(),
+          "hint" to
+            "Nothing in memory matches that. Say so plainly rather than guessing at what it " +
+              "might have been.",
+        )
+      }
+      // Finding a cold note is itself evidence it still matters, so being searched for warms it.
+      vault.touchNotes(hits.filter { it.kind == MemoryHit.Kind.NOTE }.map { it.id }, now())
+      sendProgress("Found ${hits.size} in memory", inProgress = false)
+      mapOf(
+        "status" to "succeeded",
+        "results" to
+          hits.map {
+            buildMap {
+              put("kind", if (it.kind == MemoryHit.Kind.NOTE) "note" else "conversation")
+              put("text", it.body)
+              put("when", humanDate(it.whenMillis))
+              if (it.kind == MemoryHit.Kind.CONVERSATION) {
+                put("title", it.title)
+                put("conversation_id", it.id)
+              }
+            }
+          },
+        "hint" to
+          "These are summaries. To read what was actually said in one of the conversations, " +
+            "call readPastConversation with its conversation_id.",
+      )
+    }
+  }
+
+  @Tool(
+    description =
+      "Read what was actually said in a past conversation, by its id from searchMemory. Use only " +
+        "when the summary is not enough, because transcripts are long."
+  )
+  fun readPastConversation(
+    @ToolParam(description = "The conversation_id from a searchMemory result.")
+    conversationId: String
+  ): Map<String, Any> {
+    return runBlocking(Dispatchers.Default) {
+      val digest =
+        vault.digest(conversationId)
+          ?: return@runBlocking failure(
+            "There is no conversation with that id. Use searchMemory first to find one."
+          )
+      val transcript =
+        ConversationArchive(context).read(digest.archivePath)
+          ?: return@runBlocking failure(
+            "The summary of \"${digest.title}\" is in memory but the full transcript is not on " +
+              "the device any more. What is known is: ${digest.summary}"
+          )
+      sendProgress("Read \"${digest.title}\"", inProgress = false)
+      mapOf(
+        "status" to "succeeded",
+        "title" to digest.title,
+        "when" to humanDate(digest.endedAtMillis),
+        // Capped hard: a transcript is charged against the same budget as the conversation
+        // happening now, and a tool result that fills the window ends the turn it was meant to
+        // help with.
+        "transcript" to transcript.take(MAX_TRANSCRIPT_CHARS),
+        "truncated" to (transcript.length > MAX_TRANSCRIPT_CHARS),
+      )
+    }
+  }
+
+  private fun humanDate(millis: Long): String =
+    if (millis <= 0) "unknown"
+    else SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(millis))
 
   private suspend fun sendProgress(label: String, inProgress: Boolean) {
     executionContext
@@ -103,4 +195,8 @@ class MemoryTool(
 
   private fun failure(message: String): Map<String, Any> =
     mapOf("status" to "failed", "error" to message)
+
+  private companion object {
+    const val MAX_TRANSCRIPT_CHARS = 4_000
+  }
 }

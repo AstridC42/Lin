@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ sealed interface PageFetchOutcome {
  * [SearXNG](https://docs.searxng.org/) metasearch instance.
  *
  * The instance must have `json` listed under `search.formats` in its `settings.yml`; most public
- * instances only serve HTML, which is why Star Storyteller expects a private instance. Every call
+ * instances only serve HTML, which is why Lin expects a private instance. Every call
  * is issued with `HttpURLConnection` on [Dispatchers.IO] so no extra HTTP dependency is pulled in.
  */
 class SearxngClient(private val readSettings: () -> WebSearchSettings) {
@@ -522,7 +522,7 @@ class SearxngClient(private val readSettings: () -> WebSearchSettings) {
 
     private const val USER_AGENT =
       "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/124.0 Mobile Safari/537.36 StarStoryteller"
+        "Chrome/124.0 Mobile Safari/537.36 Lin"
 
     /**
      * Trims trailing slashes and adds a scheme when the user typed a bare host.

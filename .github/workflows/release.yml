@@ -1,4 +1,4 @@
-# Builds and publishes a Star Storyteller release.
+# Builds and publishes a Lin release.
 #
 # Cutting a release is one step: push a `v<major>.<minor>.<patch>` tag. This workflow derives the
 # app's versionName and versionCode from that tag, builds the APKs, and publishes them on the
@@ -134,7 +134,7 @@ jobs:
             -keystore ci-keystore/star-ci.jks -storetype PKCS12 -alias star \
             -keyalg RSA -keysize 4096 -validity 10950 \
             -storepass "$CI_KEYSTORE_PASSWORD" -keypass "$CI_KEYSTORE_PASSWORD" \
-            -dname "CN=Star Storyteller Test Builds, OU=CI, O=Star Storyteller"
+            -dname "CN=Lin Test Builds, OU=CI, O=Lin"
 
       - name: Save the CI signing key
         if: ${{ env.KEYSTORE_BASE64 == '' && steps.signing-cache.outputs.cache-hit != 'true' }}
@@ -218,7 +218,7 @@ jobs:
             # app-arm64-v8a-release -> arm64-v8a, app-universal-release -> universal
             abi="${base#app-}"
             abi="${abi%-release}"
-            cp "$apk" "dist/star-storyteller-${VERSION}-${abi}.apk"
+            cp "$apk" "dist/lin-${VERSION}-${abi}.apk"
           done
           if [ -z "$(ls -A dist)" ]; then
             echo "::error::No APKs were produced"
@@ -252,14 +252,14 @@ jobs:
           base="https://github.com/${REPO}/releases/download/${TAG}"
           size_of() {
             # Human-readable size of a built APK, so the table says what a tap will cost.
-            local file="dist/star-storyteller-${VERSION}-$1.apk"
+            local file="dist/lin-${VERSION}-$1.apk"
             if [ -f "$file" ]; then
               echo "$(( ( $(stat -c%s "$file") + 524288 ) / 1048576 )) MB"
             else
               echo "-"
             fi
           }
-          link() { echo "[star-storyteller-${VERSION}-$1.apk](${base}/star-storyteller-${VERSION}-$1.apk)"; }
+          link() { echo "[lin-${VERSION}-$1.apk](${base}/lin-${VERSION}-$1.apk)"; }
 
           {
             echo "## Install"
@@ -292,7 +292,7 @@ jobs:
             echo
             echo "## Set it as your assistant"
             echo
-            echo "Settings → Apps → Default apps → Digital assistant app → Star Storyteller."
+            echo "Settings → Apps → Default apps → Digital assistant app → Lin."
             echo "Then open the app, pick a model from the chip at the top of the chat, and let it"
             echo "download. Web search needs your own SearXNG instance — see the README."
             echo
@@ -317,14 +317,14 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag -a "$TAG" -m "Star Storyteller $TAG"
+          git tag -a "$TAG" -m "Lin $TAG"
           git push origin "$TAG"
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Star Storyteller ${{ steps.version.outputs.name }}
+          name: Lin ${{ steps.version.outputs.name }}
           body_path: release-notes.md
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || contains(steps.version.outputs.name, '-') }}
           files: |

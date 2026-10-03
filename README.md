@@ -1,10 +1,10 @@
-# Star Storyteller
+# Lin
 
 An on-device digital assistant for Android, built as a fork of
 [Google AI Edge Gallery](https://github.com/google-ai-edge/gallery).
 
 Edge Gallery is a showcase: one screen per capability, each a separate
-demo. Star Storyteller keeps every one of those capabilities and puts them
+demo. Lin keeps every one of those capabilities and puts them
 behind a single conversation, so the app can be used the way you actually use
 an assistant — ask a question, drop in a photo, tell it to call someone — often
 in the same message.
@@ -17,7 +17,7 @@ assistant with this much reach actually has, and what is done about it.
 
 ## What is different from upstream
 
-| | Edge Gallery | Star Storyteller |
+| | Edge Gallery | Lin |
 |---|---|---|
 | Start screen | Capability gallery | The assistant chat |
 | Capabilities | Separate screens: chat, ask image, ask audio, mobile actions, agent | One chat, with a mode button that biases it |
@@ -266,7 +266,7 @@ cd Android/src
 Requires JDK 21 and Android SDK platform 37. Everything else is fetched by
 Gradle. `local.properties` needs `sdk.dir=/path/to/android-sdk`.
 
-The app installs as `com.starstoryteller.assistant`, so it sits alongside
+The app installs as `com.lin.assistant`, so it sits alongside
 upstream Edge Gallery rather than replacing it.
 
 ## Where the changes live

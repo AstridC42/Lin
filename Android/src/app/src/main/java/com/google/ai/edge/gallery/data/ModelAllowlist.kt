@@ -249,7 +249,7 @@ data class AllowedModel(
 }
 
 /**
- * Mirrors an `llm_chat` entry onto Star Storyteller's unified assistant task.
+ * Mirrors an `llm_chat` entry onto Lin's unified assistant task.
  *
  * The remote allowlist is written against the upstream task ids and has no way to know about the
  * assistant, so a capability the model advertises for plain chat - thinking, speculative decoding,

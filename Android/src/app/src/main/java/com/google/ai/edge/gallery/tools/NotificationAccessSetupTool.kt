@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ class NotificationAccessSetupTool : ToolDefinition {
       "status" to "failed",
       "error" to
         "Notification access has not been granted, so nothing can be read, replied to or " +
-          "dismissed. Tell the user to turn on Star Storyteller under Settings > Notifications > " +
+          "dismissed. Tell the user to turn on Lin under Settings > Notifications > " +
           "Device & app notifications, or from the Guide panel in the app. Do not claim there are " +
           "no notifications.",
     )

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Copyright 2026 The Star Storyteller Authors
+  Copyright 2026 The Lin Authors
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  Metadata for StarRecognitionService. No settings activity is declared: the service forwards to
+  Metadata for LinRecognitionService. No settings activity is declared: the service forwards to
   the device's own recognizer and has nothing of its own to configure.
 -->
 <recognition-service xmlns:android="http://schemas.android.com/apk/res/android" />

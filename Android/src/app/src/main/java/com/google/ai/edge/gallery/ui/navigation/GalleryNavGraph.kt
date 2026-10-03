@@ -89,7 +89,7 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "AGGalleryNavGraph"
 private const val SCHEME_UPSTREAM = "com.google.ai.edge.gallery"
-private const val SCHEME_STAR_STORYTELLER = "starstoryteller"
+private const val SCHEME_STAR_STORYTELLER = "lin"
 private const val ROUTE_ASSISTANT = "assistant"
 private const val ROUTE_HOMESCREEN = "homepage"
 private const val ROUTE_MODEL_LIST = "model_list"
@@ -190,7 +190,7 @@ fun GalleryNavHost(
 
   NavHost(
     navController = navController,
-    // Star Storyteller opens on the assistant rather than the capability gallery: it is meant to
+    // Lin opens on the assistant rather than the capability gallery: it is meant to
     // be the phone's default assistant, so the chat has to be the first thing on screen. The
     // gallery is one tap away from the assistant's mode bar and is otherwise unchanged.
     startDestination = ROUTE_ASSISTANT,
@@ -474,7 +474,7 @@ fun GalleryNavHost(
   // Wait until the model manager has been initialized and the tasks are available.
   if (data != null && modelManagerUiState.tasks.isNotEmpty()) {
     intent.data = null
-    // Star Storyteller answers to its own scheme as well as the upstream one, so links keep
+    // Lin answers to its own scheme as well as the upstream one, so links keep
     // working when both apps are installed. Normalize to the upstream form and handle both with
     // the same code below.
     val uriStr =

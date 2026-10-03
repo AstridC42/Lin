@@ -64,9 +64,9 @@ android {
   compileSdk { this.version = release(37) { minorApiLevel = 0 } }
 
   defaultConfig {
-    // Star Storyteller ships as its own app rather than a drop-in replacement for Edge Gallery,
+    // Lin ships as its own app rather than a drop-in replacement for Edge Gallery,
     // so it installs alongside it instead of colliding with its package name.
-    applicationId = "com.starstoryteller.assistant"
+    applicationId = "com.lin.assistant"
     minSdk = 31
     targetSdk = 37
     // Driven by the release workflows rather than hardcoded: both pack the semantic version and

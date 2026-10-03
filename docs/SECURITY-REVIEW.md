@@ -73,7 +73,7 @@ Declining those intents would remove sharing, text selection and the launcher
 search box — the feature *is* the exposure. Two things limit it: the chat is in
 front of the user with the injected text visible as a message, so it is not
 silent; and the deep-link route is closed, which is the one that would have let a
-*web page* do this. `ACTION_VIEW` on the `starstoryteller://` scheme is
+*web page* do this. `ACTION_VIEW` on the `lin://` scheme is
 `BROWSABLE`, and `AssistantIntents.parse` deliberately extracts no query from it.
 
 Worth revisiting if the assistant ever acts without the screen being on.
@@ -123,7 +123,7 @@ Reviewed all ten. The ones without a permission are:
 |---|---|
 | `MainActivity` | Finding 3 above. |
 | `OssLicenses*Activity` | Google library, displays licence text. |
-| `StarCarAppService` | Guarded in code by `HostValidator` against the Car App Library's list of Google-signed hosts, not by `ALLOW_ALL_HOSTS_VALIDATOR`. |
+| `LinCarAppService` | Guarded in code by `HostValidator` against the Car App Library's list of Google-signed hosts, not by `ALLOW_ALL_HOSTS_VALIDATOR`. |
 | `AssistantWidgetProvider` | Launches the app. No data in, nothing to redirect. |
 | `BootReceiver` | Upstream. Checks the action and only reschedules the app's own notifications; a forged broadcast achieves nothing. Our own `ReminderBootReceiver` is not exported. |
 
@@ -155,6 +155,22 @@ One of these found a real bug while being written: the first version of the MCP
 sanitiser used Java's `\p{Cntrl}` and `\s`, both ASCII-only, so U+0085 and U+2028
 — a next-line and a line separator — went straight through a filter whose entire
 job was stopping a server from starting a line of its own.
+
+### 8. The memory vault is a new store of personal data
+
+**Noted, not a finding.** The vault holds what a model inferred about the user from their
+conversations, plus every conversation in full under `files/memory/archive`. Both are app-private
+and both are excluded from cloud backup along with the rest of the settings store (finding 2).
+
+Two things are worth stating rather than discovering later. The transcripts are plain Markdown
+rather than encrypted, so anything that can read the app's private files can read them - which on
+an unrooted device means the app itself. And the vault is reachable by the model through
+`searchMemory` and `readPastConversation`, which means a prompt injection that reaches the model
+can ask it to read old conversations aloud; that is the same exposure as finding 1 and is bounded
+by the same sanitiser, but the thing on the other side is now larger.
+
+Clearing it is one action: **Memory** in the Guide panel deletes notes individually, and
+uninstalling takes the archive with it.
 
 ## What this review does not cover
 

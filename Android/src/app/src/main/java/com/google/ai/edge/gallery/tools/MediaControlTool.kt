@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.util.Log
-import com.google.ai.edge.gallery.notifications.StarNotificationListener
+import com.google.ai.edge.gallery.notifications.LinNotificationListener
 import com.google.ai.edge.gallery.media.MusicApps
 import com.google.ai.edge.litertlm.Tool
 import com.google.ai.edge.litertlm.ToolParam
@@ -207,10 +207,10 @@ class MediaControlTool(
    * Taking the first would pause the wrong thing, so an actively playing session always wins.
    */
   private fun activeController(): MediaController? {
-    if (!StarNotificationListener.isGranted(context)) return null
+    if (!LinNotificationListener.isGranted(context)) return null
     val manager =
       context.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager ?: return null
-    val component = ComponentName(context, StarNotificationListener::class.java)
+    val component = ComponentName(context, LinNotificationListener::class.java)
     val sessions =
       try {
         manager.getActiveSessions(component)
@@ -226,10 +226,10 @@ class MediaControlTool(
 
   /** Distinguishes "no permission" from "nothing playing", which are not the same answer. */
   private fun noSessionFailure(nothingPlaying: String): Map<String, Any> =
-    if (!StarNotificationListener.isGranted(context)) {
+    if (!LinNotificationListener.isGranted(context)) {
       failure(
         "Media control needs notification access, which has not been granted. Tell the user to " +
-          "turn on Star Storyteller under Settings > Notifications > Device & app notifications, " +
+          "turn on Lin under Settings > Notifications > Device & app notifications, " +
           "or from the Guide panel. Do not claim nothing is playing."
       )
     } else {

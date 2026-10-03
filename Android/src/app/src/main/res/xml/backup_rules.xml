@@ -2,7 +2,7 @@
 <!--
   The pre-Android-12 form of data_extraction_rules.xml, kept in step with it.
 
-  Star Storyteller: minSdk is 31, so in practice the other file is the one that applies. This
+  Lin: minSdk is 31, so in practice the other file is the one that applies. This
   exists because the manifest names it and because a divergence between the two is the kind of
   thing that is only noticed on the one device where it matters.
 -->

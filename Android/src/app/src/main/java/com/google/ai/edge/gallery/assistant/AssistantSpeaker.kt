@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -183,7 +183,7 @@ class AssistantSpeaker(context: Context) {
   }
 
   companion object {
-    private const val UTTERANCE_ID = "star-storyteller-reply"
+    private const val UTTERANCE_ID = "lin-reply"
     private const val MAX_SPOKEN_CHARS = 4000
 
     private val CODE_BLOCK = Regex("```[\\s\\S]*?```")

@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import com.google.ai.edge.gallery.agent.sessions.LlmSessionManager
 import com.google.ai.edge.gallery.customtasks.agentchat.AgentTools
 import com.google.ai.edge.gallery.customtasks.common.CustomTask
 import com.google.ai.edge.gallery.data.DataStoreRepository
+import com.google.ai.edge.gallery.memory.MemoryVaultRepository
 import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.skills.SkillManager
@@ -65,11 +66,13 @@ internal object AssistantTaskModule {
     searxngClient: SearxngClient,
     homeAssistantClient: HomeAssistantClient,
     dataStoreRepository: DataStoreRepository,
+    memoryVaultRepository: MemoryVaultRepository,
   ): AgentTools =
     AssistantTools(
         searxngClient = searxngClient,
         homeAssistantClient = homeAssistantClient,
         settingsRepository = dataStoreRepository,
+        memoryVault = memoryVaultRepository,
       )
       .apply { skillsProvider = skillManager }
 
@@ -98,6 +101,7 @@ internal object AssistantTaskModule {
     dataStoreRepository: DataStoreRepository,
     searxngClient: SearxngClient,
     homeAssistantClient: HomeAssistantClient,
+    memoryVaultRepository: MemoryVaultRepository,
   ): CustomTask =
     AssistantTask(
       context = context,
@@ -107,5 +111,6 @@ internal object AssistantTaskModule {
       dataStoreRepository = dataStoreRepository,
       searxngClient = searxngClient,
       homeAssistantClient = homeAssistantClient,
+      memoryVault = memoryVaultRepository,
     )
 }

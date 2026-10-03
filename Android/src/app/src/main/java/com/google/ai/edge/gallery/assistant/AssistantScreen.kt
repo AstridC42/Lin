@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -75,7 +76,11 @@ import com.google.ai.edge.gallery.customtasks.agentchat.SkillManagerViewModel
 import com.google.ai.edge.gallery.customtasks.agentchat.resetSessionWithCurrentSkillsAndMcps
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.Task
-import com.google.ai.edge.gallery.memory.MemoryBook
+import com.google.ai.edge.gallery.memory.MemoryMaintenance
+import com.google.ai.edge.gallery.memory.MemoryRetention
+import com.google.ai.edge.gallery.memory.MemoryVaultRepository
+import com.google.ai.edge.gallery.memory.rememberLoadedModelRegistry
+import com.google.ai.edge.gallery.proto.MemoryVault
 import com.google.ai.edge.gallery.search.SearxngClient
 import com.google.ai.edge.gallery.smarthome.HomeAssistantClient
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageInfo
@@ -86,6 +91,8 @@ import com.google.ai.edge.gallery.ui.common.textandvoiceinput.HoldToDictateViewM
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.theme.emptyStateContent
 import com.google.ai.edge.gallery.ui.theme.emptyStateTitle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The single chat screen that replaces Google Assistant.
@@ -112,6 +119,7 @@ fun AssistantScreen(
   dataStoreRepository: DataStoreRepository,
   searxngClient: SearxngClient,
   homeAssistantClient: HomeAssistantClient,
+  memoryVault: MemoryVaultRepository,
   initialQuery: String? = null,
   initialImageUris: List<String> = listOf(),
   startListening: Boolean = false,
@@ -195,8 +203,50 @@ fun AssistantScreen(
   // Whether there is anything to tell the model about the user. Shares the revision counter with
   // the capability settings because it changes the prompt the same way they do: the section is
   // present or absent, and the session has to be rebuilt either way.
-  val hasMemory =
-    remember(webSearchRevision) { dataStoreRepository.readAssistantMemory().factCount > 0 }
+  // The vault is written by a background worker as well as by the user, so this is collected
+  // rather than read once: a conversation digested while the chat is open should be known to the
+  // next session built, without the screen having to be revisited.
+  val vaultState by memoryVault.vault.collectAsState(initial = MemoryVault.getDefaultInstance())
+  val memorySection =
+    remember(vaultState) {
+      MemoryRetention.format(
+        MemoryRetention.forPrompt(vaultState.noteList, System.currentTimeMillis())
+      )
+    }
+  val hasMemory = memorySection.isNotEmpty()
+
+  // Everything the vault needs that is not a conversation ending: carry over what the old
+  // twenty-fact memory held, and make sure the daily catch-up exists. Both are idempotent, so
+  // running them on every appearance of the screen costs a read.
+  LaunchedEffect(Unit) {
+    withContext(Dispatchers.IO) {
+      memoryVault.migrateLegacyFacts(
+        dataStoreRepository.readAssistantMemory().factList.map { it.text to it.savedAtMillis }
+      )
+      memoryVault.sweep(System.currentTimeMillis())
+    }
+    MemoryMaintenance.scheduleDailyPass(context)
+  }
+
+  // Background work must not reach for the engine while the user is mid-turn: two generations
+  // on one engine shows up as their reply stalling for no visible reason. The digester asks
+  // before borrowing, and this is what it reads.
+  val chatUiState by viewModel.uiState.collectAsState()
+  val loadedModelRegistry = rememberLoadedModelRegistry()
+  LaunchedEffect(chatUiState.inProgress) {
+    if (chatUiState.inProgress) loadedModelRegistry.markBusy() else loadedModelRegistry.markIdle()
+  }
+
+  // A conversation ends when the chat goes away. Queueing it here rather than on every message
+  // is what makes a digest cover the whole conversation instead of a growing prefix of it.
+  DisposableEffect(Unit) {
+    onDispose {
+      val sessionId = runCatching { viewModel.currentSessionId }.getOrNull()
+      if (!sessionId.isNullOrBlank()) {
+        MemoryMaintenance.conversationEnded(context, sessionId)
+      }
+    }
+  }
 
   val systemPromptResolver =
     remember(mode, webSearchEnabled, webSearchHost, smartHomeEnabled) {
@@ -249,14 +299,13 @@ fun AssistantScreen(
           webSearchInstance =
             searxngClient.instanceUrlOrNull()?.let { AssistantTask.hostOf(it) }.orEmpty(),
           smartHomeEnabled = homeAssistantClient.isConfigured(),
-          hasMemory = dataStoreRepository.readAssistantMemory().factCount > 0,
+          hasMemory = memorySection.isNotEmpty(),
         )
       },
       skillsForPrompt = { skills -> skills.filterNot { it.name in AssistantTask.SUPERSEDED_BY_TOOLS } },
       extraSubstitutions =
         mapOf(
-          AssistantPrompts.MEMORY_PLACEHOLDER to
-            MemoryBook.format(dataStoreRepository.readAssistantMemory())
+          AssistantPrompts.MEMORY_PLACEHOLDER to memorySection
         ),
     )
   }
@@ -468,7 +517,7 @@ fun AssistantScreen(
 
   if (showMemory) {
     MemoryDialog(
-      dataStoreRepository = dataStoreRepository,
+      memoryVault = memoryVault,
       onDismiss = { showMemory = false },
       // Editing what is remembered changes the system prompt, so the session has to be rebuilt
       // for it to take effect - the same path a capability setting takes.

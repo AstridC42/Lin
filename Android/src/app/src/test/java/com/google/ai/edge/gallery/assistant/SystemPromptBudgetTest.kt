@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -152,8 +152,9 @@ class SystemPromptBudgetTest {
 
     /**
      * Every capability on, including a memory section. Raised from 950 when memory was added: the
-     * heading is real cost, and the facts themselves are capped separately in MemoryBook rather
-     * than measured here, since they are substituted in after this prompt is built.
+     * heading is real cost, and the notes themselves are capped separately by
+     * MemoryRetention.MAX_PROMPT_CHARS rather than measured here, since they are substituted in
+     * after this prompt is built.
      */
     private const val WORST_CASE_BUDGET = 1000
   }

@@ -229,7 +229,7 @@ fun SettingsDialog(
             }
           }
 
-          // Star Storyteller assistant settings: the SearXNG connection and whether the
+          // Lin assistant settings: the SearXNG connection and whether the
           // assistant may dial without the user tapping call.
           Column(
             modifier = Modifier.fillMaxWidth(),

@@ -61,7 +61,7 @@ jobs:
             -keystore ci-keystore/star-ci.jks -storetype PKCS12 -alias star \
             -keyalg RSA -keysize 4096 -validity 10950 \
             -storepass "$CI_KEYSTORE_PASSWORD" -keypass "$CI_KEYSTORE_PASSWORD" \
-            -dname "CN=Star Storyteller CI, OU=CI, O=Star Storyteller, L=, ST=, C=ZZ"
+            -dname "CN=Lin CI, OU=CI, O=Lin, L=, ST=, C=ZZ"
 
       - name: Save the CI signing key
         if: ${{ steps.signing-cache.outputs.cache-hit != 'true' }}

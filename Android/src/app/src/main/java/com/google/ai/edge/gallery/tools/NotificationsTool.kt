@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.google.ai.edge.gallery.tools
 
 import android.content.Context
 import com.google.ai.edge.gallery.notifications.NotificationSummary
-import com.google.ai.edge.gallery.notifications.StarNotificationListener
+import com.google.ai.edge.gallery.notifications.LinNotificationListener
 import com.google.ai.edge.litertlm.Tool
 import com.google.ai.edge.litertlm.ToolParam
 import java.text.SimpleDateFormat
@@ -59,7 +59,7 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
       if (unavailable != null) return@runBlocking unavailable
 
       sendProgress("Reading notifications", inProgress = true)
-      val all = StarNotificationListener.activeNotifications(context)
+      val all = LinNotificationListener.activeNotifications(context)
       val filtered =
         if (fromApp.isBlank()) all
         else all.filter { it.appName.contains(fromApp.trim(), ignoreCase = true) }
@@ -107,7 +107,7 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
         return@runBlocking failure("The reply was empty, so nothing was sent.")
       }
 
-      if (!StarNotificationListener.reply(id, message)) {
+      if (!LinNotificationListener.reply(id, message)) {
         return@runBlocking failure(
           "That notification could not be replied to. It may have been dismissed, or the app may " +
             "not offer a reply action. Ask the user whether to open the app instead."
@@ -126,7 +126,7 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
       val unavailable = unavailableReason()
       if (unavailable != null) return@runBlocking unavailable
       if (id.isBlank()) return@runBlocking failure("No notification id was given.")
-      if (!StarNotificationListener.dismiss(id)) {
+      if (!LinNotificationListener.dismiss(id)) {
         return@runBlocking failure("That notification could not be dismissed.")
       }
       sendProgress("Dismissed", inProgress = false)
@@ -142,7 +142,7 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
       val unavailable = unavailableReason()
       if (unavailable != null) return@runBlocking unavailable
       if (id.isBlank()) return@runBlocking failure("No notification id was given.")
-      if (!StarNotificationListener.open(id)) {
+      if (!LinNotificationListener.open(id)) {
         return@runBlocking failure("That notification could not be opened.")
       }
       mapOf("status" to "succeeded")
@@ -164,7 +164,7 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
       if (id.isBlank() || button.isBlank()) {
         return@runBlocking failure("Both a notification id and a button label are needed.")
       }
-      if (!StarNotificationListener.runAction(id, button)) {
+      if (!LinNotificationListener.runAction(id, button)) {
         return@runBlocking failure(
           "That notification has no button called \"$button\". Check the actions listed for it."
         )
@@ -183,13 +183,13 @@ class NotificationsTool(private val context: Context) : ToolDefinition {
    */
   private fun unavailableReason(): Map<String, Any>? =
     when {
-      !StarNotificationListener.isGranted(context) ->
+      !LinNotificationListener.isGranted(context) ->
         failure(
-          "Notification access has not been granted. Tell the user to turn on Star Storyteller " +
+          "Notification access has not been granted. Tell the user to turn on Lin " +
             "under Settings > Notifications > Device & app notifications, or from the Guide panel " +
             "in the app. Do not claim there are no notifications."
         )
-      !StarNotificationListener.isConnected() ->
+      !LinNotificationListener.isConnected() ->
         failure(
           "Notification access is granted but not connected yet. Ask the user to try again in a " +
             "moment. Do not claim there are no notifications."

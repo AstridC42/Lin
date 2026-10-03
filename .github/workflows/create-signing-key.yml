@@ -14,7 +14,7 @@ on:
       common_name:
         description: 'Name to put in the certificate (shown to nobody in practice)'
         required: false
-        default: 'Star Storyteller'
+        default: 'Lin'
         type: string
       i_understand:
         description: 'I understand this replaces nothing — if a key already exists, do not run this'

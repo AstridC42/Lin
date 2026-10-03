@@ -26,23 +26,23 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!--
-      Star Storyteller: so the assistant can move and cancel appointments, not only add them. An
+      Lin: so the assistant can move and cancel appointments, not only add them. An
       intent to the calendar app can open its editor for a new event and nothing else - there is no
       intent for changing one, and none for reading the diary back.
     -->
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
-    <!-- Star Storyteller: needed to resolve "call Sam" to a phone number. -->
+    <!-- Lin: needed to resolve "call Sam" to a phone number. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!--
-      Star Storyteller: only used when the user opts in to direct dialing under
+      Lin: only used when the user opts in to direct dialing under
       Settings > Assistant. Without it - and by default - the assistant opens the dialer
       pre-filled and the user places the call.
     -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
-    <!-- Star Storyteller: lets setAlarm / setTimer skip the clock app's confirmation screen. -->
+    <!-- Lin: lets setAlarm / setTimer skip the clock app's confirmation screen. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!--
-      Star Storyteller: the assistant's own reminders fire at a stated time, and an inexact alarm
+      Lin: the assistant's own reminders fire at a stated time, and an inexact alarm
       can drift by many minutes - which for "remind me at four" is a wrong answer, not a late one.
       USE_EXACT_ALARM is granted on install for an app whose purpose includes alarms and reminders;
       SCHEDULE_EXACT_ALARM is the requestable fallback on builds that do not grant it.
@@ -51,10 +51,10 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <!-- Star Storyteller: the always-listening wake word service holds the microphone. -->
+    <!-- Lin: the always-listening wake word service holds the microphone. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
     <!--
-      Star Storyteller: keeps the process alive so a loaded model survives the chat being closed.
+      Lin: keeps the process alive so a loaded model survives the chat being closed.
       There is no category for "holding a language model in memory" - it runs no loop, holds no
       wake lock and listens to nothing - so special use is the honest declaration.
     -->
@@ -80,7 +80,7 @@
     <uses-permission android:name="com.google.android.providers.gsf.permission.READ_GSERVICES" />
 
     <!--
-      Star Storyteller: package visibility for the device actions the assistant performs.
+      Lin: package visibility for the device actions the assistant performs.
       Android 11+ hides other packages unless they are declared here, which would otherwise make
       openApp, the dialer, the SMS composer and maps look "not installed".
     -->
@@ -123,13 +123,13 @@
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
         <!--
-          Star Storyteller: so the Guide panel can tell whether Android Auto is on this phone and
+          Lin: so the Guide panel can tell whether Android Auto is on this phone and
           offer a way into its settings. Without this the package is invisible and the panel would
           report it missing on a phone that has it.
         -->
         <package android:name="com.google.android.projection.gearhead" />
         <!--
-          Star Storyteller: the messaging apps the assistant can write a draft into. Without these
+          Lin: the messaging apps the assistant can write a draft into. Without these
           the packages are invisible on Android 11+, so "message Sam on WhatsApp" would report the
           app as missing on a phone that has it.
         -->
@@ -177,7 +177,7 @@
         <uses-native-library android:name="libedgetpu_tachyon.google.so" android:required="false" />
         <uses-native-library android:name="libedgetpu_client.google.so" android:required="false" />
         <!--
-          Star Storyteller: the activity handles its own configuration changes rather than being
+          Lin: the activity handles its own configuration changes rather than being
           destroyed and recreated for them.
 
           uiMode was already here for dark mode. The rest are for foldables. Unfolding changes the
@@ -215,13 +215,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="com.google.ai.edge.gallery" />
-                <!-- Star Storyteller's own scheme, so deep links keep working when the upstream
+                <!-- Lin's own scheme, so deep links keep working when the upstream
                      Edge Gallery app is installed side by side and claims the old one. -->
-                <data android:scheme="starstoryteller" />
+                <data android:scheme="lin" />
             </intent-filter>
 
             <!--
-              Star Storyteller: registers the app as a digital assistant, so it can be picked
+              Lin: registers the app as a digital assistant, so it can be picked
               under Settings > Apps > Default apps > Digital assistant app and launched with the
               assist gesture or the power-button hold.
             -->
@@ -273,7 +273,7 @@
             android:theme="@style/Theme.Gallery.OssLicenses" />
 
         <!--
-          Star Storyteller: the services that make the app a real digital assistant rather than
+          Lin: the services that make the app a real digital assistant rather than
           just an app that answers an ASSIST intent.
 
           The intent filter on MainActivity is enough to appear in some assist-app lists, but the
@@ -285,7 +285,7 @@
           them to other apps.
         -->
         <service
-            android:name="com.google.ai.edge.gallery.voice.StarVoiceInteractionService"
+            android:name="com.google.ai.edge.gallery.voice.LinVoiceInteractionService"
             android:exported="true"
             android:permission="android.permission.BIND_VOICE_INTERACTION">
             <meta-data
@@ -297,7 +297,7 @@
         </service>
 
         <service
-            android:name="com.google.ai.edge.gallery.voice.StarVoiceInteractionSessionService"
+            android:name="com.google.ai.edge.gallery.voice.LinVoiceInteractionSessionService"
             android:exported="true"
             android:permission="android.permission.BIND_VOICE_INTERACTION" />
 
@@ -307,7 +307,7 @@
           its listening in the chat, where it can show what it heard.
         -->
         <service
-            android:name="com.google.ai.edge.gallery.voice.StarRecognitionService"
+            android:name="com.google.ai.edge.gallery.voice.LinRecognitionService"
             android:exported="true"
             android:permission="android.permission.RECORD_AUDIO">
             <intent-filter>
@@ -320,7 +320,7 @@
         </service>
 
         <!--
-          Star Storyteller: continuous listening for a spoken wake phrase.
+          Lin: continuous listening for a spoken wake phrase.
 
           Off unless the user turns it on. Android gives no app-definable hardware hotword -
           AlwaysOnHotwordDetector only serves keyphrases the device's DSP was enrolled with - so
@@ -333,7 +333,7 @@
             android:foregroundServiceType="microphone" />
 
         <!--
-          Star Storyteller: the reason the process is not reclaimed while a model is loaded. See
+          Lin: the reason the process is not reclaimed while a model is loaded. See
           ResidentAssistantService for why this is the mechanism and what it costs.
         -->
         <service
@@ -357,7 +357,7 @@
         </service>
 
         <!--
-          Star Storyteller: Android Auto.
+          Lin: Android Auto.
 
           The car screen is not the chat. Android Auto renders from a fixed set of templates with
           hard caps on text and refresh rate, and a scrolling conversation is neither an available
@@ -368,7 +368,7 @@
           sources" are turned on in the phone's Android Auto settings.
         -->
         <service
-            android:name="com.google.ai.edge.gallery.car.StarCarAppService"
+            android:name="com.google.ai.edge.gallery.car.LinCarAppService"
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
@@ -389,7 +389,7 @@
             android:resource="@xml/automotive_app_desc" />
 
         <!--
-          Star Storyteller: notification access.
+          Lin: notification access.
 
           The one capability that closes the biggest gap with Google Assistant - "what did I miss",
           "read my messages", "reply to Sam" - and also what Android requires before an app may
@@ -400,7 +400,7 @@
           has to be turned on in system settings, and nothing is read until it is.
         -->
         <service
-            android:name="com.google.ai.edge.gallery.notifications.StarNotificationListener"
+            android:name="com.google.ai.edge.gallery.notifications.LinNotificationListener"
             android:exported="false"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
@@ -410,7 +410,7 @@
         </service>
 
         <!--
-          Star Storyteller: home-screen widget. Reaches the assistant without depending on the
+          Lin: home-screen widget. Reaches the assistant without depending on the
           assist gesture, which needs the assistant role and is awkward on some manufacturer
           builds even with it.
         -->
@@ -425,7 +425,7 @@
                 android:resource="@xml/assistant_widget_info" />
         </receiver>
 
-        <!-- Star Storyteller: delivers one reminder when it comes due. -->
+        <!-- Lin: delivers one reminder when it comes due. -->
         <receiver
             android:name="com.google.ai.edge.gallery.reminders.ReminderReceiver"
             android:exported="false" />

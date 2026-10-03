@@ -29,7 +29,7 @@
   <string name="aichat_initializing_title" translatable="true" description="Status indicator when initializing model. [CHAR_LIMIT=31]">Initializing model</string>
   <string name="aichat_initializing_content" translatable="true" description="Loading message shown while a chat or translator session is initializing. [CHAR_LIMIT=110]">Sit tight, this can take up to 1 minute</string>
   <string name="app_intro" translatable="true" description="Introduction text shown on the home screen. [CHAR_LIMIT=90]">Explore a world of amazing on-device models from</string>
-  <string name="app_name" translatable="false">Star Storyteller</string>
+  <string name="app_name" translatable="false">Lin</string>
   <string name="app_name_first_part" translatable="false">Google AI</string>
   <string name="app_name_second_part" translatable="false">Edge Gallery</string>
   <string name="askimage_emptystate_title" translatable="false">Ask Image</string>
@@ -946,7 +946,7 @@
   <!-- Short description for the Tiny Garden task. [CHAR_LIMIT=35] -->
   <string name="task_short_desc_tiny_garden" translatable="true" description="Short description for the Tiny Garden task. [CHAR_LIMIT=45]">Use natural language to plant</string>
 
-  <!-- ==================== Star Storyteller assistant ==================== -->
+  <!-- ==================== Lin assistant ==================== -->
   <!-- Label of the unified assistant capability. [CHAR_LIMIT=20] -->
   <string name="task_label_assistant" translatable="true" description="Label of the unified assistant capability. [CHAR_LIMIT=20]">Assistant</string>
   <!-- Description of the unified assistant capability. [CHAR_LIMIT=300] -->
@@ -1052,10 +1052,10 @@
   <string name="assistant_model_list_failed" translatable="true" description="Title shown when the model list could not be loaded. [CHAR_LIMIT=60]">Could not load the model list</string>
   <!-- Label of the button that retries loading the model list. [CHAR_LIMIT=15] -->
   <string name="assistant_retry" translatable="true" description="Label of the button that retries loading the model list. [CHAR_LIMIT=15]">Try again</string>
-  <string name="assistant_recovery_title" translatable="true" description="Title shown when the app closed while loading a model last time. [CHAR_LIMIT=60]">Star Storyteller closed while loading a model</string>
+  <string name="assistant_recovery_title" translatable="true" description="Title shown when the app closed while loading a model last time. [CHAR_LIMIT=60]">Lin closed while loading a model</string>
   <string name="assistant_recovery_content" translatable="true" description="Explains that the last launch did not survive loading a model. %1$s is the model name. [CHAR_LIMIT=300]">The last time the app started, it stopped while loading %1$s. That usually means the model needs more memory than this phone has. Pick a smaller model to carry on, or try this one again.</string>
   <string name="assistant_recovery_pick_another" translatable="true" description="Label of the button that opens the gallery to choose a different model. [CHAR_LIMIT=25]">Pick another model</string>
-  <string name="assistant_crash_title" translatable="true" description="Title shown when the previous run crashed. [CHAR_LIMIT=60]">Star Storyteller stopped unexpectedly</string>
+  <string name="assistant_crash_title" translatable="true" description="Title shown when the previous run crashed. [CHAR_LIMIT=60]">Lin stopped unexpectedly</string>
   <string name="assistant_crash_content" translatable="true" description="Explains the crash report below and asks for it to be reported. [CHAR_LIMIT=200]">This is what went wrong last time. Press and hold to copy it if you are reporting the problem.</string>
   <string name="assistant_crash_continue" translatable="true" description="Label of the button that dismisses the crash report. [CHAR_LIMIT=15]">Continue</string>
   <string name="assistant_crash_copy" translatable="true" description="Button that copies the crash report. [CHAR_LIMIT=30]">Copy report</string>
@@ -1063,14 +1063,14 @@
   <string name="assistant_listening_hint" translatable="true" description="Placeholder shown before anything has been heard. [CHAR_LIMIT=60]">Go ahead \u2014 say what you need.</string>
   <string name="assistant_listening_stop" translatable="true" description="Label of the button that stops listening. [CHAR_LIMIT=15]">Stop</string>
   <string name="wake_word_channel_name" translatable="true" description="Notification channel for the wake word listener. [CHAR_LIMIT=40]">Wake word listening</string>
-  <string name="wake_word_channel_description" translatable="true" description="Describes the wake word notification channel. [CHAR_LIMIT=150]">Shown whenever Star Storyteller is listening for its wake phrase.</string>
+  <string name="wake_word_channel_description" translatable="true" description="Describes the wake word notification channel. [CHAR_LIMIT=150]">Shown whenever Lin is listening for its wake phrase.</string>
   <string name="wake_word_notification_title" translatable="true" description="Ongoing notification title. %1$s is the wake phrase. [CHAR_LIMIT=60]">Listening for \u201c%1$s\u201d</string>
   <string name="wake_word_notification_text" translatable="true" description="Ongoing notification body. [CHAR_LIMIT=120]">The microphone stays on. This uses more battery than normal.</string>
   <string name="wake_word_stop" translatable="true" description="Notification action that stops listening. [CHAR_LIMIT=15]">Stop</string>
   <string name="wake_word_tile_label" translatable="true" description="Quick settings tile label. [CHAR_LIMIT=20]">Wake word</string>
   <string name="assist_panel_listening" translatable="true" description="Status shown while the pop-up assistant is listening. [CHAR_LIMIT=30]">Listening</string>
   <string name="assist_panel_thinking" translatable="true" description="Status shown while the pop-up assistant is working out an answer. [CHAR_LIMIT=30]">Thinking</string>
-  <string name="assist_panel_answered" translatable="true" description="Status shown once the pop-up assistant has answered. [CHAR_LIMIT=30]">Star Storyteller</string>
+  <string name="assist_panel_answered" translatable="true" description="Status shown once the pop-up assistant has answered. [CHAR_LIMIT=30]">Lin</string>
   <string name="assist_panel_prompt" translatable="true" description="Placeholder shown before anything has been heard. [CHAR_LIMIT=60]">Say what you need\u2026</string>
   <string name="assist_panel_this_screen" translatable="true" description="Button that asks about what is on the screen. [CHAR_LIMIT=20]">This screen</string>
   <string name="assist_panel_this_screen_question" translatable="true" description="Shown as the question when asking about the screen. [CHAR_LIMIT=60]">What is on my screen?</string>
@@ -1080,7 +1080,7 @@
   <string name="assist_panel_close" translatable="true" description="Button that dismisses the pop-up. [CHAR_LIMIT=20]">Close</string>
   <string name="assist_panel_still_there" translatable="true" description="Shown when the pop-up listened again after answering and heard nothing. [CHAR_LIMIT=80]">Say \"again\" if you need anything else.</string>
   <string name="assist_panel_no_speech" translatable="true" description="Shown when nothing was heard. [CHAR_LIMIT=100]">I did not catch that.</string>
-  <string name="assist_panel_no_microphone" translatable="true" description="Shown when the microphone permission has not been granted. [CHAR_LIMIT=200]">Star Storyteller needs the microphone to listen. Open the chat and allow it once.</string>
+  <string name="assist_panel_no_microphone" translatable="true" description="Shown when the microphone permission has not been granted. [CHAR_LIMIT=200]">Lin needs the microphone to listen. Open the chat and allow it once.</string>
   <string name="assist_panel_opening" translatable="true" description="Shown when the pop-up hands the question to the full app. [CHAR_LIMIT=120]">Opening the chat to answer that\u2026</string>
   <string name="assist_panel_failed" translatable="true" description="Shown when answering in the pop-up failed. [CHAR_LIMIT=120]">That did not work. Opening the chat instead\u2026</string>
   <string name="music_app_title" translatable="true" description="Title of the music app picker. [CHAR_LIMIT=40]">Music app</string>
@@ -1110,9 +1110,15 @@
   <string name="voice_settings_try" translatable="true" description="Button that speaks a sample line. [CHAR_LIMIT=30]">Hear it</string>
   <string name="voice_settings_manual_title" translatable="true" description="Manual entry for the voice settings. [CHAR_LIMIT=40]">Assistant voice</string>
   <string name="voice_settings_manual_body" translatable="true" description="Manual entry describing voice settings. [CHAR_LIMIT=200]">Pick which voice reads replies out loud, and how fast and how high it speaks. Long-press Speak on the chat screen to get here quickly.</string>
-  <string name="memory_title" translatable="true" description="Title of the dialog listing what the assistant remembers. [CHAR_LIMIT=40]">What it remembers</string>
-  <string name="memory_explainer" translatable="true" description="Explains the memory list. [CHAR_LIMIT=300]">These go into every conversation, so the assistant knows them without being told again. It keeps the %1$d most recent. Delete anything wrong - it will be repeated confidently until you do.</string>
-  <string name="memory_empty" translatable="true" description="Shown when nothing is remembered yet. [CHAR_LIMIT=200]">Nothing yet. Tell the assistant to remember something, or add it below.</string>
+  <string name="memory_title" translatable="true" description="Title of the dialog listing what the assistant remembers. [CHAR_LIMIT=40]">What Lin knows</string>
+  <string name="memory_explainer" translatable="true" description="Explains the memory list. [CHAR_LIMIT=300]">These go into every conversation, so Lin knows them without being told again. Anything not mentioned for %1$d days cools off on its own, but stays searchable. Delete anything wrong - it will be repeated confidently until you do.</string>
+  <string name="memory_empty" translatable="true" description="Shown when nothing is remembered yet. [CHAR_LIMIT=200]">Nothing yet. Lin writes notes after each conversation, or you can add one below.</string>
+  <string name="memory_cold_heading" translatable="true" description="Heading above notes that have cooled out of active memory. [CHAR_LIMIT=60]">Cooled off (%1$d) - still searchable</string>
+  <string name="memory_conversations_heading" translatable="true" description="Heading above the list of past conversations. [CHAR_LIMIT=60]">Past conversations</string>
+  <string name="memory_no_conversations" translatable="true" description="Shown when no conversation has been summarised yet. [CHAR_LIMIT=200]">None summarised yet. Lin writes a summary a few minutes after a conversation ends.</string>
+  <string name="memory_digest_now" translatable="true" description="Button that summarises waiting conversations now. [CHAR_LIMIT=60]">Summarise %1$d waiting now</string>
+  <string name="memory_pin" translatable="true" description="Content description of the pin button on a note. [CHAR_LIMIT=30]">Keep this always</string>
+  <string name="memory_untitled" translatable="true" description="Name for a conversation with no title. [CHAR_LIMIT=30]">Conversation</string>
   <string name="memory_add_label" translatable="true" description="Label of the field for adding a fact. [CHAR_LIMIT=60]">Something to remember</string>
   <string name="memory_add" translatable="true" description="Button that saves a fact. [CHAR_LIMIT=20]">Remember it</string>
   <string name="memory_forget" translatable="true" description="Content description of the delete button on a remembered fact. [CHAR_LIMIT=30]">Forget this</string>
@@ -1123,8 +1129,8 @@
   <string name="memory_manual_title" translatable="true" description="Manual section title about memory. [CHAR_LIMIT=30]">Memory</string>
   <string name="memory_manual_body" translatable="true" description="Manual section about memory. [CHAR_LIMIT=400]">Say \"remember that…\" and it keeps that in mind for every conversation afterwards - what you call people, how you travel, anything worth not repeating. Say \"forget that…\" to remove one. Everything it has been told is listed under Memory above, where you can add or delete lines yourself; worth a look now and then, because a fact remembered wrongly gets repeated confidently until someone corrects it.</string>
   <string name="resident_channel_name" translatable="true" description="Notification channel for the service that keeps the model loaded. [CHAR_LIMIT=40]">Ready to answer</string>
-  <string name="resident_channel_description" translatable="true" description="Describes that notification channel. [CHAR_LIMIT=200]">Shown while Star Storyteller is holding its model in memory so it can answer immediately.</string>
-  <string name="resident_notification_title" translatable="true" description="Title of the ongoing notification. [CHAR_LIMIT=40]">Star Storyteller is ready</string>
+  <string name="resident_channel_description" translatable="true" description="Describes that notification channel. [CHAR_LIMIT=200]">Shown while Lin is holding its model in memory so it can answer immediately.</string>
+  <string name="resident_notification_title" translatable="true" description="Title of the ongoing notification. [CHAR_LIMIT=40]">Lin is ready</string>
   <string name="resident_notification_text" translatable="true" description="Body of the ongoing notification. [CHAR_LIMIT=120]">Holding the model in memory so it can answer straight away.</string>
   <string name="resident_stop" translatable="true" description="Action that stops holding the model. [CHAR_LIMIT=20]">Stop</string>
   <string name="resident_setting_title" translatable="true" description="Switch that keeps the model loaded. [CHAR_LIMIT=40]">Stay ready</string>
@@ -1133,13 +1139,13 @@
   <string name="wake_word_enable" translatable="true" description="Label of the switch that enables continuous listening. [CHAR_LIMIT=40]">Listen for the wake word</string>
   <string name="wake_word_phrase_label" translatable="true" description="Label of the field holding the wake phrase. [CHAR_LIMIT=30]">Phrase</string>
   <string name="wake_word_cost_warning" translatable="true" description="Explains the cost of continuous listening. [CHAR_LIMIT=400]">Android gives no app a true low-power wake word, so this keeps the microphone open and listens continuously. It uses noticeably more battery, and your phone shows the microphone indicator the whole time. A notification stays up while it runs, and the Wake word quick-settings tile turns it off from anywhere.</string>
-  <string name="car_talk_title" translatable="true" description="Car screen row that starts talking to the assistant. [CHAR_LIMIT=30]">Talk to Star Storyteller</string>
+  <string name="car_talk_title" translatable="true" description="Car screen row that starts talking to the assistant. [CHAR_LIMIT=30]">Talk to Lin</string>
   <string name="car_talk_subtitle" translatable="true" description="Explains the car screen talk row. [CHAR_LIMIT=50]">Ask a question or place a call</string>
   <string name="car_wake_word_title" translatable="true" description="Car screen row that toggles the wake word. [CHAR_LIMIT=30]">Wake word</string>
   <string name="car_wake_word_on" translatable="true" description="Wake word state shown in the car. [CHAR_LIMIT=30]">Listening \u2014 tap to stop</string>
   <string name="car_wake_word_off" translatable="true" description="Wake word state shown in the car. [CHAR_LIMIT=30]">Off \u2014 tap to listen</string>
   <string name="assistant_hands_free" translatable="true" description="Chip that toggles a spoken back-and-forth conversation. [CHAR_LIMIT=20]">Hands-free</string>
-  <string name="manual_title" translatable="true" description="Title of the side manual. [CHAR_LIMIT=40]">What Star Storyteller can do</string>
+  <string name="manual_title" translatable="true" description="Title of the side manual. [CHAR_LIMIT=40]">What Lin can do</string>
   <string name="manual_role_held" translatable="true" description="Shown when the app is the device assistant. [CHAR_LIMIT=60]">This is your digital assistant</string>
   <string name="manual_role_not_held" translatable="true" description="Shown when the app is not the device assistant. [CHAR_LIMIT=60]">Not your digital assistant yet</string>
   <string name="manual_role_explainer" translatable="true" description="Explains what becoming the assistant unlocks. [CHAR_LIMIT=300]">Until it is, the assist gesture, holding the power button, a headset button and your car cannot reach it. Android asks you to confirm.</string>
@@ -1149,7 +1155,7 @@
   <string name="manual_voice_speak" translatable="true" description="Manual line about spoken replies. [CHAR_LIMIT=200]">Speak — read every reply out loud.</string>
   <string name="manual_voice_handsfree" translatable="true" description="Manual line about hands-free mode. [CHAR_LIMIT=250]">Hands-free — the assistant answers aloud, then listens again, so you can talk without touching the phone.</string>
   <string name="manual_voice_wake" translatable="true" description="Manual line about the wake word. [CHAR_LIMIT=250]">Wake word — say a phrase to summon it. Keeps the microphone on, so it costs battery.</string>
-  <string name="manual_voice_popup" translatable="true" description="Manual line about the assist pop-up. [CHAR_LIMIT=300]">Hold the power button once Star Storyteller is your default assistant, and it appears as a panel over whatever you were doing: it listens, shows what it heard, and answers there. If no model is loaded yet it opens the chat instead, since loading one takes far too long to do behind a floating card.</string>
+  <string name="manual_voice_popup" translatable="true" description="Manual line about the assist pop-up. [CHAR_LIMIT=300]">Hold the power button once Lin is your default assistant, and it appears as a panel over whatever you were doing: it listens, shows what it heard, and answers there. If no model is loaded yet it opens the chat instead, since loading one takes far too long to do behind a floating card.</string>
   <string name="manual_voice_choose" translatable="true" description="Manual line about choosing a voice. [CHAR_LIMIT=200]">Hold down Speak, or use Assistant voice below, to pick which voice reads replies and how fast and how high it speaks. Tap a voice to hear it.</string>
   <string name="manual_modes_title" translatable="true" description="Manual section heading. [CHAR_LIMIT=30]">Modes</string>
   <string name="manual_modes_body" translatable="true" description="Explains what modes do. [CHAR_LIMIT=300]">Auto, Chat, Media, Web, Device and Agent bias how it answers. No mode removes anything: you can attach a photo and ask for a phone call in the same message, in any mode.</string>
@@ -1167,7 +1173,7 @@
   <string name="manual_grant_notifications" translatable="true" description="Button that opens notification access settings. [CHAR_LIMIT=40]">Allow reading notifications</string>
   <string name="manual_car_open_settings" translatable="true" description="Button that opens Android Auto settings. [CHAR_LIMIT=60]">Open Android Auto settings</string>
   <string name="manual_car_missing" translatable="true" description="Shown when Android Auto is not on the phone. [CHAR_LIMIT=200]">Android Auto is not installed on this phone, so nothing can appear on a car screen until it is. Install it from the Play Store.</string>
-  <string name="manual_car_steps" translatable="true" description="The steps needed to see a sideloaded app in Android Auto. [CHAR_LIMIT=600]">Android Auto hides apps that did not come from the Play Store, and gives no error when it does. To see Star Storyteller in the car: open Android Auto settings, scroll to the bottom and tap Version ten times to turn on developer mode, then open the three-dot menu, choose Developer settings and switch on Unknown sources. Reconnect the phone to the car afterwards. Star Storyteller is a parked app, so it appears in the car\'s app list when the car is stopped, not while driving.</string>
+  <string name="manual_car_steps" translatable="true" description="The steps needed to see a sideloaded app in Android Auto. [CHAR_LIMIT=600]">Android Auto hides apps that did not come from the Play Store, and gives no error when it does. To see Lin in the car: open Android Auto settings, scroll to the bottom and tap Version ten times to turn on developer mode, then open the three-dot menu, choose Developer settings and switch on Unknown sources. Reconnect the phone to the car afterwards. Lin is a parked app, so it appears in the car\'s app list when the car is stopped, not while driving.</string>
   <string name="manual_grant_location" translatable="true" description="Button that asks for approximate location. [CHAR_LIMIT=60]">Allow location for weather</string>
   <string name="manual_weather_title" translatable="true" description="Manual section title for weather. [CHAR_LIMIT=30]">Weather</string>
   <string name="manual_weather_body" translatable="true" description="Manual section body for weather. [CHAR_LIMIT=300]">Ask what the weather is doing, whether it will rain, or what the week looks like. Name a town for anywhere else. It needs nothing set up: forecasts come from Open-Meteo, which asks for no account and no key. Allowing approximate location lets you leave the town out.</string>
@@ -1175,9 +1181,9 @@
   <string name="manual_notifications_body" translatable="true" description="Explains notification access. [CHAR_LIMIT=400]">Ask what you missed, have messages read out, reply, dismiss. Needs notification access, which Android only grants from system settings \u2014 and which lets it see every notification on the phone.</string>
   <string name="manual_media_body" translatable="true" description="Explains media control. [CHAR_LIMIT=250]">Play, pause, skip and volume for whatever is playing. Android puts this behind the same notification access.</string>
   <string name="reminder_channel_name" translatable="true" description="Notification channel for reminders. [CHAR_LIMIT=40]">Reminders</string>
-  <string name="reminder_channel_description" translatable="true" description="Describes the reminder channel. [CHAR_LIMIT=150]">Reminders you asked Star Storyteller to keep.</string>
+  <string name="reminder_channel_description" translatable="true" description="Describes the reminder channel. [CHAR_LIMIT=150]">Reminders you asked Lin to keep.</string>
   <string name="reminder_notification_title" translatable="true" description="Title of a reminder notification. [CHAR_LIMIT=40]">Reminder</string>
-  <string name="widget_prompt" translatable="true" description="Placeholder text on the home screen widget. [CHAR_LIMIT=40]">Ask Star Storyteller</string>
+  <string name="widget_prompt" translatable="true" description="Placeholder text on the home screen widget. [CHAR_LIMIT=40]">Ask Lin</string>
   <string name="smart_home_title" translatable="true" description="Title of the smart home settings dialog. [CHAR_LIMIT=40]">Smart home</string>
   <string name="smart_home_short" translatable="true" description="Short label for the smart home button. [CHAR_LIMIT=20]">Smart home</string>
   <string name="smart_home_explainer" translatable="true" description="Explains how to connect Home Assistant. [CHAR_LIMIT=400]">Connect Home Assistant. Create a long-lived access token from your Home Assistant profile page and paste it here. A .local address only works while the phone is on the same network.</string>

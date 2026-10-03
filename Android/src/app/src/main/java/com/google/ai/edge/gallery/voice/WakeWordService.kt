@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Star Storyteller Authors
+ * Copyright 2026 The Lin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ private const val RESTART_DELAY_MS = 800L
 private const val BUSY_RESTART_DELAY_MS = 5_000L
 
 /** The phrase used when the user has not chosen one. */
-const val DEFAULT_WAKE_PHRASE = "hey star"
+const val DEFAULT_WAKE_PHRASE = "hey lin"
 
 /**
  * Listens continuously for a spoken phrase and opens the assistant when it hears it.
@@ -274,8 +274,8 @@ class WakeWordService : Service(), RecognitionListener {
   }
 
   companion object {
-    const val ACTION_STOP = "com.starstoryteller.assistant.STOP_WAKE_WORD"
-    const val EXTRA_PHRASE = "com.starstoryteller.assistant.WAKE_PHRASE"
+    const val ACTION_STOP = "com.lin.assistant.STOP_WAKE_WORD"
+    const val EXTRA_PHRASE = "com.lin.assistant.WAKE_PHRASE"
 
     /**
      * Whether a transcript contains the wake phrase.

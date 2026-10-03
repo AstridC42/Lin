@@ -1,4 +1,4 @@
-# Installing Star Storyteller
+# Installing Lin
 
 You do not need Android Studio, a terminal, or a computer at all for the normal path. Everything
 below can be done from a browser and a phone.
@@ -97,7 +97,7 @@ Two ways past:
   Uninstall the old one and try again — note that uninstalling deletes the downloaded models.
   Every test build carries its signing key's fingerprint in the release notes, and a build whose
   key has changed says so at the top.
-- Star Storyteller installs as `com.starstoryteller.assistant`, so it sits **alongside** Google AI
+- Lin installs as `com.lin.assistant`, so it sits **alongside** Google AI
   Edge Gallery rather than replacing it. Having both is fine.
 - **A message about a *harmful* app, with no way to continue**, is a hard block rather than a
   warning. Google offers no override for that classification and neither does Samsung's, so
