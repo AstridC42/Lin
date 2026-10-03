@@ -24,6 +24,7 @@ import com.google.ai.edge.gallery.agent.AgentRuntimeExecutor
 import com.google.ai.edge.gallery.agent.PromptExpander
 import com.google.ai.edge.gallery.customtasks.agentchat.AgentTools
 import com.google.ai.edge.gallery.customtasks.agentchat.SkillManagerViewModel
+import com.google.ai.edge.gallery.customtasks.agentchat.setupAgentSkillTopK
 import com.google.ai.edge.gallery.customtasks.common.CustomTask
 import com.google.ai.edge.gallery.customtasks.common.CustomTaskDataForBuiltinTask
 import com.google.ai.edge.gallery.data.BuiltInTaskId
@@ -88,6 +89,20 @@ class AssistantTask(
     systemInstruction: Contents?,
     onDone: (String) -> Unit,
   ) {
+    // Greedy decoding, before the conversation exists.
+    //
+    // Upstream sets TopK to 1 for agent chat - its commit says "for better tool call quality" -
+    // from a DisposableEffect when the chat screen enters composition. For the assistant that is
+    // too late and sometimes never: the model is selected and initialised by the route, and the
+    // conversation is created here, with whatever TopK the allowlist gave it. For Gemma-4-E4B
+    // that is 64, at temperature 1.0.
+    //
+    // Sampling 64 candidates at full temperature while emitting an exact grammar is how
+    // `call:web_search{query:doctor who lego}` comes out instead of a well-formed call, and the
+    // reply dies in the parser with an ANTLR error the user cannot act on. Set it where the
+    // conversation is actually built, so it holds whether or not a screen has appeared.
+    model.setupAgentSkillTopK()
+
     coroutineScope.launch(Dispatchers.Default) {
       // Skills and MCP servers have to be loaded before the prompt can list them.
       val skillsJob = launch {
