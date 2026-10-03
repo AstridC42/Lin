@@ -1114,6 +1114,7 @@
   <string name="settings_section_assistant" translatable="true" description="Heading for assistant settings. [CHAR_LIMIT=30]">Assistant</string>
   <string name="settings_section_memory" translatable="true" description="Heading for memory settings. [CHAR_LIMIT=30]">Memory</string>
   <string name="settings_section_connections" translatable="true" description="Heading for connection settings. [CHAR_LIMIT=30]">Connections</string>
+  <string name="settings_direct_calls_on_detail" translatable="true" description="Explanation shown when the assistant is allowed to place calls itself. [CHAR_LIMIT=200]">On: say \"call Dad\" and the call is placed. Needs the phone permission.</string>
   <string name="settings_section_phone" translatable="true" description="Heading for phone settings. [CHAR_LIMIT=30]">Phone</string>
   <string name="settings_section_model" translatable="true" description="Heading for model settings. [CHAR_LIMIT=30]">Model</string>
   <string name="settings_mode" translatable="true" description="Row that opens the assistant mode picker. [CHAR_LIMIT=30]">Mode</string>

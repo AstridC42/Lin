@@ -148,14 +148,26 @@ class SystemPromptBudgetTest {
   }
 
   companion object {
-    private const val BUDGET = 800
+    /**
+     * The largest any single mode's prompt may be, with every optional capability off.
+     *
+     * Lowered from 800 to 500 after the prompt was rewritten to stop saying things twice - the
+     * default mode's block had been restating the routing procedure capability by capability, so
+     * the whole ordering was read, and paid for, twice. The widest mode now measures ~426 tokens.
+     *
+     * A ratchet rather than a ceiling: the headroom above the measurement is for a real addition,
+     * and the point of lowering it is that drifting back to 800 by a sentence at a time fails
+     * here instead of on a phone.
+     */
+    private const val BUDGET = 500
 
     /**
-     * Every capability on, including a memory section. Raised from 950 when memory was added: the
-     * heading is real cost, and the notes themselves are capped separately by
+     * Every capability on, including a memory section, which measures ~580 tokens.
+     *
+     * Lowered from 1000 by the same rewrite. The notes themselves are capped separately by
      * MemoryRetention.MAX_PROMPT_CHARS rather than measured here, since they are substituted in
      * after this prompt is built.
      */
-    private const val WORST_CASE_BUDGET = 1000
+    private const val WORST_CASE_BUDGET = 700
   }
 }

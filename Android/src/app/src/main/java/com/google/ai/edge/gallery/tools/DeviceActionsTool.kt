@@ -153,10 +153,11 @@ class DeviceActionsTool(
       }
 
       val number = resolved.number
-      val direct =
-        allowDirectCalls() &&
-          ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) ==
-            PackageManager.PERMISSION_GRANTED
+      val permitted =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) ==
+          PackageManager.PERMISSION_GRANTED
+      val optedIn = allowDirectCalls()
+      val direct = optedIn && permitted
       val action = if (direct) Intent.ACTION_CALL else Intent.ACTION_DIAL
       val started = startActivity(Intent(action, "tel:${number.telUriEncode()}".toUri()))
       if (!started) {
@@ -176,6 +177,19 @@ class DeviceActionsTool(
         "result" to
           if (direct) "The call is being placed."
           else "The dialer is open with the number filled in; the user taps to call.",
+        // Why it stopped at the dialer, in terms the user can act on. Both reasons look identical
+        // from the outside - a dialer with the number in it - and somebody who asked for a call
+        // and got a dialer deserves to be told which switch is off rather than asking again.
+        "hint" to
+          when {
+            direct -> "Say the call is going through."
+            !optedIn ->
+              "Tell them the call is ready to tap, and that Settings > Phone > \"Let the " +
+                "assistant place calls directly\" lets you dial for them next time."
+            else ->
+              "Tell them the call is ready to tap, and that direct calling is switched on but " +
+                "the phone permission was refused, so it has to be granted before you can dial."
+          },
       )
     }
   }

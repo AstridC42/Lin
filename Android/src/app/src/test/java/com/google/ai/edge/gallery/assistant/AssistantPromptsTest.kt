@@ -211,9 +211,18 @@ class AssistantPromptsTest {
     assertTrue("answering from memory must be the last step", answerDirectly > loadSkill)
   }
 
-  /** The mode block is appended last, so it must not reopen what the routing closed. */
+  /**
+   * The mode block is appended last, so it must not reopen what the routing closed.
+   *
+   * It used to close it a second time instead, restating the routing capability by capability -
+   * which cost the whole ordering twice out of a budget that had already run out on the first
+   * message of a conversation. So the block now defers rather than repeats, and this test moved
+   * with it: what must hold is that the last thing the model reads before the conversation does
+   * not invite it to answer from its own knowledge, whether by listing that option first or by
+   * listing it at all.
+   */
   @Test
-  fun theAutoModeBlockDoesNotPutAnsweringFromMemoryFirst() {
+  fun theAutoModeBlockDoesNotReopenTheRouting() {
     val prompt =
       AssistantPrompts.resolve(
         currentPrompt = "",
@@ -222,9 +231,13 @@ class AssistantPromptsTest {
         webSearchEnabled = false,
       )
     val modeBlock = prompt.substring(prompt.indexOf("Current mode: AUTO"))
-    val skillFirst = modeBlock.indexOf("load_skill")
-    val memoryLast = modeBlock.indexOf("Answer directly from your own knowledge")
-    assertTrue("the auto mode block should mention load_skill", skillFirst >= 0)
-    assertTrue("answering from memory must come after the tool options", memoryLast > skillFirst)
+    assertTrue(
+      "the auto mode block must point back at the routing rather than restate it",
+      modeBlock.contains("routing above"),
+    )
+    assertFalse(
+      "the auto mode block must not offer answering from your own knowledge as an option",
+      Regex("(?i)answer (directly|from your own)").containsMatchIn(modeBlock),
+    )
   }
 }
