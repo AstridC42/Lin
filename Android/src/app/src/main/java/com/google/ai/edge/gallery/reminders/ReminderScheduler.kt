@@ -173,7 +173,7 @@ object ReminderScheduler {
         .setContentTitle(context.getString(R.string.reminder_notification_title))
         .setContentText(reminder.text)
         .setStyle(NotificationCompat.BigTextStyle().bigText(reminder.text))
-        .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+        .setSmallIcon(R.drawable.ic_stat_lin)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setAutoCancel(true)
         .setContentIntent(openIntent)

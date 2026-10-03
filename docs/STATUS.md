@@ -1,6 +1,6 @@
 # Status
 
-Where the project actually is, as of `0.5.0`.
+Where the project actually is, as of `0.5.1`.
 
 **Upstream base:** `google-ai-edge/gallery` at `70061fd` (version 1.0.20,
 1 October 2026). What that merge brought with it is at the bottom of this file.
@@ -152,11 +152,22 @@ In the order I would do them, with the reasoning rather than just the list.
 
 ### 1. Fewer tools in front of the model at once
 
-The real constraint on this app is not features, it is that around 25 tool
-schemas plus the system prompt consume roughly three quarters of a 4,000-token
-budget before the conversation starts. Every capability added makes the model
-slightly worse at choosing between them, and one tool result containing a list
-can still push a turn over.
+The real constraint on this app is not features, it is the fixed overhead. The
+count in this section used to say "around 25 tool schemas"; it is **44 tool
+functions with 66 parameters**, and measured on a real phone the system prompt
+and those schemas come to **4,230 tokens before the user types anything**.
+
+Against the 4,000 the allowlist asks for, that does not merely crowd the
+conversation - it means a brand new conversation cannot start at all. The first
+message came back as `Input token ids are too long: 4230 >= 4000`, the session
+was thrown away and rebuilt, and the same thing happened again. Three separate
+bug reports - web search not working, no reply arriving, a loop after a search -
+were all this, because the turn died before any of it ran.
+
+Raising the context to 8,192 (the model advertises 32,000) buys room now. It
+does not change the arithmetic: every capability added still makes the model
+slightly worse at choosing between them, and the overhead is still most of a
+small model's budget.
 
 The fix is to stop sending all of them every turn and send the handful the
 message plausibly needs. A lexical first pass — the message against each tool's
@@ -164,9 +175,10 @@ own description — costs nothing, needs no new runtime, and captures most of th
 benefit. It also puts the interface in place that a smarter selector can later
 sit behind, which is what makes the next item cheap instead of speculative.
 
-**This should come before any further capabilities**, because it makes
-everything already built work better, and because adding tools before it
-actively trades against what is there.
+**This should come before any further capabilities.** That was already written
+here before anything broke; it is now the difference between an assistant that
+works on its recommended model and one that does not. Forty-four tools is well
+past the point where sending all of them every turn is defensible.
 
 ### 2. EmbeddingGemma, behind that same interface
 

@@ -128,7 +128,7 @@ class ResidentAssistantService : Service() {
       NotificationCompat.Builder(this, CHANNEL_ID)
         .setContentTitle(getString(R.string.resident_notification_title))
         .setContentText(getString(R.string.resident_notification_text))
-        .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+        .setSmallIcon(R.drawable.ic_stat_lin)
         .setOngoing(true)
         .setContentIntent(openIntent)
         .setPriority(NotificationCompat.PRIORITY_LOW)

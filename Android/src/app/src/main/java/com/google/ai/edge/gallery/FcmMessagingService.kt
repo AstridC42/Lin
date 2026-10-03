@@ -90,7 +90,7 @@ class GalleryFcmMessagingService : FirebaseMessagingService() {
     val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
     val notificationBuilder =
       NotificationCompat.Builder(this, channelId)
-        .setSmallIcon(R.mipmap.ic_launcher)
+        .setSmallIcon(R.drawable.ic_stat_lin)
         .setContentTitle(title ?: getString(R.string.gallery_news_notification_title))
         .setContentText(messageBody)
         .setAutoCancel(true)

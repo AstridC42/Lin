@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ Copyright 2026 The Lin Authors
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<!--
+  Lin's mark: an L drawn as one stroke, with a dot above its foot.
+
+  Everything here is sized to the adaptive icon safe zone. The canvas is 108dp and launchers mask
+  it to a circle, a squircle or a rounded square depending on the device, keeping only the central
+  66dp - so the mark lives well inside it and nothing can be cropped by a mask shape this build
+  will never see.
+
+  Strokes rather than filled outlines, with round caps, so it stays legible when the launcher
+  renders it at 48px and when the system tints the monochrome layer flat.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- The L: down, then right. -->
+  <path
+      android:pathData="M40,36 L40,71 L68,71"
+      android:strokeColor="#FF000000"
+      android:strokeWidth="10"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round" />
+  <!-- The dot: what it is holding on to. -->
+  <path
+      android:pathData="M68,42 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0"
+      android:fillColor="#FF000000" />
+</vector>
