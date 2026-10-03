@@ -159,7 +159,7 @@ class WakeWordService : Service(), RecognitionListener {
       NotificationCompat.Builder(this, CHANNEL_ID)
         .setContentTitle(getString(R.string.wake_word_notification_title, phrase))
         .setContentText(getString(R.string.wake_word_notification_text))
-        .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+        .setSmallIcon(R.drawable.ic_stat_lin)
         .setOngoing(true)
         .setContentIntent(openIntent)
         .setPriority(NotificationCompat.PRIORITY_LOW)

@@ -348,7 +348,7 @@
         <service
             android:name="com.google.ai.edge.gallery.voice.WakeWordTileService"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_monochrome"
+            android:icon="@drawable/ic_stat_lin"
             android:label="@string/wake_word_tile_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
