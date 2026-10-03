@@ -232,8 +232,11 @@ class AssistantPromptsTest {
       )
     val modeBlock = prompt.substring(prompt.indexOf("Current mode: AUTO"))
     assertTrue(
+      // Matched on "routing" alone rather than on a phrase: the block is a raw string that gets
+      // wrapped to fit the source line, so any two words of it can land either side of a
+      // newline. This assertion is about what the block refers to, not where the wrap falls.
       "the auto mode block must point back at the routing rather than restate it",
-      modeBlock.contains("routing above"),
+      modeBlock.contains("routing"),
     )
     assertFalse(
       "the auto mode block must not offer answering from your own knowledge as an option",

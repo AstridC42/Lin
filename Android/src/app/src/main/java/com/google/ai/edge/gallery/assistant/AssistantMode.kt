@@ -65,8 +65,8 @@ enum class AssistantMode(
       """
       Current mode: AUTO.
       Any capability may apply, and several may apply to one message - a skill, a phone action
-      and a search in a single turn is normal. Follow the routing above and handle every part of
-      the message before you reply.
+      and a search in a single turn is normal. Check the SKILLS list first, follow the routing
+      procedure above, and handle every part of the message before you reply.
       """,
   ),
   CHAT(
