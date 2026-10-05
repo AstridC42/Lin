@@ -1114,6 +1114,19 @@
   <string name="settings_section_assistant" translatable="true" description="Heading for assistant settings. [CHAR_LIMIT=30]">Assistant</string>
   <string name="settings_section_memory" translatable="true" description="Heading for memory settings. [CHAR_LIMIT=30]">Memory</string>
   <string name="settings_section_connections" translatable="true" description="Heading for connection settings. [CHAR_LIMIT=30]">Connections</string>
+  <string name="safe_mode_title" translatable="true" description="Title of the recovery screen shown when the app could not start. [CHAR_LIMIT=40]">Lin could not start</string>
+  <string name="safe_mode_content" translatable="true" description="Explanation on the recovery screen. %1$d is the number of failed launches. [CHAR_LIMIT=300]">The last %1$d attempts to open the app closed before anything appeared, so this time it started with everything switched off. Nothing has been deleted. Below is what was recorded, and the things worth trying, cheapest first.</string>
+  <string name="safe_mode_no_report" translatable="true" description="Shown on the recovery screen when no crash was recorded. [CHAR_LIMIT=300]">Nothing was recorded, which is itself a clue: it means the app was stopped by the system rather than by an error in its own code, and running out of memory is the usual reason.</string>
+  <string name="safe_mode_things_to_try" translatable="true" description="Heading above the recovery actions. [CHAR_LIMIT=40]">Things to try</string>
+  <string name="safe_mode_done" translatable="true" description="Label of a recovery action that has been used. [CHAR_LIMIT=20]">Done</string>
+  <string name="safe_mode_forget_model" translatable="true" description="Recovery action resetting app settings. [CHAR_LIMIT=60]">Reset settings</string>
+  <string name="safe_mode_forget_model_detail" translatable="true" description="What resetting settings costs. [CHAR_LIMIT=200]">Forgets your preferences and which model was chosen, so the app does not load it again on the next start. Your downloaded models are kept.</string>
+  <string name="safe_mode_clear_memory" translatable="true" description="Recovery action clearing the memory vault. [CHAR_LIMIT=60]">Clear what Lin remembers</string>
+  <string name="safe_mode_clear_memory_detail" translatable="true" description="What clearing memory costs. [CHAR_LIMIT=200]">Deletes the notes about you and the archived conversations. Your downloaded models are kept.</string>
+  <string name="safe_mode_clear_skills" translatable="true" description="Recovery action clearing skills and MCP servers. [CHAR_LIMIT=60]">Clear skills and MCP servers</string>
+  <string name="safe_mode_clear_skills_detail" translatable="true" description="What clearing skills costs. [CHAR_LIMIT=200]">Removes installed skills and any MCP servers you added. They can be set up again.</string>
+  <string name="safe_mode_start_normally" translatable="true" description="Recovery action restarting the app normally. [CHAR_LIMIT=60]">Close and start normally</string>
+  <string name="safe_mode_start_normally_detail" translatable="true" description="What starting normally does. [CHAR_LIMIT=200]">Closes the app so you can open it again as usual. If it still will not start, you will come back here.</string>
   <string name="settings_direct_calls_on_detail" translatable="true" description="Explanation shown when the assistant is allowed to place calls itself. [CHAR_LIMIT=200]">On: say \"call Dad\" and the call is placed. Needs the phone permission.</string>
   <string name="settings_section_phone" translatable="true" description="Heading for phone settings. [CHAR_LIMIT=30]">Phone</string>
   <string name="settings_section_model" translatable="true" description="Heading for model settings. [CHAR_LIMIT=30]">Model</string>

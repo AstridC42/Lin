@@ -17,8 +17,10 @@
 package com.google.ai.edge.gallery
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import com.google.ai.edge.gallery.assistant.CrashReport
+import com.google.ai.edge.gallery.assistant.SafeMode
 import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.StoreHealth
 import com.google.ai.edge.gallery.notifications.NotificationScheduleManager
@@ -47,6 +49,18 @@ class GalleryApplication : Application() {
    * thing the user wants the app closed over. So each step is allowed to fail on its own, the
    * failure is recorded where the launch screen will show it, and the app opens.
    */
+  /**
+   * The earliest point this process runs any of our code.
+   *
+   * Before Hilt injects anything and before [onCreate], so that a crash in either one is still
+   * counted as a launch that did not survive. That is what lets the next launch know to come up
+   * in safe mode rather than repeating it.
+   */
+  override fun attachBaseContext(base: Context) {
+    super.attachBaseContext(base)
+    SafeMode.noteLaunchStarted(base)
+  }
+
   override fun onCreate() {
     super.onCreate()
     // First, so that a crash in any of the setup below is still recorded. The app is installed
@@ -55,6 +69,14 @@ class GalleryApplication : Application() {
     CrashReport.install(this)
     // And immediately after, so a failing settings store has somewhere to report itself from.
     StoreHealth.install(this)
+
+    // In safe mode none of the rest runs. Every step below reads from disk, and the disk is the
+    // suspect when two launches in a row have failed - so a recovery launch touches as little as
+    // it can, and the recovery screen is built to need none of it.
+    if (SafeMode.active) {
+      Log.w(TAG, "Safe mode: skipping start-up steps")
+      return
+    }
 
     // Initialize the notification schedule manager to load the scheduled notifications from the
     // disk.
