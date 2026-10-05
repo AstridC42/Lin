@@ -19,6 +19,7 @@ package com.google.ai.edge.gallery.di
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.core.Serializer
 import androidx.datastore.dataStoreFile
 import com.google.ai.edge.gallery.AppLifecycleProvider
@@ -36,6 +37,7 @@ import com.google.ai.edge.gallery.data.DefaultChatSessionRepository
 import com.google.ai.edge.gallery.data.DefaultDataStoreRepository
 import com.google.ai.edge.gallery.data.DefaultDownloadRepository
 import com.google.ai.edge.gallery.data.DownloadRepository
+import com.google.ai.edge.gallery.data.StoreHealth
 import com.google.ai.edge.gallery.proto.BenchmarkResults
 import com.google.ai.edge.gallery.proto.CutoutCollection
 import com.google.ai.edge.gallery.proto.MemoryVault
@@ -99,6 +101,11 @@ internal object AppModule {
     return DataStoreFactory.create(
       serializer = settingsSerializer,
       produceFile = { context.dataStoreFile("settings.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("settings", error)
+          Settings.getDefaultInstance()
+        },
     )
   }
 
@@ -112,6 +119,11 @@ internal object AppModule {
     return DataStoreFactory.create(
       serializer = cutoutsSerializer,
       produceFile = { context.dataStoreFile("cutouts.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("saved cutouts", error)
+          CutoutCollection.getDefaultInstance()
+        },
     )
   }
 
@@ -125,6 +137,11 @@ internal object AppModule {
     return DataStoreFactory.create(
       serializer = userDataSerializer,
       produceFile = { context.dataStoreFile("user_data.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("sign-in details", error)
+          UserData.getDefaultInstance()
+        },
     )
   }
 
@@ -138,6 +155,11 @@ internal object AppModule {
     return DataStoreFactory.create(
       serializer = benchmarkResultsSerializer,
       produceFile = { context.dataStoreFile("benchmark_results.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("benchmark results", error)
+          BenchmarkResults.getDefaultInstance()
+        },
     )
   }
 
@@ -151,6 +173,11 @@ internal object AppModule {
     return DataStoreFactory.create(
       serializer = skillsSerializer,
       produceFile = { context.dataStoreFile("skills.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("installed skills", error)
+          Skills.getDefaultInstance()
+        },
     )
   }
 
@@ -173,6 +200,11 @@ internal object AppModule {
     return DataStoreFactory.create(
       serializer = memoryVaultSerializer,
       produceFile = { context.dataStoreFile("memory_vault.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("memory vault", error)
+          MemoryVault.getDefaultInstance()
+        },
     )
   }
 

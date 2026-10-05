@@ -19,7 +19,9 @@ package com.google.ai.edge.gallery.ui.common.onboarding
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.dataStoreFile
+import com.google.ai.edge.gallery.data.StoreHealth
 import com.google.ai.edge.gallery.proto.OnboardingData
 import dagger.Module
 import dagger.Provides
@@ -38,6 +40,11 @@ internal object OnboardingModule {
     return DataStoreFactory.create(
       serializer = OnboardingSerializer,
       produceFile = { context.dataStoreFile("onboarding_data.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("first-run state", error)
+          OnboardingData.getDefaultInstance()
+        },
     )
   }
 }

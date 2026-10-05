@@ -21,7 +21,9 @@ import android.util.Log
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.core.Serializer
+import com.google.ai.edge.gallery.data.StoreHealth
 import com.google.ai.edge.gallery.proto.ScheduledNotification
 import com.google.ai.edge.gallery.proto.ScheduledNotifications
 import com.google.protobuf.InvalidProtocolBufferException
@@ -50,6 +52,11 @@ constructor(@ApplicationContext private val context: Context) {
     DataStoreFactory.create(
       serializer = ScheduledNotificationsSerializer,
       produceFile = { File(context.filesDir, "scheduled_notifications.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("scheduled reminders", error)
+          ScheduledNotifications.getDefaultInstance()
+        },
     )
   private val TAG = "NotificationScheduleManager"
 

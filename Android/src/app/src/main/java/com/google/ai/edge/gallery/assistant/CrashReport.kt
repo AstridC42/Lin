@@ -25,6 +25,7 @@ import java.io.StringWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "AGCrashReport"
 private const val CRASH_FILE = "last-crash.txt"
@@ -93,6 +94,37 @@ object CrashReport {
     file(context).writeText(report.take(MAX_REPORT_CHARS))
   }
 
+  /**
+   * Adds [text] to the report, for a failure the app survived but the user needs to know about.
+   *
+   * A crash is not the only thing worth reporting. When a settings file cannot be read and is
+   * reset to its defaults, the app keeps running - which is the point - but the user's preferences
+   * have just silently gone, and they are owed an explanation rather than left to notice one
+   * setting at a time. The launch screen already shows this file and waits for it to be
+   * dismissed, so a note here reaches them the same way a crash does.
+   *
+   * [key] makes the note idempotent: the failing read that produced it usually happens on every
+   * access, and a report that appends the same line four hundred times says less than one line.
+   */
+  fun note(context: Context, key: String, text: String) {
+    if (!noted.add(key)) return
+    try {
+      val target = file(context)
+      val existing = if (target.exists()) target.readText() else ""
+      val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+      val addition = buildString {
+        if (existing.isNotEmpty()) appendLine()
+        appendLine("$stamp - $text")
+      }
+      target.writeText((existing + addition).take(MAX_REPORT_CHARS))
+    } catch (e: Throwable) {
+      Log.e(TAG, "Could not record the note", e)
+    }
+  }
+
+  /** Notes already written by this process, so a repeated failure is reported once. */
+  private val noted = java.util.Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+
   /** The recorded crash, or null when the last run ended normally. */
   fun read(context: Context): String? =
     try {
@@ -105,6 +137,7 @@ object CrashReport {
   /** Discards the recorded crash, once it has been shown. */
   fun clear(context: Context) {
     try {
+      noted.clear()
       file(context).delete()
     } catch (e: Throwable) {
       Log.e(TAG, "Could not clear the recorded crash", e)

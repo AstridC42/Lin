@@ -195,13 +195,27 @@ class DefaultDataStoreRepository(
     }
   }
 
+  /**
+   * The saved theme, or the automatic one when the store cannot be read.
+   *
+   * Read fresh rather than through `settings()`: the snapshot there is only kept in step by the
+   * writers that go through `updateSettings`, and `saveTheme` below writes the store directly, so
+   * reading this field from the snapshot could return a theme the user has since changed.
+   *
+   * Guarded because this is called from `Application.onCreate`, where a throw is not a crash
+   * anybody can report - it is an app that closes before it has drawn a single pixel, and closes
+   * again the next time, because whatever made the read fail is on the disk.
+   */
   override fun readTheme(): Theme {
-    return runBlocking {
-      val settings = dataStore.data.first()
-      val curTheme = settings.theme
-      // Use "auto" as the default theme.
-      if (curTheme == Theme.THEME_UNSPECIFIED) Theme.THEME_AUTO else curTheme
-    }
+    val curTheme =
+      try {
+        runBlocking { dataStore.data.first() }.theme
+      } catch (e: Throwable) {
+        StoreHealth.recordReadFailure("settings", e)
+        return Theme.THEME_AUTO
+      }
+    // Use "auto" as the default theme.
+    return if (curTheme == Theme.THEME_UNSPECIFIED) Theme.THEME_AUTO else curTheme
   }
 
   /**
@@ -220,12 +234,16 @@ class DefaultDataStoreRepository(
    * Reads `settings.disableFirebaseAnalytics` from proto DataStore and returns the inverted value
    * so that `false` (default uninitialized value) evaluates to `true` (enabled).
    */
-  override fun readFirebaseAnalytics(): Boolean {
-    return runBlocking {
-      val settings = dataStore.data.first()
-      !settings.disableFirebaseAnalytics
+  /** Also read in `Application.onCreate`, and guarded for the same reason as [readTheme]. */
+  override fun readFirebaseAnalytics(): Boolean =
+    try {
+      !runBlocking { dataStore.data.first() }.disableFirebaseAnalytics
+    } catch (e: Throwable) {
+      StoreHealth.recordReadFailure("settings", e)
+      // Analytics off is the safe default for a read that failed: it is the choice that does
+      // nothing, and it is what a fresh install has.
+      false
     }
-  }
 
   override fun saveSecret(key: String, value: String) {
     runBlocking {
@@ -524,13 +542,51 @@ class DefaultDataStoreRepository(
    */
   @Volatile private var settingsSnapshot: Settings? = null
 
-  private fun settings(): Settings =
-    settingsSnapshot ?: runBlocking { dataStore.data.first() }.also { settingsSnapshot = it }
+  /**
+   * The stored settings, or their defaults when the store cannot be read at all.
+   *
+   * Reading preferences must not be able to close the app. A corrupt file is already handled where
+   * the store is created, by resetting it; this covers everything else that can make a read fail,
+   * of which a full disk is the likely one - the user has just downloaded several gigabytes of
+   * model weights, and the first thing they do afterwards is open the app.
+   *
+   * Three of these reads happen before the app has drawn anything: the theme and the analytics
+   * flag in `Application.onCreate`, and the assistant's settings, to find out whether the previous
+   * launch died while loading a model. A throw from any of them is not a crash the user can report
+   * - it is an app that will not start, and will not start on the next attempt either, because the
+   * cause is sitting on the disk. Defaults are a bad outcome. A phone with an app on it that
+   * cannot be opened is a worse one.
+   *
+   * Deliberately not cached on failure: `settingsSnapshot` stays null, so the next read tries the
+   * disk again rather than pinning defaults in memory for the rest of the process. Whatever made
+   * the read fail may well have passed by then.
+   */
+  private fun settings(): Settings {
+    settingsSnapshot?.let {
+      return it
+    }
+    return try {
+      runBlocking { dataStore.data.first() }.also { settingsSnapshot = it }
+    } catch (e: Throwable) {
+      StoreHealth.recordReadFailure("settings", e)
+      Settings.getDefaultInstance()
+    }
+  }
 
-  /** Applies [change] to the stored settings and keeps the snapshot in step with the result. */
+  /**
+   * Applies [change] to the stored settings and keeps the snapshot in step with the result.
+   *
+   * A write that fails is reported and dropped rather than thrown. The call sites are switches and
+   * text fields in settings dialogs, and on a full disk every one of them would otherwise take the
+   * app down as it was touched.
+   */
   private fun updateSettings(change: (Settings.Builder) -> Settings.Builder) {
-    runBlocking {
-      settingsSnapshot = dataStore.updateData { current -> change(current.toBuilder()).build() }
+    try {
+      runBlocking {
+        settingsSnapshot = dataStore.updateData { current -> change(current.toBuilder()).build() }
+      }
+    } catch (e: Throwable) {
+      StoreHealth.recordWriteFailure("settings", e)
     }
   }
 
