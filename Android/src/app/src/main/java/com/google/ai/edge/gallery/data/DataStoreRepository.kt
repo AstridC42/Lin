@@ -174,9 +174,64 @@ class DefaultDataStoreRepository(
   private val benchmarkResultsDataStore: DataStore<BenchmarkResults>,
   private val skillsDataStore: DataStore<Skills>,
 ) : DataStoreRepository {
+
+  /**
+   * The store's contents, or an empty proto when it cannot be read at all.
+   *
+   * Reading a preference must never be able to close the app, and several of these reads happen
+   * before the app has drawn anything - the imported-model list and the saved access token are
+   * both read while the model list is being assembled, which is before the first frame. A throw
+   * from there is not a crash anybody can report: the app closes with nothing on screen, and does
+   * it again next launch, because the cause is a file on the disk.
+   *
+   * A corrupt file is already handled where the store is created, by resetting it. This is for
+   * everything else that can fail - a full disk being the likely one - and the proto defaults are
+   * the right answer for every read here, because each of them is an empty list, an empty string
+   * or a zero.
+   */
+  private suspend fun <T> DataStore<T>.readSafely(store: String, fallback: () -> T): T =
+    try {
+      data.first()
+    } catch (e: Throwable) {
+      StoreHealth.recordReadFailure(store, e)
+      fallback()
+    }
+
+  /**
+   * Applies [transform], recording a failure rather than throwing it.
+   *
+   * The call sites are switches and text fields in settings dialogs. On a disk that cannot be
+   * written, every one of them would otherwise close the app as it was touched, which tells the
+   * user far less than a note saying the change could not be saved.
+   */
+  private suspend fun <T> DataStore<T>.updateSafely(store: String, transform: suspend (T) -> T) {
+    try {
+      updateData(transform)
+    } catch (e: Throwable) {
+      StoreHealth.recordWriteFailure(store, e)
+    }
+  }
+
+  private suspend fun currentSettings(): Settings =
+    dataStore.readSafely("settings") { Settings.getDefaultInstance() }
+
+  private suspend fun currentUserData(): UserData =
+    userDataDataStore.readSafely("sign-in details") { UserData.getDefaultInstance() }
+
+  private suspend fun currentCutouts(): CutoutCollection =
+    cutoutDataStore.readSafely("saved cutouts") { CutoutCollection.getDefaultInstance() }
+
+  private suspend fun currentBenchmarkResults(): BenchmarkResults =
+    benchmarkResultsDataStore.readSafely("benchmark results") {
+      BenchmarkResults.getDefaultInstance()
+    }
+
+  private suspend fun currentSkills(): Skills =
+    skillsDataStore.readSafely("installed skills") { Skills.getDefaultInstance() }
+
   override fun saveTextInputHistory(history: List<String>) {
     runBlocking {
-      dataStore.updateData { settings ->
+      dataStore.updateSafely("settings") { settings ->
         settings.toBuilder().clearTextInputHistory().addAllTextInputHistory(history).build()
       }
     }
@@ -184,14 +239,16 @@ class DefaultDataStoreRepository(
 
   override fun readTextInputHistory(): List<String> {
     return runBlocking {
-      val settings = dataStore.data.first()
+      val settings = currentSettings()
       settings.textInputHistoryList
     }
   }
 
   override fun saveTheme(theme: Theme) {
     runBlocking {
-      dataStore.updateData { settings -> settings.toBuilder().setTheme(theme).build() }
+      dataStore.updateSafely("settings") { settings ->
+        settings.toBuilder().setTheme(theme).build()
+      }
     }
   }
 
@@ -224,7 +281,7 @@ class DefaultDataStoreRepository(
    */
   override fun saveFirebaseAnalytics(enabled: Boolean) {
     runBlocking {
-      dataStore.updateData { settings ->
+      dataStore.updateSafely("settings") { settings ->
         settings.toBuilder().setDisableFirebaseAnalytics(!enabled).build()
       }
     }
@@ -247,30 +304,32 @@ class DefaultDataStoreRepository(
 
   override fun saveSecret(key: String, value: String) {
     runBlocking {
-      userDataDataStore.updateData { userData ->
+      userDataDataStore.updateSafely("sign-in details") { userData ->
         userData.toBuilder().putSecrets(key, value).build()
       }
     }
   }
 
   override fun readSecret(key: String): String? {
-    return runBlocking { userDataDataStore.data.first().secretsMap[key] }
+    return runBlocking { currentUserData().secretsMap[key] }
   }
 
   override fun deleteSecret(key: String) {
     runBlocking {
-      userDataDataStore.updateData { userData -> userData.toBuilder().removeSecrets(key).build() }
+      userDataDataStore.updateSafely("sign-in details") { userData ->
+        userData.toBuilder().removeSecrets(key).build()
+      }
     }
   }
 
   override fun saveAccessTokenData(accessToken: String, refreshToken: String, expiresAt: Long) {
     runBlocking {
       // Clear the entry in old data store.
-      dataStore.updateData { settings ->
+      dataStore.updateSafely("settings") { settings ->
         settings.toBuilder().setAccessTokenData(AccessTokenData.getDefaultInstance()).build()
       }
 
-      userDataDataStore.updateData { userData ->
+      userDataDataStore.updateSafely("sign-in details") { userData ->
         userData
           .toBuilder()
           .setAccessTokenData(
@@ -287,8 +346,10 @@ class DefaultDataStoreRepository(
 
   override fun clearAccessTokenData() {
     runBlocking {
-      dataStore.updateData { settings -> settings.toBuilder().clearAccessTokenData().build() }
-      userDataDataStore.updateData { userData ->
+      dataStore.updateSafely("settings") { settings ->
+        settings.toBuilder().clearAccessTokenData().build()
+      }
+      userDataDataStore.updateSafely("sign-in details") { userData ->
         userData.toBuilder().clearAccessTokenData().build()
       }
     }
@@ -296,14 +357,14 @@ class DefaultDataStoreRepository(
 
   override fun readAccessTokenData(): AccessTokenData? {
     return runBlocking {
-      val userData = userDataDataStore.data.first()
+      val userData = currentUserData()
       userData.accessTokenData
     }
   }
 
   override fun saveImportedModels(importedModels: List<ImportedModel>) {
     runBlocking {
-      dataStore.updateData { settings ->
+      dataStore.updateSafely("settings") { settings ->
         settings.toBuilder().clearImportedModel().addAllImportedModel(importedModels).build()
       }
     }
@@ -311,34 +372,36 @@ class DefaultDataStoreRepository(
 
   override fun readImportedModels(): List<ImportedModel> {
     return runBlocking {
-      val settings = dataStore.data.first()
+      val settings = currentSettings()
       settings.importedModelList
     }
   }
 
   override fun isTosAccepted(): Boolean {
     return runBlocking {
-      val settings = dataStore.data.first()
+      val settings = currentSettings()
       settings.isTosAccepted
     }
   }
 
   override fun acceptTos() {
     runBlocking {
-      dataStore.updateData { settings -> settings.toBuilder().setIsTosAccepted(true).build() }
+      dataStore.updateSafely("settings") { settings ->
+        settings.toBuilder().setIsTosAccepted(true).build()
+      }
     }
   }
 
   override fun isGemmaTermsOfUseAccepted(): Boolean {
     return runBlocking {
-      val settings = dataStore.data.first()
+      val settings = currentSettings()
       settings.isGemmaTermsAccepted
     }
   }
 
   override fun acceptGemmaTermsOfUse() {
     runBlocking {
-      dataStore.updateData { settings ->
+      dataStore.updateSafely("settings") { settings ->
         settings.toBuilder().setIsGemmaTermsAccepted(true).build()
       }
     }
@@ -346,30 +409,34 @@ class DefaultDataStoreRepository(
 
   override fun getHasRunTinyGarden(): Boolean {
     return runBlocking {
-      val settings = dataStore.data.first()
+      val settings = currentSettings()
       settings.hasRunTinyGarden
     }
   }
 
   override fun setHasRunTinyGarden(hasRun: Boolean) {
     runBlocking {
-      dataStore.updateData { settings -> settings.toBuilder().setHasRunTinyGarden(hasRun).build() }
+      dataStore.updateSafely("settings") { settings ->
+        settings.toBuilder().setHasRunTinyGarden(hasRun).build()
+      }
     }
   }
 
   override fun addCutout(cutout: Cutout) {
     runBlocking {
-      cutoutDataStore.updateData { cutouts -> cutouts.toBuilder().addCutout(cutout).build() }
+      cutoutDataStore.updateSafely("saved cutouts") { cutouts ->
+        cutouts.toBuilder().addCutout(cutout).build()
+      }
     }
   }
 
   override fun getAllCutouts(): List<Cutout> {
-    return runBlocking { cutoutDataStore.data.first().cutoutList }
+    return runBlocking { currentCutouts().cutoutList }
   }
 
   override fun setCutout(newCutout: Cutout) {
     runBlocking {
-      cutoutDataStore.updateData { cutouts ->
+      cutoutDataStore.updateSafely("saved cutouts") { cutouts ->
         var index = -1
         for (i in 0..<cutouts.cutoutCount) {
           val cutout = cutouts.cutoutList.get(i)
@@ -389,13 +456,15 @@ class DefaultDataStoreRepository(
 
   override fun setCutouts(cutouts: List<Cutout>) {
     runBlocking {
-      cutoutDataStore.updateData { CutoutCollection.newBuilder().addAllCutout(cutouts).build() }
+      cutoutDataStore.updateSafely("saved cutouts") {
+        CutoutCollection.newBuilder().addAllCutout(cutouts).build()
+      }
     }
   }
 
   override fun setHasSeenBenchmarkComparisonHelp(seen: Boolean) {
     runBlocking {
-      dataStore.updateData { settings ->
+      dataStore.updateSafely("settings") { settings ->
         settings.toBuilder().setHasSeenBenchmarkComparisonHelp(seen).build()
       }
     }
@@ -403,26 +472,26 @@ class DefaultDataStoreRepository(
 
   override fun getHasSeenBenchmarkComparisonHelp(): Boolean {
     return runBlocking {
-      val settings = dataStore.data.first()
+      val settings = currentSettings()
       settings.hasSeenBenchmarkComparisonHelp
     }
   }
 
   override fun addBenchmarkResult(result: BenchmarkResult) {
     runBlocking {
-      benchmarkResultsDataStore.updateData { results ->
+      benchmarkResultsDataStore.updateSafely("benchmark results") { results ->
         results.toBuilder().addResult(0, result).build()
       }
     }
   }
 
   override fun getAllBenchmarkResults(): List<BenchmarkResult> {
-    return runBlocking { benchmarkResultsDataStore.data.first().resultList }
+    return runBlocking { currentBenchmarkResults().resultList }
   }
 
   override fun deleteBenchmarkResult(index: Int) {
     runBlocking {
-      benchmarkResultsDataStore.updateData { results ->
+      benchmarkResultsDataStore.updateSafely("benchmark results") { results ->
         val newResults = results.toBuilder().removeResult(index).build()
         newResults
       }
@@ -431,7 +500,7 @@ class DefaultDataStoreRepository(
 
   override fun addSkill(skill: Skill) {
     runBlocking {
-      skillsDataStore.updateData { skills ->
+      skillsDataStore.updateSafely("installed skills") { skills ->
         val newSkills = buildList {
           add(skill)
           addAll(skills.skillList)
@@ -443,7 +512,7 @@ class DefaultDataStoreRepository(
 
   override fun setSkills(skills: List<Skill>) {
     runBlocking {
-      skillsDataStore.updateData { curSkills ->
+      skillsDataStore.updateSafely("installed skills") { curSkills ->
         curSkills.toBuilder().clearSkill().addAllSkill(skills).build()
       }
     }
@@ -451,7 +520,7 @@ class DefaultDataStoreRepository(
 
   override fun setSkillSelected(skill: Skill, selected: Boolean) {
     runBlocking {
-      skillsDataStore.updateData { skills ->
+      skillsDataStore.updateSafely("installed skills") { skills ->
         val newSkills =
           skills.skillList.map { curSkill ->
             if (curSkill.name == skill.name) {
@@ -467,7 +536,7 @@ class DefaultDataStoreRepository(
 
   override fun setAllSkillsSelected(selected: Boolean) {
     runBlocking {
-      skillsDataStore.updateData { skills ->
+      skillsDataStore.updateSafely("installed skills") { skills ->
         val newSkills =
           skills.skillList.map { curSkill ->
             curSkill.toBuilder().setSelected(selected).setUserModifiedSelection(true).build()
@@ -478,12 +547,12 @@ class DefaultDataStoreRepository(
   }
 
   override fun getAllSkills(): List<Skill> {
-    return runBlocking { skillsDataStore.data.first().skillList }
+    return runBlocking { currentSkills().skillList }
   }
 
   override fun deleteSkill(name: String) {
     runBlocking {
-      skillsDataStore.updateData { skills ->
+      skillsDataStore.updateSafely("installed skills") { skills ->
         val newSkills = skills.skillList.filter { it.name != name }
         Skills.newBuilder().addAllSkill(newSkills).build()
       }
@@ -491,7 +560,7 @@ class DefaultDataStoreRepository(
   }
 
   override suspend fun deleteSkills(names: Set<String>) {
-    skillsDataStore.updateData { skills ->
+    skillsDataStore.updateSafely("installed skills") { skills ->
       val newSkills = skills.skillList.filter { it.name !in names }
       skills.toBuilder().clearSkill().addAllSkill(newSkills).build()
     }
@@ -499,7 +568,7 @@ class DefaultDataStoreRepository(
 
   override fun addViewedPromoId(promoId: String) {
     runBlocking {
-      dataStore.updateData { settings ->
+      dataStore.updateSafely("settings") { settings ->
         if (settings.viewedPromoIdList.contains(promoId)) {
           settings
         } else {
@@ -511,7 +580,7 @@ class DefaultDataStoreRepository(
 
   override fun removeViewedPromoId(promoId: String) {
     runBlocking {
-      dataStore.updateData { settings ->
+      dataStore.updateSafely("settings") { settings ->
         val newList = settings.viewedPromoIdList.filter { it != promoId }
         settings.toBuilder().clearViewedPromoId().addAllViewedPromoId(newList).build()
       }
@@ -520,7 +589,7 @@ class DefaultDataStoreRepository(
 
   override fun hasViewedPromo(promoId: String): Boolean {
     return runBlocking {
-      val settings = dataStore.data.first()
+      val settings = currentSettings()
       settings.viewedPromoIdList.contains(promoId)
     }
   }
