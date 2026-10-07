@@ -48,6 +48,11 @@ Confirmed on a real phone.
   memory while it holds, and says so in an ongoing notification.
 - **Releases.** Every push to `main` publishes a rolling pre-release with four
   ABI APKs, signed with a stable key so they install over each other.
+- **Instant Media Search** and **Video Moment Finder**, ported from upstream -
+  search your own photos by describing them, and find and cut a moment out of a
+  long video. Both need **EmbeddingGemma-2**, which arrived in the `1_0_20`
+  allowlist. Listed here rather than under *Working* only because nobody has
+  run them on a phone yet.
 
 ## Built, not yet confirmed
 
@@ -246,7 +251,57 @@ with a **Copy report** button. There is no computer attached to a phone running
 a sideloaded build, so that report is the only account of what happened — and
 the difference between a fix and a guess.
 
-## What the upstream refresh brought
+## Caught up with upstream
+
+Asked whether the fork was current, because features visible in the Edge
+Gallery were missing from Lin. It was not, and the obvious way to measure it
+was wrong: commit ancestry said 94 commits behind, but the earlier merge was
+squashed, so git cannot see upstream commits as ancestors even where the code
+is present - Scrapbook and the Hugging Face explore screen are both "after"
+that base and both were already here. Compare content, not history.
+
+Content comparison found 51 files, and these gaps:
+
+- **Instant Media Search** (`smartalbum`) and **Video Moment Finder**
+  (`videomomentfinder`), both open-sourced upstream on 5-6 October. Two whole
+  tasks, genuinely absent. Ported with their supporting
+  `services/semanticretrieval` and `services/photolibrary`, the onboarding
+  images and 189 strings.
+- **The allowlist pin.** Upstream names these files after *its* version, so
+  this fork pins one; it was on `1_0_19` and upstream had published `1_0_20`.
+  That matters more than a version number: `1_0_20` adds **EmbeddingGemma-2**,
+  and its `taskTypes` are exactly `smart_album` and `video_moment_finder`. Both
+  ported tasks would have had no model at all without the bump.
+- **LiteRT-LM 0.11.0 to 0.18.0**, required because the semantic retrieval code
+  uses `litertlm.ModelInfo`. The upgrade removed the `Capabilities` class, so
+  the two places this fork checked for speculative-decoding support were
+  migrated to `ModelInfo.from` with a type check, the way upstream did.
+- **The external-prompt confirmation.** Upstream holds a prompt that arrived
+  via deep link until the user has read it, because any app, web page, QR code
+  or notification can open one. That matters more here than upstream, since Lin
+  can place a call, send a message and switch things off in a house. Wired so
+  only *external* prompts go through it - dictation, a wake-word summon and the
+  suggestion chips all arrive by another path and are sent as before, because
+  the user has just spoken or tapped and hands-free would break otherwise.
+
+Two differences were left, deliberately:
+
+- **Upstream's model-downloader refactor** (`ModelDownloader`,
+  `LiteRtLmModelDownloader`, `AICoreModelDownloader`, and an `UNAVAILABLE`
+  status with structured unavailability metadata). No user-visible feature
+  attached, and taking it means rewriting this fork's download path - while an
+  unexplained crash reported as happening *after a model download* is still
+  open. Changing that path now would confound the one diagnosis in progress.
+  The three files were copied and then deleted; nothing here referenced them.
+- **Visual token budget configuration.** A model-settings dropdown. It touches
+  thirteen files including `ConfigDialog.kt`, `ChatView.kt` and
+  `ModelPageAppBar.kt`, all heavily diverged here, so it is a hand-merge of
+  central files for a secondary setting.
+
+Also note upstream **removed** Android Auto. This fork uses it, so the
+dependency was kept rather than taking that deletion.
+
+## What the earlier upstream refresh brought
 
 The fork started as a snapshot and was 79 upstream commits behind. Merged now,
 and three of those commits matter here rather than just upstream:

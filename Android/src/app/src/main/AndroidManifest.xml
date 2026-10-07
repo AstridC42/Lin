@@ -23,6 +23,15 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <!--
+      Instant Media Search reads the photo library, and on API 31-32 that still means
+      READ_EXTERNAL_STORAGE - the granular READ_MEDIA_* permissions above only exist from API 33.
+      minSdk here is 31, so without this the task cannot see anything on the two oldest supported
+      versions. Capped so it is not requested where the granular ones apply.
+    -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!--
