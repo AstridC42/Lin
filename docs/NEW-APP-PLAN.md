@@ -48,13 +48,22 @@ has sat at the top of `STATUS.md` for weeks stops being necessary.
 
 Reversible unless marked otherwise.
 
-- **Same repository, new top-level directory.** The fork keeps shipping and the
-  crash work is not abandoned; lifting the engine wrapper is a file copy rather
-  than a dependency; one CI, one signing key. Splitting it into its own
-  repository later is a `git filter-repo` away.
-- **A distinct application id during development**, so both apps install side
-  by side and the fork stays usable while this one is a skeleton. It takes over
-  `com.lin.assistant` only at Phase 7.
+- **Same repository, new top-level directory.** Lifting the engine wrapper is a
+  file copy rather than a dependency; one CI, one signing key. Splitting it
+  into its own repository later is a `git filter-repo` away.
+- **A new application id: `com.lin.agent`.** Not a replacement for the fork's
+  `com.lin.assistant`, so both install side by side and the fork stays usable
+  while this one is a skeleton. One word to change if you want a different one.
+- **The fork is archived, not maintained.** It becomes a reference: a working
+  implementation of engine setup, device quirks, HuggingFace auth, semantic
+  retrieval and a hundred small Android details, sitting in the same repository
+  where it can be read and copied from. No new features, no releases.
+
+  Two consequences worth stating. The open crash is still worth diagnosing, but
+  only for what it *tells* us: if it is LiteRT-LM on this device, the new app
+  inherits it, and Phase 1 needs to know. And PR #37, the upstream port, is
+  still worth merging, because Instant Media Search is the reference
+  implementation of the embedder and vector store this app is about to need.
 - **Toolchain matched to the fork**, so lifted code compiles unchanged: Gradle
   9.2.1, AGP 9.0.1, Kotlin 2.2.21, JDK 21, compileSdk/targetSdk 37, minSdk 31,
   Compose BOM 2026.02.00, Hilt 2.60.1, DataStore 1.1.7, WorkManager 2.12.0,
@@ -77,6 +86,72 @@ no Instant Media Search. No multi-model picker UI. No image generation.
 The focus is the thing the fork could not be: one assistant that is good at
 being an assistant.
 
+## The models
+
+Verified against upstream's `1_0_20` allowlist and the Hugging Face Hub on
+7 October 2026, not from memory.
+
+### On the phone
+
+| | Size | Min RAM | Context | Modalities |
+|---|---|---|---|---|
+| **Gemma 4 E2B** | 2.59 GB | 8 GB | 32,000 | text, image, audio |
+| **Gemma 4 E4B** | 3.66 GB | 12 GB | 32,000 | text, image, audio |
+
+Both offered, E2B the default. **E4B wants 12 GB of RAM**, worth checking
+against the actual phone before making it the default, because below that the
+memory warning fires and it is right to.
+
+Neither has an NPU build: both are `gpu,cpu` with no SoC variants.
+
+### The embedder
+
+EmbeddingGemma 2 is a family, not one model. All three map into the same
+768-dimensional space with an 8,192-token context, int4 QAT transformer and
+embeddings:
+
+| | Modalities | Params | Generic file |
+|---|---|---|---|
+| **Text 270M** | text | 270M | **164 MB** |
+| Text-Vision 440M | text, images | 440M | not measured |
+| 740M | text, images, video, audio | 740M | 484 MB |
+
+**Use Text 270M for memory.** Upstream's allowlist lists only the 740M, because
+it ships it for photo and video search. Lin's memory notes are text: the 270M is
+three times smaller, lands in the same vector space, and sits beside a 3.66 GB
+chat model without a fight. The 740M earns its place only for semantic search
+over the photo library, which is a later feature and a separate decision.
+
+The embedder does **not** go through LiteRT-LM's `Engine`/`Conversation`. It
+runs on MediaPipe `UniversalEmbedder` and `SemanticRetriever` (tasks-retrieval
+1.1.0), a different runtime path, hence a separate `Embedder` interface below
+rather than squeezing it into `LlmBackend`.
+
+### NPU: the files are real, the path is not ready
+
+The NPU builds do exist. Both embedder repos carry ten SoC-specific files
+alongside the generic one: Qualcomm SM8550, SM8650, SM8750, SM8850, QCS8275;
+MediaTek MT6991, MT6993; Google Tensor G5, G6; Intel PTL.
+
+Three things make this an experiment rather than a v1 feature:
+
+1. **The vendor runtime has to be on the device.** Qualcomm NPU through
+   LiteRT-LM needs QAIRT runtime libraries present, and Google's own guide pins
+   a specific version. An app cannot assume they are there.
+2. **The documented path is `adb` and a CLI binary**, pushing the dispatch
+   library and running `litert_lm_main --backend=npu`. That is a research
+   workflow, not an app integration. A secondary source describes Gemma NPU
+   acceleration on Qualcomm and MediaTek as an early-access programme; treat
+   that as unconfirmed.
+3. **Upstream shipped it GPU/CPU only.** Google wrote both the model and the
+   Gallery and still set `accelerators: "gpu,cpu"`, `variantLabel: "GPU"`, no
+   SoC mapping. That is the most telling evidence available about readiness.
+
+So: **GPU/CPU in v1**, with the model registry designed to carry a SoC-to-file
+mapping from the start, so turning NPU on later is data rather than a refactor.
+This reverses one line of the table below: a minimal SoC variant mechanism is
+needed after all, just not the Gallery's allowlist machinery around it.
+
 ## Architecture
 
 ### The one interface that matters
@@ -96,6 +171,17 @@ interface LlmBackend {
 Three implementations: `OnDeviceBackend` (LiteRT-LM), `OllamaBackend` (HTTP),
 and `FakeBackend` for tests. That third one is the point — it makes the whole
 agent loop unit-testable, which the fork's design made effectively impossible.
+
+Embedding is a second, smaller interface, because it runs on MediaPipe rather
+than LiteRT-LM, and because conflating them would put a vector store behind a
+chat abstraction:
+
+```kotlin
+interface Embedder {
+  val dimensions: Int                                   // 768
+  suspend fun embed(parts: List<EmbedPart>): FloatArray
+}
+```
 
 ### The agent spine
 
@@ -164,7 +250,9 @@ computer attached.
 | **Port (ours)** | `CrashReport`, `SafeMode`, `StoreHealth`, `EngineErrors`. | `app/` |
 | **Port, then rewrite** | The prompts. Shape carries over; content gets much shorter, because an orchestrator with five tools needs far less steering than one with forty-four. | `core/agent/` |
 | **Write fresh** | The agent spine, the tool registry, the Ollama backend, the backend interface, model acquisition (two or three known files, resumable, SHA-256 verified), the UI. | — |
-| **Do not take** | The allowlist machinery, SoC variant selection, the task/model registry, every gallery screen. | — |
+| **Write fresh, small** | A SoC-to-file mapping in the model registry. Needed after all, for the NPU embedder variants. A map and a lookup, not the Gallery's allowlist machinery. | `core/models/` |
+| **Read, do not take** | Instant Media Search's `services/semanticretrieval`: the `UniversalEmbedder`, `SqliteVectorStore` and `SemanticRetriever` wiring. The reference for Phase 5, arriving via PR #37. | — |
+| **Do not take** | The allowlist machinery, the task/model registry, every gallery screen. | — |
 
 ## Phases
 
@@ -183,8 +271,9 @@ mode trips on the second failed launch, breadcrumb names the phase.
 
 ### Phase 1 — One model, one conversation
 
-`LlmBackend` with `OnDeviceBackend` behind it. Gemma 4 E2B resident, streaming
-replies, one continuous conversation persisted across restarts.
+`LlmBackend` with `OnDeviceBackend` behind it. Gemma 4 E2B or E4B resident,
+chosen in settings, streaming replies, one continuous conversation persisted
+across restarts.
 
 For development the model file is already on the phone from the fork, so point
 at it and defer the download path to 1b. That removes HF auth from the critical
@@ -241,8 +330,10 @@ back before it goes.
 ### Phase 5 — Memory
 
 Port `memory/`. Replace word-overlap search with embedding retrieval using
-EmbeddingGemma-2, which arrived in the `1_0_20` allowlist. Background digest
-after a conversation ends.
+**EmbeddingGemma 2 Text 270M**, 164 MB and co-resident with the chat model,
+through MediaPipe `UniversalEmbedder` and a vector store, with Instant Media
+Search as the reference implementation. Background digest after a conversation
+ends.
 
 **Measurement:** recall over a set of planted facts, and that nothing invented
 appears in a reply when the vault has no answer.
@@ -286,9 +377,12 @@ Phase 0 does not depend on the answer; Phase 1 does.
 
 ## Open questions
 
-1. Separate repository eventually, or keep it here?
-2. Does an Ollama server already exist, and which model on it? This decides
+1. Does an Ollama server already exist, and which model on it? This decides
    what Phase 2 is tested against.
-3. Voice in v1, or Phase 6 as written?
-4. Is the fork maintained in parallel during this, or frozen at the point the
-   crash is fixed?
+2. Voice in v1, or Phase 6 as written?
+3. How much RAM does the phone have? It decides whether E4B can be the default
+   or stays an option behind a warning.
+4. `com.lin.agent` as the application id, or something else?
+
+Answered already: the fork is archived as a reference, the new app takes a new
+id, and both Gemma 4 E2B and E4B are offered.
