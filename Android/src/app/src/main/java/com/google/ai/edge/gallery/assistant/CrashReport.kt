@@ -91,7 +91,35 @@ object CrashReport {
       appendLine()
       append(stackTrace)
     }
-    file(context).writeText(report.take(MAX_REPORT_CHARS))
+    val text = report.take(MAX_REPORT_CHARS)
+    file(context).writeText(text)
+    alsoWriteWhereAFileManagerCanReachIt(context, text)
+  }
+
+  /**
+   * Writes a second copy outside the app's private directory.
+   *
+   * The private copy is only readable by the app, which is fine right up to the case that matters
+   * most: a crash before the first frame. Then the app has a perfect account of what happened and
+   * no way to ever show it, and the person holding the phone has no computer attached to run
+   * logcat on - so the report exists and is unreachable, which is how an app ends up reported as
+   * "it keeps crashing" with nothing further available.
+   *
+   * `getExternalFilesDir` needs no permission and is browsable with any file manager at
+   * Android/data/<package>/files, so a copy there can be found and sent on even when the app
+   * never manages to draw anything. It is removed with the app, and holds only this report.
+   *
+   * Entirely best-effort: external storage can be unavailable, and a failure here must not
+   * replace the real crash with a less useful one.
+   */
+  private fun alsoWriteWhereAFileManagerCanReachIt(context: Context, text: String) {
+    try {
+      val dir = context.getExternalFilesDir(null) ?: return
+      if (!dir.exists() && !dir.mkdirs()) return
+      File(dir, CRASH_FILE).writeText(text)
+    } catch (e: Throwable) {
+      Log.e(TAG, "Could not write the shared copy of the crash", e)
+    }
   }
 
   /**
@@ -116,7 +144,9 @@ object CrashReport {
         if (existing.isNotEmpty()) appendLine()
         appendLine("$stamp - $text")
       }
-      target.writeText((existing + addition).take(MAX_REPORT_CHARS))
+      val text = (existing + addition).take(MAX_REPORT_CHARS)
+      target.writeText(text)
+      alsoWriteWhereAFileManagerCanReachIt(context, text)
     } catch (e: Throwable) {
       Log.e(TAG, "Could not record the note", e)
     }
@@ -139,6 +169,7 @@ object CrashReport {
     try {
       noted.clear()
       file(context).delete()
+      context.getExternalFilesDir(null)?.let { File(it, CRASH_FILE).delete() }
     } catch (e: Throwable) {
       Log.e(TAG, "Could not clear the recorded crash", e)
     }

@@ -59,6 +59,7 @@ class GalleryApplication : Application() {
   override fun attachBaseContext(base: Context) {
     super.attachBaseContext(base)
     SafeMode.noteLaunchStarted(base)
+    SafeMode.mark(base, "process created")
   }
 
   override fun onCreate() {
@@ -77,6 +78,7 @@ class GalleryApplication : Application() {
       Log.w(TAG, "Safe mode: skipping start-up steps")
       return
     }
+    SafeMode.mark(this, "application created")
 
     // Initialize the notification schedule manager to load the scheduled notifications from the
     // disk.
@@ -94,6 +96,7 @@ class GalleryApplication : Application() {
   /** Runs one startup step, recording a failure rather than letting it close the app. */
   private inline fun step(what: String, block: () -> Unit) {
     try {
+      SafeMode.mark(this, "start-up: $what")
       block()
     } catch (e: Throwable) {
       Log.e(TAG, "Startup step '$what' failed", e)

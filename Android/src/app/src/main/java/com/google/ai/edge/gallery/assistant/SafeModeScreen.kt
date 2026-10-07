@@ -59,7 +59,12 @@ data class RecoveryAction(val label: String, val detail: String, val onClick: ()
  * Almost always something smaller is enough, and the user should get to find that out.
  */
 @Composable
-fun SafeModeScreen(report: String, failures: Int, actions: List<RecoveryAction>) {
+fun SafeModeScreen(
+  report: String,
+  failures: Int,
+  reachedPhase: String,
+  actions: List<RecoveryAction>,
+) {
   val context = LocalContext.current
   val clipboard = LocalClipboardManager.current
   // Each action is offered once. They are destructive and none of them is worth doing twice by
@@ -79,6 +84,15 @@ fun SafeModeScreen(report: String, failures: Int, actions: List<RecoveryAction>)
       style = MaterialTheme.typography.bodyMedium,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+
+    // How far the last launch got, which is the only evidence there is when the report is empty.
+    if (reachedPhase.isNotBlank()) {
+      Text(
+        context.getString(R.string.safe_mode_reached, reachedPhase),
+        style = MaterialTheme.typography.bodyMedium,
+        fontFamily = FontFamily.Monospace,
+      )
+    }
 
     if (report.isNotBlank()) {
       Card(modifier = Modifier.fillMaxWidth()) {

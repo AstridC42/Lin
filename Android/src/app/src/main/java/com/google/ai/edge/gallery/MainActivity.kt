@@ -102,6 +102,7 @@ class MainActivity : ComponentActivity() {
       return
     }
 
+    SafeMode.mark(this, "activity created")
     assistantRequest = AssistantIntents.parse(intent)
 
     // Convert FCM Console data extras to intent data for GalleryNavGraph to pick up
@@ -120,6 +121,7 @@ class MainActivity : ComponentActivity() {
         return
       }
 
+      SafeMode.mark(this, "content set")
       setContent {
         GalleryTheme {
           Surface(modifier = Modifier.fillMaxSize()) {
@@ -139,6 +141,7 @@ class MainActivity : ComponentActivity() {
               // inside the composition rather than at the end of onCreate, because onCreate
               // returning only means the work was scheduled - a crash in the first composition
               // would otherwise be recorded as a success and never trigger safe mode.
+              SafeMode.mark(this@MainActivity, "first frame")
               SafeMode.noteLaunchSucceeded(this@MainActivity)
             }
             AnimatedVisibility(
@@ -161,7 +164,12 @@ class MainActivity : ComponentActivity() {
       contentSet = true
     }
 
+    // Two marks, because the view model is constructed lazily on this first access and reads
+    // from disk while it is - so "view model created" failing and "model list requested" failing
+    // are different faults in different code.
+    SafeMode.mark(this, "view model created")
     modelManagerViewModel.loadModelAllowlist()
+    SafeMode.mark(this, "model list requested")
 
     // Show splash screen.
     val splashScreen = installSplashScreen()
@@ -238,6 +246,7 @@ class MainActivity : ComponentActivity() {
           SafeModeScreen(
             report = CrashReport.read(this).orEmpty(),
             failures = SafeMode.consecutiveFailures,
+            reachedPhase = SafeMode.lastMilestone(this),
             actions =
               listOf(
                 RecoveryAction(

@@ -117,6 +117,39 @@ object SafeMode {
     return Decision(failures = failures, safeMode = failures >= FAILURES_BEFORE_SAFE_MODE)
   }
 
+  /**
+   * Records how far this launch got, overwriting the previous mark.
+   *
+   * The point of this is the crash that leaves no stack trace. If the process is killed by the
+   * system rather than by an exception - running out of memory, a native abort in the inference
+   * engine - no Java code runs on the way down, so the crash reporter records nothing and the
+   * report is empty. An empty report and a phone that shows nothing is the position this whole
+   * investigation has been stuck in.
+   *
+   * A breadcrumb survives that, because it was written before the process died rather than during
+   * it. "Got as far as loading the model list" and "got as far as the first frame" are different
+   * bugs, and knowing which is most of the work of finding it.
+   *
+   * Cheap on purpose - a short string committed to SharedPreferences - because it is on the
+   * start-up path and the start-up path is what is broken.
+   */
+  fun mark(context: Context, milestone: String) {
+    try {
+      prefs(context).edit().putString(KEY_MILESTONE, milestone).commit()
+    } catch (e: Throwable) {
+      Log.e(TAG, "Could not record milestone '$milestone'", e)
+    }
+  }
+
+  /** The furthest the previous launch got, for showing alongside the report. */
+  fun lastMilestone(context: Context): String =
+    try {
+      prefs(context).getString(KEY_MILESTONE, "").orEmpty()
+    } catch (e: Throwable) {
+      Log.e(TAG, "Could not read the last milestone", e)
+      ""
+    }
+
   /** Called once the first frame is on the screen: this launch worked. */
   fun noteLaunchSucceeded(context: Context) {
     try {
@@ -150,6 +183,7 @@ object SafeMode {
   private const val PREFS_NAME = "lin_launch_health"
   private const val KEY_IN_PROGRESS = "launch_in_progress"
   private const val KEY_FAILURES = "consecutive_failures"
+  private const val KEY_MILESTONE = "last_milestone"
 
   /** A force-quit during start-up looks like one failure, so one is not enough to act on. */
   private const val FAILURES_BEFORE_SAFE_MODE = 2
