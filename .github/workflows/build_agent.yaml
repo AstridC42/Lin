@@ -1,0 +1,105 @@
+# Builds the new Lin app (agent/) and publishes an installable APK.
+#
+# Separate from build_android.yaml, which builds the archived Edge Gallery fork. Two apps with
+# different ids, different Gradle projects and different lifecycles; one workflow that built both
+# would couple a frozen reference implementation to the app under active development.
+#
+# Debug-signed on purpose for now. The fork's release key is held in an Actions cache and the two
+# apps have different application ids, so there is no signature clash and nothing to coordinate -
+# release signing arrives when this app starts cutting releases.
+name: Build Lin
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'agent/**'
+      - '.github/workflows/build_agent.yaml'
+  pull_request:
+    paths:
+      - 'agent/**'
+      - '.github/workflows/build_agent.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: build-agent-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Lin APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+
+    steps:
+      - name: Checkout the source code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          # Scoped to this app's own build files, so the fork's builds and this one do not evict
+          # each other's caches.
+          key: gradle-agent-${{ runner.os }}-${{ hashFiles('agent/**/*.gradle.kts', 'agent/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-agent-${{ runner.os }}-
+
+      - name: Install Android SDK Platform 37
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" >/dev/null
+
+      # Before the build, so a broken test fails the run quickly rather than after an APK.
+      - name: Run the unit tests
+        run: ./gradlew :core:testDebugUnitTest :engine:testDebugUnitTest --console=plain
+
+      - name: Build
+        run: ./gradlew :app:assembleDebug --console=plain
+
+      - name: Name the APK after the commit
+        id: rename
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          short="${HEAD_SHA:0:7}"
+          mkdir -p "$RUNNER_TEMP/apks"
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/apks/lin-${short}.apk"
+          ls -lh "$RUNNER_TEMP/apks"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+
+      # Three days, one file. The fork filled a 500 MB allowance by keeping four APKs for
+      # fourteen, and then every build failed on the upload with the compile and tests green
+      # above it - a red tick that said nothing about the code.
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: lin-${{ steps.rename.outputs.short }}
+          path: ${{ runner.temp }}/apks/*.apk
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Say where the APK is
+        run: |
+          {
+            echo "### Lin \`${{ steps.rename.outputs.short }}\`"
+            echo
+            echo "Scroll to **Artifacts** at the bottom of this page, download"
+            echo "\`lin-${{ steps.rename.outputs.short }}\`, unzip it, put the \`.apk\` on your"
+            echo "phone and tap it."
+            echo
+            echo "Debug-signed, and a different application id from the archived Gallery fork, so"
+            echo "it installs alongside it rather than over it."
+          } >> "$GITHUB_STEP_SUMMARY"

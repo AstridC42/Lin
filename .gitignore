@@ -7,3 +7,8 @@ local.properties
 keystore.properties
 *.jks
 *.keystore
+
+# The new app's Gradle output.
+agent/build/
+agent/*/build/
+agent/.gradle/

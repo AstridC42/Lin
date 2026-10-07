@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="app_name">Lin</string>
+  <string name="ask_placeholder">Ask Lin</string>
+  <string name="send">Send</string>
+
+  <string name="recovery_title">Lin could not start</string>
+  <string name="recovery_body">The last %1$d attempts closed before anything appeared, so this
+    time Lin started with everything switched off. Nothing has been deleted.</string>
+  <string name="recovery_reached">Got as far as: %1$s</string>
+  <string name="recovery_no_report">Nothing was recorded, which is itself a clue: it means the app
+    was stopped by the system rather than by an error in its own code, and running out of memory is
+    the usual reason.</string>
+  <string name="recovery_copy">Copy the report</string>
+  <string name="recovery_start_normally">Close and start normally</string>
+</resources>
