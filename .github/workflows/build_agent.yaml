@@ -55,10 +55,22 @@ jobs:
             gradle-agent-${{ runner.os }}-
 
       # android-37.0, with the minor version, because compileSdk pins
-      # release(37) { minorApiLevel = 0 } and "platforms;android-37" is not a package that exists.
-      # Same command the fork's workflow uses, which is known to work on this runner image.
+      # release(37) { minorApiLevel = 0 }: "platforms;android-37" is not a package that exists.
+      #
+      # Deliberately unable to fail the job. The identical command in the fork's workflow succeeds
+      # on this runner image and this one did not, twice, with no detail beyond "exit code 1" -
+      # and the logs are not reachable from where this is being driven. So it reports what it
+      # actually sees and gets out of the way: if the platform really is missing, the Build step
+      # below says so in terms that name the problem, which is a better error than this step's.
       - name: Install Android SDK Platform 37
-        run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0"
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+          ls "$ANDROID_HOME/cmdline-tools" 2>&1 || true
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platforms;android-37.0" || true
+          echo "--- installed platforms ---"
+          "$SDKMANAGER" --list_installed 2>&1 | grep -i "platforms;" || true
 
       # Before the build, so a broken test fails the run quickly rather than after an APK.
       - name: Run the unit tests
