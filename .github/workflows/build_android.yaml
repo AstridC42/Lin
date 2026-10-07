@@ -80,38 +80,32 @@ jobs:
           ls -lh "$RUNNER_TEMP/apks"
           echo "short=$short" >> "$GITHUB_OUTPUT"
 
-      # One artifact per ABI, so you download the ~43 MB you need rather than all ~190 MB.
+      # One ABI, kept briefly.
+      #
+      # This used to upload all four at 14 days, which is about 190 MB per push. The account's
+      # Actions storage allowance is 500 MB, so it filled, and then every build failed on the
+      # upload - with the compile and the unit tests having passed - which is a red tick that
+      # says nothing about the code and trains you to ignore red ticks.
+      #
+      # Dropping the other three costs no coverage: the Build step above still builds every ABI,
+      # so a break in any of them still fails the build. What is lost is being able to download
+      # them from a branch run, and they were never much use there anyway - these are
+      # debug-signed and will not install over a release build. A release publishes all four,
+      # signed, on the Releases page, which is where they are actually fetched from.
+      #
+      # And the upload does not gate the build. What this workflow is for is "does it compile and
+      # do the tests pass", both of which have already happened by this point; whether a
+      # convenience download was stored afterwards is a different question, and letting it fail
+      # the job meant a full storage allowance reported itself as broken code. The rename step
+      # above still fails the build if no APK was produced, which is the case that matters.
       - name: Upload arm64-v8a (almost certainly the one you want)
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: apk-arm64-v8a-${{ steps.rename.outputs.short }}
           path: ${{ runner.temp }}/apks/*-arm64-v8a.apk
           if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload universal
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk-universal-${{ steps.rename.outputs.short }}
-          path: ${{ runner.temp }}/apks/*-universal.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload armeabi-v7a
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk-armeabi-v7a-${{ steps.rename.outputs.short }}
-          path: ${{ runner.temp }}/apks/*-armeabi-v7a.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload x86_64
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk-x86_64-${{ steps.rename.outputs.short }}
-          path: ${{ runner.temp }}/apks/*-x86_64.apk
-          if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
 
       - name: Say where the APKs are
         run: |
