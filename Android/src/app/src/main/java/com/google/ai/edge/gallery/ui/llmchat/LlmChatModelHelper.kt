@@ -219,7 +219,17 @@ object LlmChatModelHelper : LlmModelHelper {
           conversation = conversation,
           metricsTracker = metricsTracker,
         )
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
+      // Throwable rather than Exception. Loading a model allocates the weights and a key-value
+      // cache sized by maxNumTokens, and the way that fails on a phone is OutOfMemoryError -
+      // which is an Error, not an Exception, so it went straight past this handler and closed the
+      // app. A failure the app lives to report lets the user pick a smaller model or a lower
+      // context; a failure that kills the process repeats on the next launch, because the app
+      // loads the same model again.
+      //
+      // This cannot catch everything: if the allocation fails inside the engine's native code the
+      // process is killed without any Java frame running, and nothing here is invoked. That case
+      // is what the loading_model_name marker is for.
       val errorMsg = cleanUpMediapipeTaskErrorMessage(e.message ?: "Unknown error")
       model.markInitializationFailed(errorMsg)
       metricsTracker.onModelInitialized()

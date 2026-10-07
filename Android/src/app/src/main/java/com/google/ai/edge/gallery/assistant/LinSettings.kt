@@ -17,30 +17,39 @@
 package com.google.ai.edge.gallery.assistant
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -55,6 +64,15 @@ data class SettingsRow(
   val detail: String = "",
   /** A tick beside the row, for the things that are either set up or not. */
   val done: Boolean? = null,
+  /**
+   * When set, the row carries a switch in this position and tapping it anywhere flips it.
+   *
+   * For the settings that are a yes or a no and have no dialog of their own. Everything else on
+   * this screen opens the dialog that owns it, but a single switch does not deserve a dialog, and
+   * routing one through a second screen is how the direct-call setting ended up somewhere no
+   * assistant user ever went.
+   */
+  val switch: Boolean? = null,
   val onClick: () -> Unit,
 )
 
@@ -105,7 +123,10 @@ fun LinSettings(sections: List<SettingsSection>, onDismiss: () -> Unit) {
           )
         }
       ) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+        LazyColumn(
+          modifier = Modifier.fillMaxSize().padding(padding),
+          contentPadding = PaddingValues(bottom = 32.dp),
+        ) {
           for (section in sections) {
             if (section.rows.isEmpty()) continue
             item(key = "head-${section.title}") {
@@ -113,14 +134,24 @@ fun LinSettings(sections: List<SettingsSection>, onDismiss: () -> Unit) {
                 section.title,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 4.dp),
+                modifier = Modifier.padding(start = 28.dp, end = 20.dp, top = 20.dp, bottom = 6.dp),
               )
             }
-            for (row in section.rows) {
-              item(key = "${section.title}-${row.title}") { SettingsRowItem(row) }
-            }
-            item(key = "rule-${section.title}") {
-              HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            // One card per section rather than a rule between sections. A run of flat rows with
+            // hairlines across them reads as a list of files; the grouping is the thing worth
+            // seeing here, because what a row does depends on which section it is in.
+            item(key = "card-${section.title}") {
+              Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors =
+                  CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                  ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+              ) {
+                Column { section.rows.forEach { SettingsRowItem(it) } }
+              }
             }
           }
         }
@@ -131,11 +162,25 @@ fun LinSettings(sections: List<SettingsSection>, onDismiss: () -> Unit) {
 
 @Composable
 private fun SettingsRowItem(row: SettingsRow) {
+  // A switch row is toggleable rather than clickable, so a screen reader reads out "switch, on"
+  // instead of "button" - the state is the whole point of a switch, and clickable has no way to
+  // carry it however the role is labelled.
+  val interactive =
+    if (row.switch != null) {
+      Modifier.toggleable(
+        value = row.switch,
+        role = Role.Switch,
+        onValueChange = { row.onClick() },
+      )
+    } else {
+      Modifier.clickable(onClick = row.onClick)
+    }
   Row(
     modifier =
       Modifier.fillMaxWidth()
-        .clickable(onClick = row.onClick)
-        .padding(horizontal = 20.dp, vertical = 12.dp),
+        .then(interactive)
+        .heightIn(min = 56.dp)
+        .padding(start = 20.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
@@ -167,6 +212,13 @@ private fun SettingsRowItem(row: SettingsRow) {
         tint = MaterialTheme.colorScheme.primary,
         modifier = Modifier.size(18.dp),
       )
+    }
+    if (row.switch != null) {
+      // Not clickable itself: the whole row is, and two overlapping targets that do the same
+      // thing is how a tap near the edge of a switch does nothing at all.
+      Box(modifier = Modifier.clearAndSetSemantics {}) {
+        Switch(checked = row.switch, onCheckedChange = null)
+      }
     }
   }
 }

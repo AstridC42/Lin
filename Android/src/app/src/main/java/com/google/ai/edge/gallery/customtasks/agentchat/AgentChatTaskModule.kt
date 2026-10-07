@@ -20,7 +20,9 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.dataStoreFile
+import com.google.ai.edge.gallery.data.StoreHealth
 import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.agent.AgentChatExecutor
 import com.google.ai.edge.gallery.agent.AgentRuntimeConfig
@@ -259,6 +261,11 @@ internal object AgentChatTaskModule {
     return DataStoreFactory.create(
       serializer = McpServersSerializer,
       produceFile = { context.dataStoreFile("mcp_servers.pb") },
+      corruptionHandler =
+        ReplaceFileCorruptionHandler { error ->
+          StoreHealth.recordReset("MCP server list", error)
+          McpServers.getDefaultInstance()
+        },
     )
   }
 }

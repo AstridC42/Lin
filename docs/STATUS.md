@@ -19,7 +19,12 @@ Confirmed on a real phone.
   images and audio attachable in every mode; a mode button that biases the
   assistant rather than changing screens.
 - **Phone actions.** Calls and texts (staged for you to send), alarms, timers,
-  opening apps, maps and directions, the torch, settings pages, links.
+  opening apps, maps and directions, the torch, settings pages, links. A call
+  can also be placed outright rather than staged, via **Settings > Phone > Let
+  the assistant place calls directly** - the capability was always there, and
+  its only switch was in the model gallery's settings dialog, which an
+  assistant user never opens. That is why every "call Dad" stopped at a dialer
+  with the number typed in.
 - **Reminders** the assistant keeps itself, which survive a reboot — distinct
   from alarms, which are handed to the clock app and cannot be read back.
 - **Skills**, including Wikipedia lookups. This took two attempts: the skills
@@ -168,6 +173,16 @@ Raising the context to 8,192 (the model advertises 32,000) buys room now. It
 does not change the arithmetic: every capability added still makes the model
 slightly worse at choosing between them, and the overhead is still most of a
 small model's budget.
+
+The prompt's own share of that has since been cut roughly in half, to **~426
+tokens** for a mode with nothing optional switched on and **~580** with
+everything on, from ~560 and ~700. Most of it came from one place: the default
+mode's block had been restating the routing procedure capability by capability,
+so the model read the whole ordering twice in different words and paid for it
+both times. `SystemPromptBudgetTest` now guards 500 and 700 rather than 800 and
+1,000, so drifting back a sentence at a time fails there instead of on a phone.
+Worth doing, but it is a few hundred tokens against the thousands below - the
+tool schemas are still the problem.
 
 Past that limit the next thing to go wrong was the tool call itself. Upstream
 sets TopK to 1 for agent chat - greedy decoding, "for better tool call quality"

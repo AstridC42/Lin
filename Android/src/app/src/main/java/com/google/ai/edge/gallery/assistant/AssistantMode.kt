@@ -55,22 +55,18 @@ enum class AssistantMode(
     descriptionRes = R.string.assistant_mode_auto_desc,
     icon = Icons.Rounded.AutoAwesome,
     promptFragment =
-      // Ordered to match the routing procedure at the top of the prompt, and for the same reason.
-      // The mode block is appended last, so it is the final thing the model reads before the
-      // conversation - and a list that began "answer directly when you already know the answer"
-      // undid the procedure above it, however emphatic that procedure was.
+      // Deliberately short, and deliberately without a list.
+      //
+      // This block used to restate the routing procedure at the top of the prompt, capability by
+      // capability, and it is appended last - so the model read the whole ordering twice, the
+      // second time in different words, and paid for it twice out of a budget that had already
+      // run out on the first message of a new conversation. The routing says what to do; the
+      // default mode's job is only to decline to narrow it.
       """
       Current mode: AUTO.
-      Decide per message which capability fits, and combine them freely within one turn:
-      - Check the SKILLS list first. Use load_skill for anything a skill covers - looking
-        something up, calendars, email, QR codes, maps, calculations - before answering from
-        memory.
-      - Use runMcpTool when an MCP tool fits the request.
-      - Use the device tools for calls, texts, alarms, timers, navigation and apps.
-      - Use webSearch when the answer depends on anything current or verifiable.
-      - Look at any attached image or listen to any attached audio before answering about it.
-      - Answer directly from your own knowledge only when none of the above covers the request.
-      A single message may need several of these. Handle all parts of it before replying.
+      Any capability may apply, and several may apply to one message - a skill, a phone action
+      and a search in a single turn is normal. Check the SKILLS list first, follow the routing
+      procedure above, and handle every part of the message before you reply.
       """,
   ),
   CHAT(
@@ -81,10 +77,9 @@ enum class AssistantMode(
     promptFragment =
       """
       Current mode: CHAT.
-      Prefer answering from your own knowledge in a natural, conversational way. Do not reach for
-      tools for something you can answer directly. Still use a tool when the user explicitly asks
-      for an action, attaches media to look at, or asks about something you cannot know without
-      checking, and say plainly when you are unsure rather than guessing.
+      Talk. Answer from your own knowledge rather than reaching for a tool. Still use one when
+      they ask for an action, attach something to look at, or ask about something you cannot know
+      without checking. Say when you are unsure instead of guessing.
       """,
   ),
   MEDIA(
@@ -95,11 +90,9 @@ enum class AssistantMode(
     promptFragment =
       """
       Current mode: MEDIA.
-      Attachments are the subject of the conversation. Examine every attached image or audio clip
-      carefully and ground your answer in what is actually there: read visible text verbatim,
-      describe what you can see or hear, and say when something is unreadable or ambiguous instead
-      of filling it in. After describing the attachment, carry out whatever the user asked you to
-      do with it, including actions in other capabilities.
+      The attachment is the subject. Ground every word in what is actually there: read visible
+      text verbatim, say what you can see or hear, and say when something is unreadable rather
+      than filling it in. Then do whatever they asked you to do with it.
       """,
   ),
   RESEARCH(
@@ -110,10 +103,9 @@ enum class AssistantMode(
     promptFragment =
       """
       Current mode: WEB.
-      Search before you answer. Call webSearch with a focused query, read the snippets, and call
-      openWebPage when a result needs more detail. Base the answer on what you found, cite the
-      URLs you used, and state it plainly when the search came back empty or contradictory rather
-      than falling back on memory without saying so.
+      Search before you answer: webSearch with a focused query, then openWebPage when a result
+      needs more. Answer from what you found and cite the URLs. If it came back empty or
+      contradictory, say so rather than quietly falling back on memory.
       """,
   ),
   ACTIONS(
@@ -124,12 +116,11 @@ enum class AssistantMode(
     promptFragment =
       """
       Current mode: DEVICE.
-      The user wants something done on the phone. Map the request onto the device tools:
-      placePhoneCall, sendTextMessage, setAlarm, setTimer, openApp, showOnMap, getDirections,
-      toggleFlashlight, openSystemSettings, openUrlInBrowser, and run_intent for email and
-      calendar. Resolve a person's name with findContact first. If a required detail is missing or
-      several contacts match, ask one short question instead of guessing. Report exactly what
-      happened, including when the action only staged something for the user to confirm.
+      They want something done on the phone. Use the device tools: placePhoneCall,
+      sendTextMessage, setAlarm, setTimer, openApp, showOnMap, getDirections, toggleFlashlight,
+      openSystemSettings, openUrlInBrowser, run_intent for email and calendar. Resolve a name
+      with findContact first. Missing detail or several matches: ask one short question. Report
+      exactly what happened, staged included.
       """,
   ),
   AGENT(
