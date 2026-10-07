@@ -16,6 +16,9 @@
 
 package com.google.ai.edge.gallery.assistant
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -31,18 +34,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.HeadsetOff
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.RecordVoiceOver
-import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material.icons.rounded.VoiceOverOff
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
@@ -168,6 +168,28 @@ fun AssistantScreen(
   var listenTurn by remember { mutableIntStateOf(0) }
   var showManual by remember { mutableStateOf(false) }
   var showSettings by remember { mutableStateOf(false) }
+
+  // Whether Lin may place a call itself rather than filling the dialer and waiting for a tap.
+  //
+  // Held in state as well as in the DataStore so the switch moves under the finger. The setting
+  // existed before this and did nothing, because its only switch was in the model gallery's
+  // settings dialog - a screen an assistant user has no reason to ever open - which is why every
+  // "call Dad" so far has ended at a dialer with the number typed in.
+  var allowDirectCalls by remember {
+    mutableStateOf(dataStoreRepository.readAssistantSettings().allowDirectCalls)
+  }
+  fun saveDirectCalls(enabled: Boolean) {
+    allowDirectCalls = enabled
+    dataStoreRepository.saveAssistantSettings(
+      dataStoreRepository.readAssistantSettings().toBuilder().setAllowDirectCalls(enabled).build()
+    )
+  }
+  // Placing a call needs CALL_PHONE, so the switch asks as it goes on, and turns itself back off
+  // if the answer is no - leaving it on would promise something the tool cannot do.
+  val callPermissionLauncher =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      if (!granted) saveDirectCalls(false)
+    }
 
   // Bumped whenever the web search settings are edited, so the derived values below recompute
   // without having to observe the whole DataStore.
@@ -375,12 +397,9 @@ fun AssistantScreen(
       aboveInputContent = {
         AssistantModeBar(
           mode = mode,
-          webSearchEnabled = webSearchEnabled,
           speakReplies = speakReplies,
           onModeClicked = { showModeSheet = true },
-          onWebSearchClicked = { showWebSearchSettings = true },
           onVoiceSettingsClicked = { showVoiceSettings = true },
-        onWakeWordClicked = { showWakeWordSettings = true },
         onTalkClicked = { listenTurn++ },
         onManualClicked = { showManual = true },
         showManualButton = !isLargeScreen(),
@@ -407,7 +426,6 @@ fun AssistantScreen(
             )
             if (!enabled) speaker.stop()
           },
-          onOpenGallery = onOpenGallery,
         )
       },
       onTurnComplete = { model ->
@@ -667,6 +685,23 @@ fun AssistantScreen(
                   },
                 ),
                 SettingsRow(
+                  title = stringResource(R.string.assistant_allow_direct_calls),
+                  detail =
+                    stringResource(
+                      if (allowDirectCalls) R.string.settings_direct_calls_on_detail
+                      else R.string.assistant_allow_direct_calls_desc
+                    ),
+                  switch = allowDirectCalls,
+                  // The screen stays open. This is the one row here that changes something
+                  // outright rather than opening the dialog that owns it, and closing the
+                  // settings screen on the tap would hide whether the switch actually moved.
+                  onClick = {
+                    val enabled = !allowDirectCalls
+                    saveDirectCalls(enabled)
+                    if (enabled) callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                  },
+                ),
+                SettingsRow(
                   title = stringResource(R.string.settings_permissions),
                   detail = stringResource(R.string.settings_permissions_detail),
                   onClick = {
@@ -800,19 +835,15 @@ private fun AssistantEmptyStateHeadline(
 @Composable
 private fun AssistantModeBar(
   mode: AssistantMode,
-  webSearchEnabled: Boolean,
   speakReplies: Boolean,
   onModeClicked: () -> Unit,
-  onWebSearchClicked: () -> Unit,
   onVoiceSettingsClicked: () -> Unit,
-  onWakeWordClicked: () -> Unit,
   onTalkClicked: () -> Unit,
   onManualClicked: () -> Unit,
   showManualButton: Boolean,
   handsFree: Boolean,
   onHandsFreeToggled: () -> Unit,
   onSpeakRepliesToggled: () -> Unit,
-  onOpenGallery: (() -> Unit)?,
 ) {
   Row(
     modifier =
@@ -820,6 +851,9 @@ private fun AssistantModeBar(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
+    // Filled rather than outlined, because this one is not an action in the same sense as the
+    // others - it says what mode the conversation is in, and only secondarily offers to change
+    // it. In a row of identical outlined chips it read as a sixth button.
     AssistChip(
       onClick = onModeClicked,
       label = { Text(stringResource(mode.labelRes)) },
@@ -830,6 +864,13 @@ private fun AssistantModeBar(
           modifier = Modifier.size(AssistChipDefaults.IconSize),
         )
       },
+      border = null,
+      colors =
+        AssistChipDefaults.assistChipColors(
+          containerColor = MaterialTheme.colorScheme.secondaryContainer,
+          labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+          leadingIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
     )
 
     // The only way to speak to the assistant. The microphone in the "+" menu records an audio
@@ -847,40 +888,12 @@ private fun AssistantModeBar(
       },
     )
 
-    AssistChip(
-      onClick = onWebSearchClicked,
-      label = { Text(stringResource(R.string.web_search_settings_title)) },
-      leadingIcon = {
-        Icon(
-          Icons.Rounded.TravelExplore,
-          contentDescription = null,
-          modifier = Modifier.size(AssistChipDefaults.IconSize),
-        )
-      },
-      colors =
-        if (webSearchEnabled) {
-          AssistChipDefaults.assistChipColors(
-            leadingIconContentColor = MaterialTheme.colorScheme.primary
-          )
-        } else {
-          AssistChipDefaults.assistChipColors(
-            leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        },
-    )
-
-    AssistChip(
-      onClick = onWakeWordClicked,
-      label = { Text(stringResource(R.string.wake_word_tile_label)) },
-      leadingIcon = {
-        Icon(
-          Icons.Rounded.Mic,
-          contentDescription = null,
-          modifier = Modifier.size(AssistChipDefaults.IconSize),
-        )
-      },
-    )
+    // Web search and the wake word used to have chips here, and the model gallery an icon button
+    // on the end. All three only opened a settings dialog, and all three are now rows on the
+    // settings screen with their state written beside them - which is where somebody looks for a
+    // setting. What is left in this row is what a turn of conversation actually uses: the mode,
+    // the microphone, hands-free, and whether replies are spoken. Eight items that scrolled
+    // sideways became five that fit.
 
     AssistChip(
       onClick = onHandsFreeToggled,
@@ -930,16 +943,6 @@ private fun AssistantModeBar(
       )
     }
 
-    if (onOpenGallery != null) {
-      IconButton(onClick = onOpenGallery) {
-        Icon(
-          Icons.Rounded.Apps,
-          contentDescription = stringResource(R.string.cd_assistant_open_gallery),
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier = Modifier.size(20.dp),
-        )
-      }
-    }
   }
 }
 

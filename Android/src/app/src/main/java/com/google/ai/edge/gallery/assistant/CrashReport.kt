@@ -25,6 +25,7 @@ import java.io.StringWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "AGCrashReport"
 private const val CRASH_FILE = "last-crash.txt"
@@ -90,8 +91,69 @@ object CrashReport {
       appendLine()
       append(stackTrace)
     }
-    file(context).writeText(report.take(MAX_REPORT_CHARS))
+    val text = report.take(MAX_REPORT_CHARS)
+    file(context).writeText(text)
+    alsoWriteWhereAFileManagerCanReachIt(context, text)
   }
+
+  /**
+   * Writes a second copy outside the app's private directory.
+   *
+   * The private copy is only readable by the app, which is fine right up to the case that matters
+   * most: a crash before the first frame. Then the app has a perfect account of what happened and
+   * no way to ever show it, and the person holding the phone has no computer attached to run
+   * logcat on - so the report exists and is unreachable, which is how an app ends up reported as
+   * "it keeps crashing" with nothing further available.
+   *
+   * `getExternalFilesDir` needs no permission and is browsable with any file manager at
+   * Android/data/<package>/files, so a copy there can be found and sent on even when the app
+   * never manages to draw anything. It is removed with the app, and holds only this report.
+   *
+   * Entirely best-effort: external storage can be unavailable, and a failure here must not
+   * replace the real crash with a less useful one.
+   */
+  private fun alsoWriteWhereAFileManagerCanReachIt(context: Context, text: String) {
+    try {
+      val dir = context.getExternalFilesDir(null) ?: return
+      if (!dir.exists() && !dir.mkdirs()) return
+      File(dir, CRASH_FILE).writeText(text)
+    } catch (e: Throwable) {
+      Log.e(TAG, "Could not write the shared copy of the crash", e)
+    }
+  }
+
+  /**
+   * Adds [text] to the report, for a failure the app survived but the user needs to know about.
+   *
+   * A crash is not the only thing worth reporting. When a settings file cannot be read and is
+   * reset to its defaults, the app keeps running - which is the point - but the user's preferences
+   * have just silently gone, and they are owed an explanation rather than left to notice one
+   * setting at a time. The launch screen already shows this file and waits for it to be
+   * dismissed, so a note here reaches them the same way a crash does.
+   *
+   * [key] makes the note idempotent: the failing read that produced it usually happens on every
+   * access, and a report that appends the same line four hundred times says less than one line.
+   */
+  fun note(context: Context, key: String, text: String) {
+    if (!noted.add(key)) return
+    try {
+      val target = file(context)
+      val existing = if (target.exists()) target.readText() else ""
+      val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+      val addition = buildString {
+        if (existing.isNotEmpty()) appendLine()
+        appendLine("$stamp - $text")
+      }
+      val text = (existing + addition).take(MAX_REPORT_CHARS)
+      target.writeText(text)
+      alsoWriteWhereAFileManagerCanReachIt(context, text)
+    } catch (e: Throwable) {
+      Log.e(TAG, "Could not record the note", e)
+    }
+  }
+
+  /** Notes already written by this process, so a repeated failure is reported once. */
+  private val noted = java.util.Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
 
   /** The recorded crash, or null when the last run ended normally. */
   fun read(context: Context): String? =
@@ -105,7 +167,9 @@ object CrashReport {
   /** Discards the recorded crash, once it has been shown. */
   fun clear(context: Context) {
     try {
+      noted.clear()
       file(context).delete()
+      context.getExternalFilesDir(null)?.let { File(it, CRASH_FILE).delete() }
     } catch (e: Throwable) {
       Log.e(TAG, "Could not clear the recorded crash", e)
     }
