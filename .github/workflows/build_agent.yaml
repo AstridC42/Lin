@@ -54,18 +54,18 @@ jobs:
           restore-keys: |
             gradle-agent-${{ runner.os }}-
 
+      # android-37.0, with the minor version, because compileSdk pins
+      # release(37) { minorApiLevel = 0 } and "platforms;android-37" is not a package that exists.
+      # Same command the fork's workflow uses, which is known to work on this runner image.
       - name: Install Android SDK Platform 37
-        run: |
-          set -euo pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" >/dev/null
+        run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0"
 
       # Before the build, so a broken test fails the run quickly rather than after an APK.
       - name: Run the unit tests
-        run: ./gradlew :core:testDebugUnitTest :engine:testDebugUnitTest --console=plain
+        run: ./gradlew --no-daemon :core:testDebugUnitTest :engine:testDebugUnitTest --console=plain
 
       - name: Build
-        run: ./gradlew :app:assembleDebug --console=plain
+        run: ./gradlew --no-daemon :app:assembleDebug --console=plain
 
       - name: Name the APK after the commit
         id: rename

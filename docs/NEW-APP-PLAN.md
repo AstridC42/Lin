@@ -111,11 +111,17 @@ covered - which moves NPU from "interesting someday" to "worth re-testing when
 the runtime story improves". It is still gated on the vendor runtime being
 present; see below.
 
-**12 GB meets Gemma 4 E4B's minimum exactly**, so E4B is viable rather than
-blocked. Exactly, though, is not comfortably: 3.66 GB of weights plus an
-8,192-token KV cache plus One UI leaves thin headroom, and a 518 MB embedder on
-top of that is why the embedder is transient rather than resident. E2B stays
-the default; E4B is a setting, and on a 16 GB unit it is the better choice.
+**12 GB, confirmed.** That is exactly Gemma 4 E4B's documented minimum, so E4B
+is viable rather than blocked - but exactly is not comfortably. 3.66 GB of
+weights, plus an 8,192-token KV cache, plus One UI on a Fold 7, is the
+footprint where Android's low-memory killer starts taking an interest. And an
+OOM kill runs no Java code on the way down, so it produces no stack trace and
+looks from the outside exactly like the app vanishing for no reason.
+
+So **E2B (2.59 GB) is the default** and E4B is a setting with that said plainly
+next to it. This is also the reason the embedder is transient rather than
+resident: holding another 484 MB between indexing bursts is 484 MB of headroom
+given away for nothing.
 
 **It is a foldable, so adaptive layout is a requirement, not a nicety.** 8
 inches unfolded is tablet-class and 6.5 folded is phone-class, and the app has
@@ -124,12 +130,17 @@ to survive moving between them mid-conversation. Two consequences:
 - The large screen should earn its size - a conversation pane beside a working
   pane showing tool activity, sub-agent progress, and media. The fork's
   `AssistantTwoPane` is the right idea to carry over.
-- **Folding is a configuration change that recreates the activity.** The fork's
-  `MainActivity` deliberately passes `null` instead of the saved instance state
-  - "forces the app to start cleanly on the Home Screen after an OS kill" -
-  which on a foldable means every fold throws the screen away. Worth checking
-  whether that is already happening on this device. The new app keeps its state
-  across configuration changes, and that is a test, not a hope.
+- **Folding is a configuration change.** One UI has a setting to keep an app
+  running across the fold, and it is switched on here, which handles the app
+  being stopped. It does not make the app keep its own state: Android still
+  recreates the activity on other configuration changes, on memory pressure and
+  after process death, and the fork's `MainActivity` passes `null` instead of
+  the saved instance state - "start cleanly after an OS kill" - so it would
+  discard the conversation whenever that happened.
+  
+  This app does both sides: `configChanges` declares the fold-related ones so
+  the activity is not recreated at all, and the conversation lives in
+  `SavedStateHandle` so it survives the cases where it is.
 
 ## The models
 
@@ -444,12 +455,13 @@ Phase 0 does not depend on the answer; Phase 1 does.
 
 1. Does an Ollama server already exist, and which model on it? This decides
    what Phase 2 is tested against.
-2. **12 GB or 16 GB** on the Fold 7? It decides whether E4B can be the default
-   rather than a setting.
+2. **The Ollama base URL and the model on it.** The server is live; Phase 2
+   needs the address to test against, and the model name decides whether tool
+   calling is available on the remote side.
 3. Voice in v1, or Phase 6 as written?
-4. `com.lin.agent` as the application id, or something else?
 
-Answered already: the fork is archived as a reference; the new app takes a new
-id; both Gemma 4 E2B and E4B are offered; the embedder is the 740M multimodal
-one because media search is in scope; NPU waits but the registry is built for
-it, and this device's SoC is covered when it lands.
+Answered already: the fork is archived as a reference; the new app is
+`com.lin.agent`; the device has 12 GB, so E2B is the default and E4B a setting;
+the embedder is the 740M multimodal one because media search is in scope; NPU
+waits, but the registry is built for it and this device's SoC is covered when
+it lands; folding is handled on both sides.
