@@ -79,12 +79,57 @@ Reversible unless marked otherwise.
 ## Non-goals for v1
 
 Stated so they can be pointed at later rather than argued about. None of the
-gallery tasks: no Prompt Lab, no benchmarking, no model browsing or comparison,
-no Ask Image / Audio Scribe as separate screens, no Tiny Garden, no Scrapbook,
-no Instant Media Search. No multi-model picker UI. No image generation.
+gallery tasks *as separate screens*: no Prompt Lab, no benchmarking, no model
+browsing or comparison, no Tiny Garden, no Scrapbook. No multi-model picker UI.
+No image generation.
+
+**Media is in scope, and so is semantic search over it** - but as capabilities
+of the one assistant, not as a task you navigate to. Attaching an image or a
+clip, asking about it, and searching the library by describing what you want
+are things Lin does in the conversation. Instant Media Search is the reference
+implementation, not the destination.
 
 The focus is the thing the fork could not be: one assistant that is good at
 being an assistant.
+
+## The device it has to run on
+
+A **Samsung Galaxy Z Fold 7**, confirmed rather than assumed, because three of
+its properties change decisions here.
+
+| | |
+|---|---|
+| SoC | Snapdragon 8 Elite for Galaxy, **SM8750** |
+| RAM | 12 GB (256/512 GB models) or 16 GB (1 TB) |
+| Main display | 8.0", 1968 x 2184, 120 Hz |
+| Cover display | 6.5", 1080 x 2520, 120 Hz |
+| OS | One UI 8, Android 16 |
+
+**SM8750 is in the NPU variant list.** Of the ten SoC-specific embedder builds,
+one is exactly this chip. So if the NPU path becomes usable, this device is
+covered - which moves NPU from "interesting someday" to "worth re-testing when
+the runtime story improves". It is still gated on the vendor runtime being
+present; see below.
+
+**12 GB meets Gemma 4 E4B's minimum exactly**, so E4B is viable rather than
+blocked. Exactly, though, is not comfortably: 3.66 GB of weights plus an
+8,192-token KV cache plus One UI leaves thin headroom, and a 518 MB embedder on
+top of that is why the embedder is transient rather than resident. E2B stays
+the default; E4B is a setting, and on a 16 GB unit it is the better choice.
+
+**It is a foldable, so adaptive layout is a requirement, not a nicety.** 8
+inches unfolded is tablet-class and 6.5 folded is phone-class, and the app has
+to survive moving between them mid-conversation. Two consequences:
+
+- The large screen should earn its size - a conversation pane beside a working
+  pane showing tool activity, sub-agent progress, and media. The fork's
+  `AssistantTwoPane` is the right idea to carry over.
+- **Folding is a configuration change that recreates the activity.** The fork's
+  `MainActivity` deliberately passes `null` instead of the saved instance state
+  - "forces the app to start cleanly on the Home Screen after an OS kill" -
+  which on a foldable means every fold throws the screen away. Worth checking
+  whether that is already happening on this device. The new app keeps its state
+  across configuration changes, and that is a test, not a hope.
 
 ## The models
 
@@ -106,26 +151,40 @@ Neither has an NPU build: both are `gpu,cpu` with no SoC variants.
 
 ### The embedder
 
-EmbeddingGemma 2 is a family, not one model. All three map into the same
-768-dimensional space with an 8,192-token context, int4 QAT transformer and
+EmbeddingGemma 2 is a family, not one model. All three map into the **same
+768-dimensional space** with an 8,192-token context, int4 QAT transformer and
 embeddings:
 
-| | Modalities | Params | Generic file |
-|---|---|---|---|
-| **Text 270M** | text | 270M | **164 MB** |
-| Text-Vision 440M | text, images | 440M | not measured |
-| 740M | text, images, video, audio | 740M | 484 MB |
+| | Modalities | Params | Generic file | SM8750 NPU build |
+|---|---|---|---|---|
+| Text 270M | text | 270M | 164 MB | 179 MB |
+| Text-Vision 440M | text, images | 440M | not measured | yes |
+| **740M** | **text, images, video, audio** | 740M | **484 MB** | **518 MB** |
 
-**Use Text 270M for memory.** Upstream's allowlist lists only the 740M, because
-it ships it for photo and video search. Lin's memory notes are text: the 270M is
-three times smaller, lands in the same vector space, and sits beside a 3.66 GB
-chat model without a fight. The 740M earns its place only for semantic search
-over the photo library, which is a later feature and a separate decision.
+**The 740M, because media search is in scope.** An earlier draft of this plan
+picked Text 270M on the grounds that memory notes are text. That was wrong once
+media and semantic search over it became requirements rather than later
+features.
 
-The embedder does **not** go through LiteRT-LM's `Engine`/`Conversation`. It
-runs on MediaPipe `UniversalEmbedder` and `SemanticRetriever` (tasks-retrieval
-1.1.0), a different runtime path, hence a separate `Embedder` interface below
-rather than squeezing it into `LlmBackend`.
+The 740M is not a different model so much as a superset: it is the same 270M
+text backbone with a 170M vision encoder and a 300M audio encoder bolted on,
+and everything lands in one shared vector space. So a single embedder serves
+both memory and media, and - the useful part - they are searchable *together*.
+"the photo I was talking about on Tuesday" is one query across notes and
+images, not two queries and a join.
+
+### Model lifecycle: one resident, one transient
+
+The chat model stays loaded. The embedder does not, and should not.
+
+Embedding is bursty: a library indexing run, or a search, then nothing for
+hours. Keeping 518 MB resident between those is 518 MB taken from the chat
+model's KV cache for no benefit. So the embedder is loaded on demand and
+released when idle.
+
+This is only straightforward because we own the model lifecycle. It is exactly
+what the Gallery's one-model-at-a-time design made awkward, and it is a concrete
+example of why the spine is worth rewriting.
 
 ### NPU: the files are real, the path is not ready
 
@@ -327,7 +386,7 @@ Deliberately after Phase 3, so tools arrive into a system that already routes.
 directly authorised, messages wait for a send, and a notification reply is read
 back before it goes.
 
-### Phase 5 — Memory
+### Phase 5 — Memory and media retrieval
 
 Port `memory/`. Replace word-overlap search with embedding retrieval using
 **EmbeddingGemma 2 Text 270M**, 164 MB and co-resident with the chat model,
@@ -335,8 +394,14 @@ through MediaPipe `UniversalEmbedder` and a vector store, with Instant Media
 Search as the reference implementation. Background digest after a conversation
 ends.
 
-**Measurement:** recall over a set of planted facts, and that nothing invented
-appears in a reply when the vault has no answer.
+Then the same retrieval over media: photo library access, background indexing
+into a vector store, and search by description. One embedder, one vector space,
+both sources - so a query can return a note and a photo together.
+
+**Measurement:** recall over a set of planted facts; that nothing invented
+appears in a reply when the vault has no answer; and indexing throughput and
+battery cost over a real library, because an indexing run that flattens the
+phone is not shippable however good the search is.
 
 ### Phase 6 — Voice and ambient
 
@@ -379,10 +444,12 @@ Phase 0 does not depend on the answer; Phase 1 does.
 
 1. Does an Ollama server already exist, and which model on it? This decides
    what Phase 2 is tested against.
-2. Voice in v1, or Phase 6 as written?
-3. How much RAM does the phone have? It decides whether E4B can be the default
-   or stays an option behind a warning.
+2. **12 GB or 16 GB** on the Fold 7? It decides whether E4B can be the default
+   rather than a setting.
+3. Voice in v1, or Phase 6 as written?
 4. `com.lin.agent` as the application id, or something else?
 
-Answered already: the fork is archived as a reference, the new app takes a new
-id, and both Gemma 4 E2B and E4B are offered.
+Answered already: the fork is archived as a reference; the new app takes a new
+id; both Gemma 4 E2B and E4B are offered; the embedder is the 740M multimodal
+one because media search is in scope; NPU waits but the registry is built for
+it, and this device's SoC is covered when it lands.
