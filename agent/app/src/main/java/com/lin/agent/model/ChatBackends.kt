@@ -94,6 +94,29 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
     }
   }
 
+  /**
+   * The server model, for a sub-agent to run on, whoever is answering the conversation.
+   *
+   * Separate from [readiness] on purpose. Who answers the user is the user's choice; what a
+   * delegated task runs on is not the same question - the whole point of delegation is a phone
+   * orchestrator reaching the bigger model, so this must be available while the conversation is
+   * being answered on the phone.
+   *
+   * Reachability is not checked here. The sub-agent's own turn fails with a message if the
+   * server has gone, and a probe before every delegation would add a round trip to a path that
+   * is about to make a much longer one anyway.
+   */
+  suspend fun serverSubAgent(): LlmBackend? {
+    val url = settings.serverUrl.first()
+    val model = settings.serverModelName.first()
+    if (url.isBlank() || model.isBlank()) return null
+    return OllamaBackend(
+      baseUrl = url,
+      authHeader = settings.serverAuthHeader.first(),
+      modelName = model,
+    )
+  }
+
   private suspend fun resolve(): ChatReadiness {
     val onDevice = localBackend()
 

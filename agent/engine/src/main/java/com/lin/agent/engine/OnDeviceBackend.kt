@@ -24,6 +24,8 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.MessageCallback
+import com.google.ai.edge.litertlm.OpenApiTool
+import com.google.ai.edge.litertlm.tool
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.Message as LiteRtMessage
 import java.io.File
@@ -83,6 +85,22 @@ class OnDeviceBackend(
 
   @Volatile private var engine: Engine? = null
   @Volatile private var conversation: Conversation? = null
+
+  /**
+   * A second conversation, created only when a turn actually offers tools.
+   *
+   * Two rather than one, and the separation is the safety property. Tool calling is the part of
+   * this app that cannot be checked without a phone, so the no-tools path stays exactly the code
+   * that is already answering on the device: a turn with no tools never touches any of this, and
+   * a mistake in the tool wiring cannot cost plain conversation.
+   *
+   * Keyed by the tool set it was built for, because tools are fixed when a conversation is
+   * created rather than per message, so a different set needs a different conversation. Cheap -
+   * the weights belong to the engine and are not reloaded.
+   */
+  @Volatile private var toolConversation: Conversation? = null
+
+  @Volatile private var toolConversationFor: List<ToolSpec> = emptyList()
 
   /** The failure from the last load attempt, so a turn can report it rather than hang. */
   @Volatile private var loadFailure: String? = null
@@ -207,14 +225,72 @@ class OnDeviceBackend(
           emit(TurnEvent.Failed("The model is not loaded."))
           return@flow
         }
-        val prompt = request.messages.lastOrNull { it.role == Message.Role.USER }?.text
+        val prompt = promptFrom(request)
         if (prompt == null) {
           emit(TurnEvent.Failed("There was nothing to send."))
           return@flow
         }
-        emitAll(stream(live, prompt))
+        emitAll(stream(conversationFor(request) ?: live, prompt))
       }
       .flowOn(Dispatchers.IO)
+
+  /**
+   * What to send this turn.
+   *
+   * A tool result is the message the model is waiting for, so it has to be what goes next -
+   * taking the last *user* message instead would re-ask the original question and lose the
+   * answer the tool just produced, which is an infinite loop with extra steps.
+   */
+  private fun promptFrom(request: TurnRequest): String? {
+    val last = request.messages.lastOrNull() ?: return null
+    return when (last.role) {
+      Message.Role.TOOL -> "Result of ${last.toolName}:\n${last.text}"
+      Message.Role.USER -> last.text
+      // Neither, which means the loop is asking the model to continue from its own turn.
+      else -> request.messages.lastOrNull { it.role == Message.Role.USER }?.text
+    }
+  }
+
+  /**
+   * The conversation to use for [request], or null to use the plain one.
+   *
+   * Returns null for a turn with no tools, which is every turn today, so that path is untouched.
+   * It also returns null when building a tool conversation fails: the tools are then simply not
+   * offered, the model answers without them, and the turn still happens. Degrading to a plain
+   * reply is the right failure for something that cannot be verified off a device.
+   */
+  @Synchronized
+  private fun conversationFor(request: TurnRequest): Conversation? {
+    if (request.tools.isEmpty()) return null
+    toolConversation?.takeIf { toolConversationFor == request.tools }?.let {
+      return it
+    }
+
+    val started = engine ?: return null
+    return try {
+      runCatching { toolConversation?.close() }
+      val fresh =
+        started.createConversation(
+          ConversationConfig(
+            samplerConfig =
+              SamplerConfig(topK = GREEDY_TOP_K, topP = 1.0, temperature = SAFE_TEMPERATURE),
+            tools = request.tools.map { tool(DeclaredTool(it)) },
+            // The loop runs the tools, not the engine. It is what scopes them by role, counts
+            // the budget and shows the user that something is happening - none of which the
+            // engine's own tool loop can do from in there.
+            automaticToolCalling = false,
+          )
+        )
+      toolConversation = fresh
+      toolConversationFor = request.tools
+      fresh
+    } catch (e: Throwable) {
+      Log.w(TAG, "Could not offer tools; answering without them", e)
+      toolConversation = null
+      toolConversationFor = emptyList()
+      null
+    }
+  }
 
   /**
    * The reply itself, once there is a loaded conversation to ask.
@@ -226,6 +302,7 @@ class OnDeviceBackend(
   private fun stream(live: Conversation, prompt: String): Flow<TurnEvent> {
     return callbackFlow {
       val accumulated = StringBuilder()
+      val requested = mutableSetOf<String>()
       val callback =
         object : MessageCallback {
           override fun onMessage(message: LiteRtMessage) {
@@ -236,6 +313,15 @@ class OnDeviceBackend(
               accumulated.append(delta)
               trySend(TurnEvent.Token(delta))
             }
+            // Read off whichever emission carries them rather than assuming it is the last.
+            // Deduplicated because a delta may repeat what an earlier one already announced,
+            // and running a tool twice for one request is worse than missing a duplicate.
+            val calls = runCatching { message.toolCalls }.getOrNull().orEmpty()
+            val fresh =
+              calls
+                .map { ToolInvocation(it.name, it.arguments) }
+                .filter { requested.add("${'$'}{it.name}(${'$'}{it.arguments})") }
+            if (fresh.isNotEmpty()) trySend(TurnEvent.ToolCalls(fresh))
           }
 
           override fun onDone() {
@@ -349,4 +435,25 @@ internal fun explain(error: Throwable): String {
 
     else -> error.message ?: "The model failed for a reason it did not explain."
   }
+}
+
+/**
+ * A tool as LiteRT-LM wants to be told about it.
+ *
+ * [execute] is never called. The loop runs tools itself - that is what scopes them by role and
+ * counts the budget - so the conversation is created with `automaticToolCalling = false` and the
+ * engine only ever reads the declaration. Returning an empty object rather than throwing keeps
+ * that true even if some path does reach it: an empty result is a wasted turn, an exception
+ * thrown from inside the engine is a lost conversation.
+ */
+private class DeclaredTool(private val spec: ToolSpec) : OpenApiTool {
+
+  override fun getToolDescriptionJsonString(): String =
+    org.json.JSONObject()
+      .put("name", spec.name)
+      .put("description", spec.description)
+      .put("parameters", org.json.JSONObject(spec.parametersSchema))
+      .toString()
+
+  override fun execute(input: String): String = "{}"
 }

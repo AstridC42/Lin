@@ -134,6 +134,16 @@ fun ConversationScreen(
         if (state.streaming.isNotEmpty()) {
           item { Bubble(Message(Message.Role.ASSISTANT, state.streaming)) }
         }
+        if (state.runningTool.isNotEmpty()) {
+          item {
+            Text(
+              stringResource(R.string.running_tool),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(vertical = 4.dp),
+            )
+          }
+        }
         if (state.error.isNotEmpty()) {
           item {
             Card(
