@@ -40,12 +40,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -141,6 +145,50 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(top = 14.dp),
+          )
+        }
+      }
+
+      Text(
+        stringResource(R.string.settings_phone_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      // The permission is asked for as the switch goes on, and a refusal leaves it off - a
+      // stored "yes" the permission does not back would make the setting lie about what Lin
+      // can do, and the policy requires both regardless.
+      val callPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+          viewModel.setAllowDirectCalls(allow = granted, granted = granted)
+        }
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              stringResource(R.string.settings_direct_calls),
+              style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+              stringResource(
+                if (state.allowDirectCalls) R.string.settings_direct_calls_on
+                else R.string.settings_direct_calls_off
+              ),
+              style = MaterialTheme.typography.bodySmall,
+              color =
+                if (state.allowDirectCalls) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(
+            checked = state.allowDirectCalls,
+            onCheckedChange = { wanted ->
+              if (wanted) callPermission.launch(Manifest.permission.CALL_PHONE)
+              else viewModel.setAllowDirectCalls(allow = false, granted = false)
+            },
           )
         }
       }
