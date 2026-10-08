@@ -64,7 +64,7 @@ import com.google.ai.edge.gallery.data.convertValueToTargetType
 import com.google.ai.edge.gallery.firebaseAnalytics
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 
-import com.google.ai.edge.litertlm.Capabilities
+import com.google.ai.edge.litertlm.ModelInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -223,10 +223,13 @@ fun ModelPageAppBar(
       modelConfigs.removeIf { it.key == ConfigKeys.ENABLE_THINKING }
     }
     var supportsSpeculativeDecoding = false
-    // Check if the model file supports speculative decoding.
+    // Check if the model file supports speculative decoding. See the note in
+    // LlmChatModelHelper: litertlm 0.18 replaced Capabilities with ModelInfo.
     try {
-      Capabilities(model.getPath(context)).use {
-        supportsSpeculativeDecoding = it.hasSpeculativeDecodingSupport()
+      ModelInfo.from(model.getPath(context)).use { modelInfo ->
+        if (modelInfo is ModelInfo.Llm) {
+          supportsSpeculativeDecoding = modelInfo.hasSpeculativeDecodingSupport()
+        }
       }
     } catch (e: Exception) {
       // Ignore exceptions and assume not supported.

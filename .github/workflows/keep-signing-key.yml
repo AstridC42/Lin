@@ -17,11 +17,16 @@
 # one place, on a schedule, with nothing racing it.
 name: Own the signing key
 
+# ARCHIVED. The Edge Gallery fork is no longer built or shipped.
+#
+# Its source stays in the repository as reference material for the Lin app under agent/ - engine
+# setup and its device quirks, HuggingFace auth, semantic retrieval, and a hundred small Android
+# details that are easier to read than to rederive. What is gone is the app itself: no builds, no
+# releases, nothing to install.
+#
+# The triggers below are reduced to workflow_dispatch so this cannot fire on its own. Nothing is
+# deleted, so if the fork ever needs to be built again the automatic triggers are a diff away.
 on:
-  schedule:
-    # Mondays and Thursdays, so the longest gap is four days against a seven-day deadline. Not on
-    # the hour: schedules that land on :00 queue behind everybody else's.
-    - cron: '17 4 * * 1,4'
   workflow_dispatch:
 
 permissions:

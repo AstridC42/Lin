@@ -8,11 +8,12 @@
 # the tag for you.
 name: Release
 
+# ARCHIVED. This published the Edge Gallery fork, which is no longer shipped.
+#
+# The tag trigger is removed so that pushing a v* tag - which is how the new app will eventually
+# cut its own releases - cannot accidentally publish the retired one. Still runnable by hand if a
+# 0.5.x build ever needs rebuilding.
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-*'
   workflow_dispatch:
     inputs:
       version:
