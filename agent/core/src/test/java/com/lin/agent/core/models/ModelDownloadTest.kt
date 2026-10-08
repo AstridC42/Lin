@@ -184,13 +184,32 @@ class ModelDownloadTest {
     assertEquals(seen.map { it.receivedBytes }.sorted(), seen.map { it.receivedBytes })
   }
 
+  /**
+   * The URL and the length to verify it against come from one value.
+   *
+   * This test replaces one that asserted the opposite - that the URL pointed at the chip-specific
+   * build - while the length check still used the portable build's size. Both were defensible on
+   * their own and together they made a download that could not succeed on this phone.
+   */
   @Test
-  fun theUrlPointsAtTheRightFileForThisChip() {
-    val url = ModelDownload.urlFor(ModelCatalog.EMBEDDING_GEMMA_2, socModel = "SM8750")
+  fun theUrlAndTheExpectedLengthComeFromTheSameBuild() {
+    val model = ModelCatalog.EMBEDDING_GEMMA_2
     assertEquals(
       "https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/main/" +
-        "embeddinggemma-2-740m_Qualcomm_SM8750.litertlm",
-      url,
+        "embeddinggemma-2-740m.litertlm",
+      ModelDownload.urlFor(model),
+    )
+    assertEquals(484_622_336L, model.build.sizeBytes)
+  }
+
+  /** Given a build, the address is that build's - no chip lookup in between. */
+  @Test
+  fun aBuildAddressesItsOwnFile() {
+    val npu = ModelCatalog.GEMMA_4_E2B.socBuilds.getValue("SM8750")
+    assertEquals(
+      "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/" +
+        "gemma-4-E2B-it_qualcomm_sm8750.litertlm",
+      ModelDownload.urlFor(ModelCatalog.GEMMA_4_E2B.repoId, npu),
     )
   }
 

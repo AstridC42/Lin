@@ -83,7 +83,7 @@ constructor(
           modelsDirectory = store.directory().absolutePath,
           models =
             ModelCatalog.all.map { model ->
-              val gigabytes = "%.1f GB".format(model.sizeBytes / 1_000_000_000.0)
+              val gigabytes = "%.1f GB".format(model.build.sizeBytes / 1_000_000_000.0)
               val role = if (model.role == ModelRole.CHAT) "chat" else "embedding"
               val fit =
                 when {

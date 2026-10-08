@@ -24,14 +24,13 @@ import java.io.File
 /**
  * Where model files live on the device, and how much memory there is to run them in.
  *
- * Downloading is Phase 1b. Until then this looks for a file that is already there, which includes
- * one copied in by hand - the fastest way to get a real model in front of this app is to take the
- * one the archived fork already downloaded.
+ * A file copied in by hand counts, and is still worth knowing about: it is the one way to avoid
+ * spending two and a half gigabytes of somebody's allowance on a model they already have.
  */
 class ModelStore(private val context: Context) {
 
   /** Where a model file belongs. */
-  fun fileFor(model: CatalogModel): File = File(directory(), model.fileFor())
+  fun fileFor(model: CatalogModel): File = File(directory(), model.build.file)
 
   /** Whether the file is there and is not obviously a partial download. */
   fun isPresent(model: CatalogModel): Boolean {
@@ -39,7 +38,7 @@ class ModelStore(private val context: Context) {
     if (!file.exists()) return false
     // A file much smaller than advertised is an interrupted download rather than a model, and
     // handing that to the engine produces a native crash rather than an error.
-    return file.length() >= model.sizeBytes / 2
+    return file.length() >= model.build.sizeBytes / 2
   }
 
   /** Models of [role] that could be loaded right now. */
