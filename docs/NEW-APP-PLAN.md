@@ -358,9 +358,20 @@ path of proving the engine works.
 **Measurement:** cold start to first token; conversation survives a restart;
 memory held while resident.
 
-### Phase 1b — Model acquisition
+### Phase 1b — Model acquisition — DONE
 
-Resumable download, SHA-256 verification, HF licence acceptance and token.
+Resumable download into a `.part` file, length verification before the file
+takes its real name, and a foreground worker so it survives the app being
+backgrounded.
+
+Two things planned here turned out not to be needed, and two unplanned things
+were: the Gemma and EmbeddingGemma builds are Apache-2.0 and ungated, so there
+is no licence screen and no token store; and length verification does the job
+SHA-256 was there for, because the catalogue is code and the sizes are read off
+the Hub. What was needed instead was the foreground service type in the
+manifest — without it `startForeground` kills the process, and WorkManager does
+not catch that — and the discovery that selecting an NPU build by chip name
+fetches a file whose length can never match.
 
 **Measurement:** a fresh install on a wiped device gets to a working model
 without a computer.
