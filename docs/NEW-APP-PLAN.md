@@ -390,8 +390,14 @@ fail silently and are worth remembering: Android blocks cleartext HTTP by
 default, so a LAN `http://…:11434` needs a network security config, and Ollama
 binds to localhost unless `OLLAMA_HOST=0.0.0.0` says otherwise.
 
-**Still to do:** the chat call itself (`/api/chat`, streaming), and routing — the
-picked model is stored and nothing sends to it yet.
+**Also done:** the chat call (`POST /api/chat`, streamed), and a "who answers"
+choice in settings — the phone or the server — with the phone taking over, and
+saying so, when the server cannot be reached.
+
+The choice is explicit rather than automatic, and that is the Phase 3 boundary
+holding: deciding *for* the user which requests go to the big model is the
+orchestration, and it needs a model that can judge "hard" first. Guessing in
+the meantime would mean nobody ever knowing which model answered.
 
 The degradation policy is designed here, not bolted on: away from home the big
 model does not exist, and an assistant that works at home and fails on the
