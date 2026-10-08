@@ -19,6 +19,7 @@ package com.lin.agent.core.models
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import java.io.File
 
 /**
@@ -44,6 +45,13 @@ class ModelStore(private val context: Context) {
   /** Models of [role] that could be loaded right now. */
   fun available(role: ModelRole): List<CatalogModel> =
     ModelCatalog.all.filter { it.role == role && isPresent(it) }
+
+  /**
+   * Deletes partial downloads nothing will ever finish, and returns the bytes freed.
+   *
+   * See the rule in [clearStrayPartsIn]; this applies it to the models directory.
+   */
+  fun clearStrayParts(): Long = clearStrayPartsIn(directory())
 
   fun directory(): File =
     File(context.filesDir, "models").also { if (!it.exists()) it.mkdirs() }
@@ -73,4 +81,41 @@ class ModelStore(private val context: Context) {
   private companion object {
     const val BYTES_IN_GB = 1024L * 1024 * 1024
   }
+}
+
+/**
+ * Deletes partial downloads in [directory] that nothing will ever finish, and returns the bytes
+ * freed.
+ *
+ * A `.part` file is only worth keeping if a future download would resume into it, and the file a
+ * download resumes into is named after the build this app would fetch. Change which build that is
+ * and the old partial becomes unreachable: invisible from inside the app, not counted as a model,
+ * and still occupying the storage.
+ *
+ * That is not hypothetical. Downloads briefly fetched the chip-specific build on phones that had
+ * one published, so a phone that tried and failed is left holding up to three gigabytes under a
+ * name the app no longer looks at. Nothing in the UI could have said so, and the only way to get
+ * it back was to uninstall - which also takes any model that did work.
+ *
+ * Safe to call while another model is downloading: that download's own `.part` file is one of the
+ * wanted ones. Finished model files are never candidates, including an NPU build somebody copied
+ * in by hand, because they are not partials.
+ *
+ * A top-level function rather than a method so it can be tested against a real directory without
+ * a Context.
+ */
+internal fun clearStrayPartsIn(directory: File): Long {
+  val wanted = ModelCatalog.all.map { it.build.file + ModelDownload.PART_SUFFIX }.toSet()
+  var freed = 0L
+  for (file in directory.listFiles() ?: return 0L) {
+    if (!file.isFile) continue
+    if (!file.name.endsWith(ModelDownload.PART_SUFFIX)) continue
+    if (file.name in wanted) continue
+    val size = file.length()
+    if (file.delete()) {
+      Log.i("LinModelStore", "Removed an unreachable partial download: ${file.name} ($size bytes)")
+      freed += size
+    }
+  }
+  return freed
 }

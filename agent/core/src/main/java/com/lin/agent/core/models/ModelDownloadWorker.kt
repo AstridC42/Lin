@@ -89,6 +89,11 @@ class ModelDownloadWorker(private val context: Context, params: WorkerParameters
     ensureChannel()
     goForeground(model.name, 0)
 
+    // Before asking for gigabytes of room, give back any that a download this app can no longer
+    // reach is still holding.
+    val freed = store.clearStrayParts()
+    if (freed > 0) Log.i(TAG, "Freed $freed bytes of unreachable partial downloads")
+
     // One value for both the address and the length to check it against. See ModelBuild.
     val build = model.build
     val outcome =

@@ -186,7 +186,8 @@ class ModelDownload(
 
   companion object {
     private const val TAG = "LinModelDownload"
-    private const val PART_SUFFIX = ".part"
+    /** Shared with [ModelStore], which cleans up the ones no download will ever claim. */
+    internal const val PART_SUFFIX = ".part"
     private const val HTTP_OK = 200
     private const val HTTP_PARTIAL = 206
     private const val BUFFER_BYTES = 1 shl 16
