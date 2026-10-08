@@ -467,6 +467,26 @@ back before it goes.
 
 ### Phase 5 — Memory and media retrieval
 
+**Done (text half):** a vector store on SQLite with the embeddings beside the
+text, `LiteRtEmbedder` over LiteRT-LM's own `EmbeddingEngine`, and the
+`remember` / `recall` tools. The embedder loads for a burst and closes, which
+is the "one resident, one transient" budget working as intended.
+
+Two corrections to what was planned here. The embedder runs on LiteRT-LM
+rather than MediaPipe's `UniversalEmbedder` — 0.18 ships an `EmbeddingEngine`,
+so one runtime and one AAR serve both models instead of two native stacks. And
+writing is an explicit tool rather than a background digest to begin with: a
+digest decides on the user's behalf what about their day is worth keeping, and
+getting that wrong is a privacy problem rather than a bug.
+
+The discipline that matters is the similarity floor. Cosine always ranks, so
+without one every query returns its five nearest memories however unrelated —
+and a model handed three irrelevant "memories" states them as fact in the
+user's own words, with nothing downstream marking them false.
+
+**Still to do:** the media half — photo indexing and search — plus the
+background digest, and a screen for reading and deleting what is held.
+
 Port `memory/`. Replace word-overlap search with embedding retrieval using
 **EmbeddingGemma 2 Text 270M**, 164 MB and co-resident with the chat model,
 through MediaPipe `UniversalEmbedder` and a vector store, with Instant Media
