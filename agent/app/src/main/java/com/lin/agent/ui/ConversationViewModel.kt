@@ -19,7 +19,9 @@ package com.lin.agent.ui
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lin.agent.engine.LlmBackend
+import com.lin.agent.core.models.CatalogModel
+import com.lin.agent.model.ChatBackends
+import com.lin.agent.model.ChatReadiness
 import com.lin.agent.engine.Message
 import com.lin.agent.engine.TurnEvent
 import com.lin.agent.engine.TurnRequest
@@ -38,6 +40,15 @@ data class ConversationState(
   val streaming: String = "",
   val inProgress: Boolean = false,
   val error: String = "",
+  /** Which model is answering, shown so it is never ambiguous. Empty when none is loaded. */
+  val backendId: String = "",
+  /**
+   * Set when there is no model on the device.
+   *
+   * The screen offers the download rather than a text box. There is no stand-in backend to fall
+   * back to - an echo that looks like a reply is worse than a screen that says what is missing.
+   */
+  val missingModel: CatalogModel? = null,
 )
 
 /**
@@ -55,17 +66,41 @@ data class ConversationState(
 @HiltViewModel
 class ConversationViewModel
 @Inject
-constructor(private val backend: LlmBackend, private val saved: SavedStateHandle) : ViewModel() {
+constructor(private val backends: ChatBackends, private val saved: SavedStateHandle) : ViewModel() {
 
   private val _state = MutableStateFlow(ConversationState(messages = restored()))
   val state: StateFlow<ConversationState> = _state.asStateFlow()
 
-  /** Which backend answered, for showing in the UI once there is more than one. */
-  val backendId: String = backend.id
+  init {
+    refreshReadiness()
+  }
+
+  /**
+   * Re-checks whether a model is available.
+   *
+   * Called on open and after a download finishes, because the usual sequence is that the app is
+   * installed before the model exists - so the conversation has to become possible without a
+   * restart.
+   */
+  fun refreshReadiness(afterDownload: Boolean = false) {
+    if (afterDownload) backends.refresh()
+    when (val readiness = backends.readiness()) {
+      is ChatReadiness.NoModel ->
+        _state.update { it.copy(missingModel = readiness.suggested, backendId = "") }
+      is ChatReadiness.Ready ->
+        _state.update { it.copy(missingModel = null, backendId = readiness.backend.id) }
+    }
+  }
 
   fun send(text: String) {
     val trimmed = text.trim()
     if (trimmed.isEmpty() || _state.value.inProgress) return
+    val backend =
+      (backends.readiness() as? ChatReadiness.Ready)?.backend
+        ?: run {
+          refreshReadiness()
+          return
+        }
 
     val outgoing = _state.value.messages + Message(Message.Role.USER, trimmed)
     _state.update { it.copy(messages = outgoing, inProgress = true, streaming = "", error = "") }

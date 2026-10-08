@@ -32,10 +32,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lin.agent.core.models.DownloadState
 import com.lin.agent.R
 
 /**
@@ -141,18 +144,69 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
-      for (model in state.models) {
+      for (line in state.models) {
         Card(modifier = Modifier.fillMaxWidth()) {
-          Column(modifier = Modifier.padding(12.dp)) {
+          Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+          ) {
+            Text(line.name, style = MaterialTheme.typography.bodyLarge)
             Text(
-              if (model.present) model.name else "${model.name} — not downloaded",
-              style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-              model.detail,
+              line.detail,
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            when (val download = line.download) {
+              is DownloadState.Running -> {
+                // Determinate where the total is known, which it is from the catalogue. A
+                // spinner for a twenty-minute transfer tells the user nothing.
+                LinearProgressIndicator(
+                  progress = { download.percent / 100f },
+                  modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                  Text(
+                    stringResource(
+                      R.string.download_progress,
+                      download.percent,
+                      "%.1f".format(download.receivedBytes / 1_000_000_000.0),
+                      "%.1f".format(download.totalBytes / 1_000_000_000.0),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                  )
+                  TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
+                    Text(stringResource(R.string.download_stop))
+                  }
+                }
+              }
+              is DownloadState.Failed ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                  Text(
+                    download.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                  )
+                  // Resuming, not restarting: whatever arrived is still on disk.
+                  Button(onClick = { viewModel.download(line.model) }) {
+                    Text(stringResource(R.string.download_retry))
+                  }
+                }
+              else ->
+                if (line.present) {
+                  Text(
+                    stringResource(R.string.download_ready),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                  )
+                } else {
+                  Button(onClick = { viewModel.download(line.model) }) {
+                    Text(stringResource(R.string.download_start))
+                  }
+                }
+            }
           }
         }
       }

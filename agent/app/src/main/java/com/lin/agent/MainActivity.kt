@@ -16,9 +16,13 @@
 
 package com.lin.agent
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,6 +77,17 @@ class MainActivity : ComponentActivity() {
       return
     }
 
+    // Asked once, at launch, rather than at the moment a download starts: being interrupted by a
+    // permission dialog in the middle of tapping Download is worse, and refusing it only hides
+    // the progress - the download itself still runs.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+      checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+        PackageManager.PERMISSION_GRANTED
+    ) {
+      registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+        .launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     LaunchHealth.mark(this, "content set")
     setContent {
       LinTheme {
@@ -82,7 +97,12 @@ class MainActivity : ComponentActivity() {
         if (showSettings) {
           SettingsScreen(onBack = { showSettings = false })
         } else {
-          ConversationScreen(onOpenSettings = { showSettings = true })
+          ConversationScreen(
+            onOpenSettings = { showSettings = true },
+            // The empty state's button goes to the same screen the gear does, which is where
+            // the downloads live. One place to manage models, not two.
+            onGetModel = { showSettings = true },
+          )
         }
         // Recorded from inside the composition rather than at the end of onCreate: onCreate
         // returning only means the work was scheduled, so a crash in the first composition would

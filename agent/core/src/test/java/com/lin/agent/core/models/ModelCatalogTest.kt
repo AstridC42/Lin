@@ -86,12 +86,38 @@ class ModelCatalogTest {
     )
   }
 
-  /** The chat models have no NPU builds at all, so they must not pretend to. */
+  /**
+   * E2B has an SoC build for this phone's chip; E4B has none.
+   *
+   * An earlier version of this test asserted that no chat model had SoC builds, which was wrong -
+   * it was describing the catalogue rather than the repositories. Listing them showed E2B carries
+   * four and E4B carries none, so there is no uniform rule to assert, and the naming convention
+   * differs from the embedder's as well.
+   */
   @Test
-  fun theChatModelsHaveNoSocVariants() {
-    for (model in ModelCatalog.chatModels) {
-      assertTrue("${model.name} should have no SoC builds", model.socFiles.isEmpty())
-      assertEquals(model.file, model.fileFor(socModel = "SM8750"))
+  fun e2bHasAnSocBuildForThisPhoneAndE4bHasNone() {
+    assertEquals(
+      "gemma-4-E2B-it_qualcomm_sm8750.litertlm",
+      ModelCatalog.GEMMA_4_E2B.fileFor(socModel = "SM8750"),
+    )
+    assertTrue(ModelCatalog.GEMMA_4_E4B.socFiles.isEmpty())
+    assertEquals(
+      ModelCatalog.GEMMA_4_E4B.file,
+      ModelCatalog.GEMMA_4_E4B.fileFor(socModel = "SM8750"),
+    )
+  }
+
+  /** Every SoC build named must belong to the model that names it, not another one's. */
+  @Test
+  fun socBuildNamesLookLikeTheirModel() {
+    for (model in ModelCatalog.all) {
+      for ((soc, file) in model.socFiles) {
+        assertTrue(
+          "$file does not look like a build of ${model.name}",
+          file.startsWith(model.file.removeSuffix(".litertlm")),
+        )
+        assertTrue("$file should name its chip", file.lowercase().contains(soc.lowercase().replace(" ", "_")))
+      }
     }
   }
 

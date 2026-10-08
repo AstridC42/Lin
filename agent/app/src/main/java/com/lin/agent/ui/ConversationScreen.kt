@@ -30,7 +30,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -59,9 +61,9 @@ import com.lin.agent.engine.Message
 /**
  * The conversation, which is the whole app for now.
  *
- * Phase 0 deliberately ships a working chat against [com.lin.agent.engine.FakeBackend], so the
- * screen, the view model and the streaming path are all proven before a real engine arrives
- * underneath them in Phase 1.
+ * When no model is on the device this offers the download instead of a text box. There is no
+ * stand-in to fall back to: the app answers from a real engine or says it cannot, because an echo
+ * that looks like a reply is the worst of the three options.
  *
  * Messages are width-capped rather than stretched. On a Fold 7 unfolded this is an 8-inch screen,
  * and a line of text running its full width is unreadable; the cap is what makes the same screen
@@ -72,6 +74,7 @@ import com.lin.agent.engine.Message
 @Composable
 fun ConversationScreen(
   onOpenSettings: () -> Unit = {},
+  onGetModel: () -> Unit = {},
   viewModel: ConversationViewModel = hiltViewModel(),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
@@ -95,7 +98,7 @@ fun ConversationScreen(
         // the user expects would be worse than one that was simply unavailable.
         actions = {
           Text(
-            viewModel.backendId,
+            state.backendId.ifEmpty { stringResource(R.string.no_model) },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -137,6 +140,34 @@ fun ConversationScreen(
             }
           }
         }
+      }
+
+      val missing = state.missingModel
+      if (missing != null) {
+        Card(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+          Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Text(
+              stringResource(R.string.no_model_title),
+              style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+              stringResource(
+                R.string.no_model_body,
+                missing.name,
+                "%.1f".format(missing.sizeBytes / 1_000_000_000.0),
+              ),
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onGetModel, modifier = Modifier.fillMaxWidth()) {
+              Text(stringResource(R.string.no_model_action))
+            }
+          }
+        }
+        return@Column
       }
 
       Row(

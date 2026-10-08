@@ -24,6 +24,12 @@ android {
   namespace = "com.lin.agent.core"
   compileSdk { this.version = release(37) { minorApiLevel = 0 } }
   defaultConfig { minSdk = 31 }
+  // android.util.Log and Build throw "not mocked" in a plain JVM test, which fails tests that
+  // merely log on a path they are exercising. Returning defaults instead keeps the logic testable
+  // without pulling in Robolectric for the sake of two static methods - and without having to
+  // strip logging out of code that benefits from it on a device.
+  testOptions { unitTests.isReturnDefaultValues = true }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
@@ -48,6 +54,9 @@ kotlin {
 dependencies {
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.datastore.preferences)
+  // Downloads that survive the app being backgrounded, and process death.
+  api(libs.androidx.work.runtime)
 
   testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
 }

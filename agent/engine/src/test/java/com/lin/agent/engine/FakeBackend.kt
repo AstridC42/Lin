@@ -21,16 +21,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
- * A backend with no model behind it.
+ * A backend with no model behind it. Test sources only.
  *
- * Here from the first commit on purpose. It lets the conversation plumbing, the UI and later the
- * whole agent loop be exercised before any weights exist and without a device - which is the test
- * seam the previous app never had, and the reason its agent behaviour could only ever be checked
- * by hand on a phone.
+ * It lives here rather than in `main` deliberately. For one commit it was the app's fallback when
+ * no model was present, which made the skeleton runnable - and also meant the app could answer
+ * from a stand-in when the intention was to test the real engine. Moving it here makes that
+ * impossible to do by accident: the shipped app cannot reference it, so "never falls back to the
+ * fake" is a property of the build rather than a promise in a comment.
  *
- * It also makes the skeleton runnable: the first build of this app can hold a conversation, which
- * means the screen, the view model and the streaming are all proven before Phase 1 swaps a real
- * engine in underneath them.
+ * What it is for is the test seam the previous app never had: exercising the conversation
+ * plumbing, and later the whole agent loop, without weights and without a device.
  */
 class FakeBackend(
   override val id: String = "fake",

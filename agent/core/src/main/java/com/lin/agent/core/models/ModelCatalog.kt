@@ -85,21 +85,40 @@ object ModelCatalog {
       role = ModelRole.CHAT,
       repoId = "litert-community/gemma-4-E2B-it-litert-lm",
       file = "gemma-4-E2B-it.litertlm",
-      sizeBytes = 2_594_275_328,
+      // Read off the Hub, not copied from the fork's allowlist, which says 2_594_275_328. The
+      // downloader verifies length, so a figure that is merely close would make every completed
+      // download look wrong.
+      sizeBytes = 2_588_147_712,
       minMemoryGb = 8,
       contextTokens = 8192,
       supportsImages = true,
       supportsAudio = true,
+      // E2B has NPU builds and E4B does not, so there is no uniform rule here - and the naming
+      // differs from the embedder's, lowercase where that one is capitalised. Both facts came
+      // from listing the repositories rather than from assuming symmetry.
+      socFiles =
+        mapOf(
+          "SM8750" to "gemma-4-E2B-it_qualcomm_sm8750.litertlm",
+          "QCS8275" to "gemma-4-E2B-it_qualcomm_qcs8275.litertlm",
+          "Tensor G5" to "gemma-4-E2B-it_Google_Tensor_G5.litertlm",
+          "Tensor G6" to "gemma-4-E2B-it_Google_Tensor_G6.litertlm",
+        ),
     )
 
-  /** Gemma 4 E4B. Better, and a setting rather than the default. See the note above. */
+  /**
+   * Gemma 4 E4B. Better, and a setting rather than the default. See the note above.
+   *
+   * No SoC builds at all, unlike E2B - so on a phone whose chip has an NPU variant, the smaller
+   * model is the one with more ways to run.
+   */
   val GEMMA_4_E4B =
     CatalogModel(
       name = "Gemma 4 E4B",
       role = ModelRole.CHAT,
       repoId = "litert-community/gemma-4-E4B-it-litert-lm",
       file = "gemma-4-E4B-it.litertlm",
-      sizeBytes = 3_662_311_424,
+      // Also from the Hub; the allowlist says 3_662_311_424.
+      sizeBytes = 3_659_530_240,
       minMemoryGb = 12,
       contextTokens = 8192,
       supportsImages = true,

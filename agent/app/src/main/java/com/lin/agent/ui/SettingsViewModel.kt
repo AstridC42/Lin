@@ -18,7 +18,10 @@ package com.lin.agent.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lin.agent.core.models.CatalogModel
+import com.lin.agent.core.models.DownloadState
 import com.lin.agent.core.models.ModelCatalog
+import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
@@ -27,12 +30,22 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.lin.agent.model.ChatBackends
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** One line about a model, for the settings screen to show. */
-data class ModelLine(val name: String, val detail: String, val present: Boolean)
+data class ModelLine(
+  val model: CatalogModel,
+  val detail: String,
+  val present: Boolean,
+  val download: DownloadState = DownloadState.Idle,
+) {
+  val name: String
+    get() = model.name
+}
 
 data class SettingsState(
   val ollamaUrl: String = "",
@@ -47,7 +60,12 @@ data class SettingsState(
 @HiltViewModel
 class SettingsViewModel
 @Inject
-constructor(private val settings: SettingsRepository, private val store: ModelStore) : ViewModel() {
+constructor(
+  private val settings: SettingsRepository,
+  private val store: ModelStore,
+  private val downloads: ModelDownloads,
+  private val backends: ChatBackends,
+) : ViewModel() {
 
   private val _state = MutableStateFlow(SettingsState())
   val state: StateFlow<SettingsState> = _state.asStateFlow()
@@ -76,7 +94,7 @@ constructor(private val settings: SettingsRepository, private val store: ModelSt
                   else -> "available"
                 }
               ModelLine(
-                name = model.name,
+                model = model,
                 detail = "$gigabytes · $role · $fit",
                 present = store.isPresent(model),
               )
@@ -85,6 +103,39 @@ constructor(private val settings: SettingsRepository, private val store: ModelSt
       }
     }
   }
+
+  init {
+    // Follow every model's download at once. Combining them keeps the screen a single state
+    // object rather than one subscription per card, and it is also what notices a download
+    // finishing so the conversation can pick the model up without a restart.
+    viewModelScope.launch {
+      val watched = ModelCatalog.all.map { model -> downloads.watch(model) }
+      combine(watched) { states -> states.toList() }
+        .collect { states ->
+          val byName = ModelCatalog.all.map { it.name }.zip(states).toMap()
+          var anyFinished = false
+          _state.update { current ->
+            current.copy(
+              models =
+                current.models.map { line ->
+                  val download = byName[line.name] ?: DownloadState.Idle
+                  val present = store.isPresent(line.model)
+                  if (download is DownloadState.Done && present && !line.present) {
+                    anyFinished = true
+                  }
+                  line.copy(present = present, download = download)
+                }
+            )
+          }
+          // A newly arrived model means the held engine reference is stale.
+          if (anyFinished) backends.refresh()
+        }
+    }
+  }
+
+  fun download(model: CatalogModel) = downloads.start(model)
+
+  fun cancelDownload(model: CatalogModel) = downloads.cancel(model)
 
   fun onUrlChanged(value: String) = _state.update { it.copy(ollamaUrl = value, saved = false) }
 

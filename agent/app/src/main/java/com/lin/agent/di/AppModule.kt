@@ -17,13 +17,9 @@
 package com.lin.agent.di
 
 import android.content.Context
-import com.lin.agent.core.models.ModelCatalog
-import com.lin.agent.core.models.ModelRole
+import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
-import com.lin.agent.engine.FakeBackend
-import com.lin.agent.engine.LlmBackend
-import com.lin.agent.engine.OnDeviceBackend
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -42,39 +38,7 @@ object AppModule {
   @Provides @Singleton
   fun provideModelStore(@ApplicationContext context: Context): ModelStore = ModelStore(context)
 
-  /**
-   * The backend the conversation talks to.
-   *
-   * A real engine when there is a model file to load, and the fake one when there is not - rather
-   * than an error screen, because an app that opens and can hold a conversation is more useful
-   * than one that refuses until a two-gigabyte download finishes. Which one answered is visible
-   * in the UI, so this is never silently pretending.
-   *
-   * The model is chosen by what is actually on the device, preferring the smallest that fits this
-   * phone's memory. On 12 GB that is E2B rather than E4B, for the reason recorded in the
-   * catalogue.
-   *
-   * Nothing above this line knows which it got. That is the whole point of the interface, and it
-   * is what will make adding the Ollama backend in Phase 2 a change to this function.
-   */
   @Provides @Singleton
-  fun provideBackend(store: ModelStore): LlmBackend {
-    val present = store.available(ModelRole.CHAT)
-    val chosen =
-      present.minByOrNull { it.sizeBytes }
-        ?: return FakeBackend(id = "no model yet", perTokenDelayMillis = 40)
-
-    val memoryGb = store.memoryGb()
-    val preferred = ModelCatalog.defaultChatModel(memoryGb)
-    val model = if (preferred != null && store.isPresent(preferred)) preferred else chosen
-
-    return OnDeviceBackend(
-      modelPath = store.fileFor(model).absolutePath,
-      cacheDir = store.cacheDirectory().absolutePath,
-      contextTokens = model.contextTokens,
-      supportsImages = model.supportsImages,
-      supportsAudio = model.supportsAudio,
-      id = model.name,
-    )
-  }
+  fun provideModelDownloads(@ApplicationContext context: Context): ModelDownloads =
+    ModelDownloads(context)
 }
