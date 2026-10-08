@@ -443,6 +443,24 @@ exists because small-model output cannot be trusted with a phone call.
 
 Deliberately after Phase 3, so tools arrive into a system that already routes.
 
+**Done:** `phone_action` — calling and messaging — with the staged-action
+policy as a pure function in `core/phone/` rather than as care taken inside the
+Android plumbing, so it is tested rather than inspected. A call opens the
+dialer unless direct calling is both opted into *and* permitted; a message uses
+`ACTION_SENDTO`, which cannot send on its own, so "waits for a send" is a
+property of the mechanism. The near-miss guard is ported: digits that are
+nearly a contact's, reordered or one off, are queried rather than dialled, and
+opting in does not bypass it.
+
+Porting that guard introduced a bug the tests caught — running the edit
+distance on the trimmed tails made `+972 50 123 4567` and `050 123 4567` read
+as a one-digit slip, which would have queried every correctly-copied
+international number.
+
+**Still to do:** notification reply with its read-back, calendar and reminders,
+media control, and MobileActions-270M as the intent parser. The remaining
+orchestrator tools (`recall`, `ask`, `answer`) belong with Phase 5's memory.
+
 **Measurement:** the staged-action policy holds — calls open the dialer unless
 directly authorised, messages wait for a send, and a notification reply is read
 back before it goes.

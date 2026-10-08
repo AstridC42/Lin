@@ -28,6 +28,7 @@ import com.lin.agent.engine.Message
 import com.lin.agent.engine.ToolRegistry
 import com.lin.agent.engine.TurnLoop
 import com.lin.agent.model.DelegateTool
+import com.lin.agent.model.PhoneTool
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,7 +74,11 @@ data class ConversationState(
 @HiltViewModel
 class ConversationViewModel
 @Inject
-constructor(private val backends: ChatBackends, private val saved: SavedStateHandle) : ViewModel() {
+constructor(
+  private val backends: ChatBackends,
+  private val phoneTool: PhoneTool,
+  private val saved: SavedStateHandle,
+) : ViewModel() {
 
   /**
    * What the orchestrator may do, which is currently one thing.
@@ -82,7 +87,8 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
    * contain what an orchestrator is allowed to ask for. The previous app assembled forty-four
    * tools into every prompt and relied on discipline to keep that appropriate.
    */
-  private val registry = ToolRegistry(listOf(DelegateTool { backends.serverSubAgent() }))
+  private val registry =
+    ToolRegistry(listOf(DelegateTool { backends.serverSubAgent() }, phoneTool))
 
   private val _state = MutableStateFlow(ConversationState(messages = restored()))
   val state: StateFlow<ConversationState> = _state.asStateFlow()
@@ -232,7 +238,10 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
       "You are Lin, an assistant running on this phone. Answer directly whenever you can. " +
         "For work that needs a much larger model - real research, long writing, heavy analysis " +
         "- call delegate. When you do, copy every condition the user stated into constraints, " +
-        "word for word; never invent one they did not say."
+        "word for word; never invent one they did not say. " +
+        "To ring someone or text them, call phone_action; it opens the dialer or the composer " +
+        "for the user to confirm, so say what you have put on screen rather than claiming it " +
+        "is done. Never invent a phone number - pass the name instead."
 
     const val KEY_ROLES = "conversation_roles"
     const val KEY_TEXTS = "conversation_texts"

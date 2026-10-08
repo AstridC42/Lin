@@ -125,6 +125,20 @@ class SettingsRepository(private val context: Context) {
   suspend fun setAnswerOnServer(value: Boolean) = write(ANSWER_ON_SERVER, value)
 
   /**
+   * Whether Lin may place a call itself, rather than opening the dialer.
+   *
+   * Off, and it stays off until somebody turns it on knowing what it does. A call is the one
+   * action in this app that cannot be undone, and the model deciding to make one is exactly the
+   * case where being wrong is unrecoverable - so the default is that the last tap is a person's.
+   *
+   * Not sufficient on its own either: the policy requires the CALL_PHONE permission as well,
+   * because this flag can outlive a permission revoked in system settings.
+   */
+  val allowDirectCalls: Flow<Boolean> = read(ALLOW_DIRECT_CALLS, false)
+
+  suspend fun setAllowDirectCalls(value: Boolean) = write(ALLOW_DIRECT_CALLS, value)
+
+  /**
    * Reads one setting, with [default] on any failure.
    *
    * `catch` rather than a bare flow: the corruption handler above covers a file that cannot be
@@ -169,5 +183,6 @@ class SettingsRepository(private val context: Context) {
     val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
     val SERVER_MODEL_NAME = stringPreferencesKey("server_model_name")
     val ANSWER_ON_SERVER = booleanPreferencesKey("answer_on_server")
+    val ALLOW_DIRECT_CALLS = booleanPreferencesKey("allow_direct_calls")
   }
 }

@@ -21,6 +21,7 @@ import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.OllamaServer
+import com.lin.agent.model.PhoneTool
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -46,4 +47,10 @@ object AppModule {
   // Stateless and injected rather than constructed where it is used, so a test can hand the
   // settings screen a server that answers without one existing.
   @Provides @Singleton fun provideOllamaServer(): OllamaServer = OllamaServer()
+
+  @Provides @Singleton
+  fun providePhoneTool(
+    @ApplicationContext context: Context,
+    settings: SettingsRepository,
+  ): PhoneTool = PhoneTool(context, settings)
 }

@@ -27,6 +27,30 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!--
+      The phone itself. Both optional in practice: without READ_CONTACTS a name cannot be looked
+      up and the model has to be given a number, and without CALL_PHONE a call can only ever be
+      staged in the dialer - which is what happens by default anyway. Neither is requested at
+      launch; they are asked for at the point they are needed.
+    -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+
+    <!--
+      Needed to see that a dialer or a messaging app exists at all. Package visibility is
+      restricted from API 30, and these are the two intents this app ever starts.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+    </queries>
+
     <application
         android:name=".LinApplication"
         android:allowBackup="false"
