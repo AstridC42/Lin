@@ -51,13 +51,18 @@ Reversible unless marked otherwise.
 - **Same repository, new top-level directory.** Lifting the engine wrapper is a
   file copy rather than a dependency; one CI, one signing key. Splitting it
   into its own repository later is a `git filter-repo` away.
-- **A new application id: `com.lin.agent`.** Not a replacement for the fork's
-  `com.lin.assistant`, so both install side by side and the fork stays usable
-  while this one is a skeleton. One word to change if you want a different one.
-- **The fork is archived, not maintained.** It becomes a reference: a working
-  implementation of engine setup, device quirks, HuggingFace auth, semantic
-  retrieval and a hundred small Android details, sitting in the same repository
-  where it can be read and copied from. No new features, no releases.
+- **A new application id: `com.lin.agent`.** Originally so that both could be
+  installed side by side while this one was a skeleton. That reason has gone -
+  the fork is not to be installed at all any more - but the id stays, because
+  changing it now is churn with nothing gained. `com.lin.assistant` is free if
+  it is ever wanted.
+- **The fork is retired, not just unmaintained.** Source only: it is kept in
+  the repository as reference material - engine setup, device quirks,
+  HuggingFace auth, semantic retrieval, and a hundred small Android details
+  easier to read than to rederive - and it is not built, released or installed.
+  The workflows that built and published it are reduced to manual dispatch, so
+  they cannot fire on their own, and `Android/ARCHIVED.md` says what each part
+  of it is still good for.
 
   Two consequences worth stating. The open crash is still worth diagnosing, but
   only for what it *tells* us: if it is LiteRT-LM on this device, the new app

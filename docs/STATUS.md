@@ -11,6 +11,18 @@ The third list is the one most worth reading — several things an assistant
 "obviously" ought to do are closed off to a sideloaded Android app, and knowing
 which saves asking for them again.
 
+> **This document describes the archived Edge Gallery fork.**
+>
+> That app is no longer built, released or installed - see
+> [`../Android/ARCHIVED.md`](../Android/ARCHIVED.md) for what its source is still good for. The
+> app under development is in `agent/`, and its plan is
+> [`NEW-APP-PLAN.md`](NEW-APP-PLAN.md).
+>
+> Everything below is kept as a record of what the fork did and what was learned from it. Several
+> of those lessons are now requirements in the new app rather than history: the reliability floor,
+> the staged-action policy for calls and messages, and the tool-budget arithmetic that made a
+> rewrite the right answer.
+
 ## Working
 
 Confirmed on a real phone.
