@@ -157,6 +157,24 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             when (val download = line.download) {
+              DownloadState.Waiting ->
+                // Indeterminate, because nothing is moving yet. Showing a bar stuck at zero is
+                // how a queued download gets mistaken for a broken one.
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                  LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                  Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                  ) {
+                    Text(
+                      stringResource(R.string.download_waiting),
+                      style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
+                      Text(stringResource(R.string.download_stop))
+                    }
+                  }
+                }
               is DownloadState.Running -> {
                 // Determinate where the total is known, which it is from the catalogue. A
                 // spinner for a twenty-minute transfer tells the user nothing.
@@ -210,8 +228,8 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
           }
         }
       }
-      // Until the download arrives in Phase 1b, the quickest way to get a real model in front of
-      // this app is to copy one in - including the one the archived fork already downloaded.
+      // Still shown now that downloading works, because copying a file in is the one way to
+      // avoid spending two and a half gigabytes of somebody's allowance twice.
       Text(
         stringResource(R.string.settings_models_where),
         style = MaterialTheme.typography.bodySmall,

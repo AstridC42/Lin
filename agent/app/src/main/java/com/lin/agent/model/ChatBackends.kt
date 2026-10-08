@@ -83,7 +83,7 @@ class ChatBackends @Inject constructor(private val store: ModelStore) {
     // who has deliberately fetched only E4B gets E4B rather than nothing.
     val preferred = ModelCatalog.defaultChatModel(memoryGb)
     val model =
-      present.firstOrNull { it == preferred } ?: present.minByOrNull { it.sizeBytes } ?: present[0]
+      present.firstOrNull { it == preferred } ?: present.minByOrNull { it.build.sizeBytes } ?: present[0]
 
     return ChatReadiness.Ready(
       backend =

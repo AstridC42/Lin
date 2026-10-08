@@ -157,7 +157,7 @@ fun ConversationScreen(
               stringResource(
                 R.string.no_model_body,
                 missing.name,
-                "%.1f".format(missing.sizeBytes / 1_000_000_000.0),
+                "%.1f".format(missing.build.sizeBytes / 1_000_000_000.0),
               ),
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,

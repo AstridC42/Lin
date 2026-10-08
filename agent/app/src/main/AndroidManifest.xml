@@ -14,7 +14,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!--
@@ -46,6 +47,32 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          The one line that stops a download killing the app.
+
+          A model download runs in a WorkManager foreground worker, and on API 34+ asking to go
+          foreground means naming a service type. WorkManager's own service - the one that
+          actually calls startForeground - declares no type at all, because only the app knows
+          what its workers do. So the type has to be merged in here, and if it is not,
+          startForeground throws:
+
+              IllegalArgumentException: foregroundServiceType 0x00000001 is not a subset of
+              foregroundServiceType attribute 0x00000000 in service element of manifest file
+
+          WorkManager catches ForegroundServiceStartNotAllowedException and SecurityException
+          around that call and nothing else, so this one falls through, on the main thread of the
+          service, and takes the process with it. From the outside that is "the app crashes the
+          moment I press Download" - and because the crash leaves the work record in a state
+          WorkManager never finished, every later tap did nothing at all.
+
+          dataSync is the right type: there is no download type, and this is a long transfer the
+          user started and can see.
+        -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
     </application>
 
 </manifest>

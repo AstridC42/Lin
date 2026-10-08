@@ -61,33 +61,72 @@ class ModelCatalogTest {
   }
 
   /**
-   * The SoC mapping, which exists before anything uses it.
+   * The rule that cost the most to learn: a chip name never changes which file is fetched.
    *
-   * This phone is an SM8750, and an NPU build for exactly that chip is published. Nothing selects
-   * it yet - that needs vendor runtime libraries on the device - but the mapping being correct now
-   * is what makes enabling it later a data change.
+   * It used to. `fileFor(socModel)` returned the NPU build when the Hub had one for the chip, so
+   * on an SM8750 - this phone - the downloader fetched the 3.02 GB NPU build and then checked it
+   * against the 2.59 GB portable build's length, because the size was a separate field that did
+   * not vary. Every attempt failed its own verification, and because a truncated body is a
+   * retryable failure, it did it five times: about fifteen gigabytes of mobile data for no model.
+   *
+   * So this asserts the absence of the behaviour an earlier test asserted the presence of.
    */
   @Test
-  fun theEmbedderHasAnNpuBuildForThisPhonesChip() {
-    val file = ModelCatalog.EMBEDDING_GEMMA_2.fileFor(socModel = "SM8750")
-    assertEquals("embeddinggemma-2-740m_Qualcomm_SM8750.litertlm", file)
-  }
-
-  @Test
-  fun anUnknownChipFallsBackToTheGenericBuild() {
-    assertEquals(
-      "embeddinggemma-2-740m.litertlm",
-      ModelCatalog.EMBEDDING_GEMMA_2.fileFor(socModel = "something-unreleased"),
-    )
-    // And an empty SoC, which is what is reported below API 31.
-    assertEquals(
-      "embeddinggemma-2-740m.litertlm",
-      ModelCatalog.EMBEDDING_GEMMA_2.fileFor(socModel = ""),
-    )
+  fun noChipChangesWhichFileIsDownloaded() {
+    // Every chip the catalogue names a build for, plus the two values a real device can report
+    // that are not in it at all.
+    val chips = ModelCatalog.all.flatMap { it.socBuilds.keys } + listOf("", "something-unreleased")
+    for (model in ModelCatalog.all) {
+      for (chip in chips) {
+        assertEquals(
+          "${model.name} must not vary its build on $chip",
+          model.portable,
+          model.buildFor(chip),
+        )
+      }
+    }
   }
 
   /**
-   * E2B has an SoC build for this phone's chip; E4B has none.
+   * The NPU builds are still catalogued, with their own sizes.
+   *
+   * Carried rather than dropped: the mapping is correct, the chip in this phone is in it, and
+   * what is missing is a loader - not data. Each one carries its own length so that enabling it
+   * cannot reintroduce the mismatch above.
+   */
+  @Test
+  fun npuBuildsAreCataloguedWithTheirOwnSizes() {
+    val embedder = ModelCatalog.EMBEDDING_GEMMA_2.socBuilds.getValue("SM8750")
+    assertEquals("embeddinggemma-2-740m_Qualcomm_SM8750.litertlm", embedder.file)
+    assertEquals(543_522_816L, embedder.sizeBytes)
+
+    val chat = ModelCatalog.GEMMA_4_E2B.socBuilds.getValue("SM8750")
+    assertEquals("gemma-4-E2B-it_qualcomm_sm8750.litertlm", chat.file)
+    assertEquals(3_016_294_400L, chat.sizeBytes)
+  }
+
+  /**
+   * No SoC build shares the portable build's length.
+   *
+   * This is the invariant that makes the old bug unmissable rather than subtle. If any of these
+   * happened to match, the mismatch would have gone unnoticed on that chip - and the next person
+   * to look would have found a catalogue that seemed fine.
+   */
+  @Test
+  fun noNpuBuildHasThePortableBuildsLength() {
+    for (model in ModelCatalog.all) {
+      for ((soc, build) in model.socBuilds) {
+        assertTrue(
+          "${model.name} on $soc is ${build.sizeBytes}, same as the portable build - " +
+            "a size mismatch would be invisible on that chip",
+          build.sizeBytes != model.portable.sizeBytes,
+        )
+      }
+    }
+  }
+
+  /**
+   * E2B has NPU builds for four chips; E4B has none.
    *
    * An earlier version of this test asserted that no chat model had SoC builds, which was wrong -
    * it was describing the catalogue rather than the repositories. Listing them showed E2B carries
@@ -95,28 +134,24 @@ class ModelCatalogTest {
    * differs from the embedder's as well.
    */
   @Test
-  fun e2bHasAnSocBuildForThisPhoneAndE4bHasNone() {
-    assertEquals(
-      "gemma-4-E2B-it_qualcomm_sm8750.litertlm",
-      ModelCatalog.GEMMA_4_E2B.fileFor(socModel = "SM8750"),
-    )
-    assertTrue(ModelCatalog.GEMMA_4_E4B.socFiles.isEmpty())
-    assertEquals(
-      ModelCatalog.GEMMA_4_E4B.file,
-      ModelCatalog.GEMMA_4_E4B.fileFor(socModel = "SM8750"),
-    )
+  fun e2bHasNpuBuildsAndE4bHasNone() {
+    assertEquals(4, ModelCatalog.GEMMA_4_E2B.socBuilds.size)
+    assertTrue(ModelCatalog.GEMMA_4_E4B.socBuilds.isEmpty())
   }
 
   /** Every SoC build named must belong to the model that names it, not another one's. */
   @Test
   fun socBuildNamesLookLikeTheirModel() {
     for (model in ModelCatalog.all) {
-      for ((soc, file) in model.socFiles) {
+      for ((soc, build) in model.socBuilds) {
         assertTrue(
-          "$file does not look like a build of ${model.name}",
-          file.startsWith(model.file.removeSuffix(".litertlm")),
+          "${build.file} does not look like a build of ${model.name}",
+          build.file.startsWith(model.portable.file.removeSuffix(".litertlm")),
         )
-        assertTrue("$file should name its chip", file.lowercase().contains(soc.lowercase().replace(" ", "_")))
+        assertTrue(
+          "${build.file} should name its chip",
+          build.file.lowercase().contains(soc.lowercase().replace(" ", "_")),
+        )
       }
     }
   }

@@ -186,15 +186,25 @@ class ModelDownload(
 
   companion object {
     private const val TAG = "LinModelDownload"
-    private const val PART_SUFFIX = ".part"
+    /** Shared with [ModelStore], which cleans up the ones no download will ever claim. */
+    internal const val PART_SUFFIX = ".part"
     private const val HTTP_OK = 200
     private const val HTTP_PARTIAL = 206
     private const val BUFFER_BYTES = 1 shl 16
     private const val REPORT_EVERY_BYTES = 2L * 1024 * 1024
 
-    /** Where a catalogue entry's file lives on Hugging Face. */
-    fun urlFor(model: CatalogModel, socModel: String = currentSocModel()): String =
-      "https://huggingface.co/${model.repoId}/resolve/main/${model.fileFor(socModel)}"
+    /**
+     * Where one build of a model lives on Hugging Face.
+     *
+     * Takes the build rather than the model, so the caller has to hold the same value it will
+     * pass as `expectedBytes`. That is deliberate: resolving the two separately is what made a
+     * download fetch one file and verify it against another's length.
+     */
+    fun urlFor(repoId: String, build: ModelBuild): String =
+      "https://huggingface.co/$repoId/resolve/main/${build.file}"
+
+    /** The build this device should fetch. */
+    fun urlFor(model: CatalogModel): String = urlFor(model.repoId, model.build)
 
     private fun httpConnection(url: String, rangeFrom: Long): Connection {
       val connection = (URL(url).openConnection() as HttpURLConnection).apply {
