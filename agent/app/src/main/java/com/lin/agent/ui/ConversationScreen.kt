@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -69,7 +70,10 @@ import com.lin.agent.engine.Message
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConversationScreen(viewModel: ConversationViewModel = hiltViewModel()) {
+fun ConversationScreen(
+  onOpenSettings: () -> Unit = {},
+  viewModel: ConversationViewModel = hiltViewModel(),
+) {
   val state by viewModel.state.collectAsStateWithLifecycle()
   var draft by rememberSaveable { mutableStateOf("") }
   val listState = rememberLazyListState()
@@ -83,7 +87,27 @@ fun ConversationScreen(viewModel: ConversationViewModel = hiltViewModel()) {
   }
 
   Scaffold(
-    topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) },
+    topBar = {
+      TopAppBar(
+        title = { Text(stringResource(R.string.app_name)) },
+        // Which backend answered, always visible. There is a real engine and a stand-in, and
+        // later a server as well; an assistant that quietly answered from somewhere other than
+        // the user expects would be worse than one that was simply unavailable.
+        actions = {
+          Text(
+            viewModel.backendId,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          IconButton(onClick = onOpenSettings) {
+            Icon(
+              Icons.Filled.Settings,
+              contentDescription = stringResource(R.string.open_settings),
+            )
+          }
+        },
+      )
+    },
     modifier = Modifier.imePadding(),
   ) { padding ->
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {

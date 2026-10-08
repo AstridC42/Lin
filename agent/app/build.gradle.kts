@@ -56,7 +56,20 @@ android {
   buildFeatures { compose = true }
 }
 
-kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_11) } }
+kotlin {
+  compilerOptions {
+    jvmTarget.set(JvmTarget.JVM_11)
+    // LiteRT-LM 0.18 ships against the Kotlin 2.4.0 stdlib, whose metadata version this
+    // compiler (2.2.21) refuses to read. The archived fork carries the same flag for the same
+    // reason, which is how this toolchain is known to work with these models.
+    //
+    // It suppresses a real check, so it is worth stating what the risk is: if the library used a
+    // 2.4 language feature in its public API, this would compile and fail at runtime. Bumping
+    // Kotlin instead would mean moving AGP and KSP too, which is a bigger change than this app
+    // should make before it has run on a phone once.
+    freeCompilerArgs.addAll("-Xskip-metadata-version-check")
+  }
+}
 
 dependencies {
   implementation(project(":core"))

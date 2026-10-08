@@ -57,26 +57,55 @@ private val Context.dataStore by
 
 private const val TAG = "LinSettings"
 
-/** Keys live here so a typo is a compile error rather than a silently absent setting. */
-object SettingsKeys {
-  /** Which on-device model to load. Empty means "not chosen yet". */
-  val MODEL_NAME = stringPreferencesKey("model_name")
-
-  /** Where the Ollama server is, as a full base URL. Empty means "not configured". */
-  val OLLAMA_URL = stringPreferencesKey("ollama_url")
-}
-
+/**
+ * Settings, exposed by name.
+ *
+ * Deliberately not a generic `read(key, default)` API. That shape leaked `Preferences.Key` out of
+ * this module, which meant every caller needed DataStore on its compile classpath and the storage
+ * choice stopped being an implementation detail - the compiler said so immediately, which is the
+ * boundary doing its job. Named accessors keep DataStore inside `core`, so swapping it for a proto
+ * store or a database later touches this file and nothing else.
+ */
 class SettingsRepository(private val context: Context) {
 
   /**
-   * Reads one setting as a flow, with [default] on any failure.
+   * Where the model server is, as a full base URL. Empty means not configured.
    *
-   * `catch` rather than a bare flow: the corruption handler covers a file that cannot be parsed,
-   * and this covers everything else that can make a read fail - a full disk being the likely one.
-   * The failure is reported and the default is served, so a disk problem degrades the app instead
-   * of closing it.
+   * A whole URL rather than a host and a port, because it has to accept both ways this server gets
+   * reached: `http://192.168.1.50:11434` on the home network and `https://ollama.example.com`
+   * through a tunnel from outside. Those differ in scheme, port and host shape, so storing the
+   * parts separately would only have to reassemble them.
    */
-  fun <T> read(key: Preferences.Key<T>, default: T): Flow<T> =
+  val serverUrl: Flow<String> = read(SERVER_URL, "")
+
+  suspend fun setServerUrl(value: String) = write(SERVER_URL, value)
+
+  /**
+   * An optional header sent with every request to the server, as `Name: value`.
+   *
+   * Here from the start rather than added later, because a tunnel puts the server on the public
+   * internet and Ollama has no authentication of its own: without something in front of it,
+   * anyone who learns the hostname can use the GPU and read the prompts. A Cloudflare Access
+   * service token or a bearer token goes here.
+   */
+  val serverAuthHeader: Flow<String> = read(SERVER_AUTH_HEADER, "")
+
+  suspend fun setServerAuthHeader(value: String) = write(SERVER_AUTH_HEADER, value)
+
+  /** Which chat model the user chose, by name. Empty means "decide from the device". */
+  val chatModelName: Flow<String> = read(CHAT_MODEL_NAME, "")
+
+  suspend fun setChatModelName(value: String) = write(CHAT_MODEL_NAME, value)
+
+  /**
+   * Reads one setting, with [default] on any failure.
+   *
+   * `catch` rather than a bare flow: the corruption handler above covers a file that cannot be
+   * parsed, and this covers everything else that can make a read fail - a full disk being the
+   * likely one on a phone that has just taken gigabytes of weights. The failure is reported and
+   * the default served, so a disk problem degrades the app rather than closing it.
+   */
+  private fun <T> read(key: Preferences.Key<T>, default: T): Flow<T> =
     context.dataStore.data
       .catch { error ->
         Log.w(TAG, "Could not read ${key.name}", error)
@@ -91,8 +120,8 @@ class SettingsRepository(private val context: Context) {
       }
       .map { it[key] ?: default }
 
-  /** Writes one setting, recording a failure rather than throwing it at the caller. */
-  suspend fun <T> write(key: Preferences.Key<T>, value: T) {
+  /** Writes one setting, recording a failure rather than throwing it at a switch being tapped. */
+  private suspend fun <T> write(key: Preferences.Key<T>, value: T) {
     try {
       context.dataStore.edit { it[key] = value }
     } catch (error: Throwable) {
@@ -105,5 +134,11 @@ class SettingsRepository(private val context: Context) {
             "out of storage space.",
       )
     }
+  }
+
+  private companion object {
+    val SERVER_URL = stringPreferencesKey("ollama_url")
+    val SERVER_AUTH_HEADER = stringPreferencesKey("ollama_auth_header")
+    val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
   }
 }

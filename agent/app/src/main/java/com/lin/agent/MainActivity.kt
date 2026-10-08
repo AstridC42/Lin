@@ -21,10 +21,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import com.lin.agent.core.diag.CrashReport
 import com.lin.agent.core.diag.LaunchHealth
 import com.lin.agent.ui.ConversationScreen
 import com.lin.agent.ui.RecoveryScreen
+import com.lin.agent.ui.SettingsScreen
 import com.lin.agent.ui.theme.LinTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -71,7 +76,14 @@ class MainActivity : ComponentActivity() {
     LaunchHealth.mark(this, "content set")
     setContent {
       LinTheme {
-        ConversationScreen()
+        // A boolean rather than a navigation graph. There are two screens; a navigation library
+        // for two screens is ceremony, and rememberSaveable means the choice survives a fold.
+        var showSettings by rememberSaveable { mutableStateOf(false) }
+        if (showSettings) {
+          SettingsScreen(onBack = { showSettings = false })
+        } else {
+          ConversationScreen(onOpenSettings = { showSettings = true })
+        }
         // Recorded from inside the composition rather than at the end of onCreate: onCreate
         // returning only means the work was scheduled, so a crash in the first composition would
         // otherwise be recorded as a success and recovery would never trigger.
