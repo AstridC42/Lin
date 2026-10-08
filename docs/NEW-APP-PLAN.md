@@ -378,8 +378,20 @@ without a computer.
 
 ### Phase 2 — The server backend
 
-`OllamaBackend` on the same interface. Host and port in settings, reachability
-probe, and an explicit UI state for which backend answered.
+`OllamaBackend` on the same interface, and an explicit UI state for which
+backend answered.
+
+**Done already:** the address and headers in settings, the reachability probe,
+and a picker over what the server has pulled (`GET /api/tags`). Listing is the
+smallest thing that proves the address, the tunnel and the header all work,
+which had to be answerable before anything could be delegated — and it starts
+no inference, so it costs the GPU nothing. Two things that would have made it
+fail silently and are worth remembering: Android blocks cleartext HTTP by
+default, so a LAN `http://…:11434` needs a network security config, and Ollama
+binds to localhost unless `OLLAMA_HOST=0.0.0.0` says otherwise.
+
+**Still to do:** the chat call itself (`/api/chat`, streaming), and routing — the
+picked model is stored and nothing sends to it yet.
 
 The degradation policy is designed here, not bolted on: away from home the big
 model does not exist, and an assistant that works at home and fails on the

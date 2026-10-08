@@ -16,12 +16,14 @@
 
 package com.lin.agent.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,18 +31,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -48,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.core.models.DownloadState
+import com.lin.agent.engine.ServerModel
 import com.lin.agent.R
 
 /**
@@ -114,7 +121,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         onValueChange = viewModel::onAuthHeaderChanged,
         label = { Text(stringResource(R.string.settings_server_header)) },
         placeholder = { Text("Authorization: Bearer ...") },
-        singleLine = true,
+        // Not single-line, because a Cloudflare Access service token is two headers and this
+        // field exists for exactly that case.
+        singleLine = false,
+        minLines = 1,
+        maxLines = 4,
         modifier = Modifier.fillMaxWidth(),
       )
       Text(
@@ -133,6 +144,23 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
           )
         }
       }
+
+      Text(
+        stringResource(R.string.settings_server_models_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_server_models_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      ServerModels(
+        state = state.serverModels,
+        picked = state.serverModel,
+        onCheck = viewModel::checkServer,
+        onPick = viewModel::pickServerModel,
+      )
 
       Text(
         stringResource(R.string.settings_models_heading),
@@ -244,3 +272,138 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     }
   }
 }
+
+/**
+ * The server's model list, and the choice of one.
+ *
+ * Every state says what to do next rather than only what happened, because this screen is where
+ * somebody finds out their phone cannot reach their server and there is no logcat on a phone. The
+ * messages come from the client, which is where the status code and the exception are, and are
+ * written as sentences for that reason.
+ */
+@Composable
+private fun ServerModels(
+  state: ServerModelsState,
+  picked: String,
+  onCheck: () -> Unit,
+  onPick: (String) -> Unit,
+) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      OutlinedButton(onClick = onCheck, enabled = state !is ServerModelsState.Checking) {
+        Text(
+          stringResource(
+            if (state is ServerModelsState.Unknown) R.string.settings_server_check
+            else R.string.settings_server_recheck
+          )
+        )
+      }
+      if (state is ServerModelsState.Found && state.models.isNotEmpty()) {
+        Text(
+          stringResource(R.string.settings_server_found, state.models.size),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+    }
+
+    when (state) {
+      ServerModelsState.Unknown ->
+        Text(
+          stringResource(R.string.settings_server_unknown),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      ServerModelsState.Checking ->
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+          Text(
+            stringResource(R.string.settings_server_checking),
+            style = MaterialTheme.typography.bodySmall,
+          )
+        }
+      is ServerModelsState.Failed ->
+        Text(
+          state.message,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.error,
+        )
+      is ServerModelsState.Found ->
+        if (state.models.isEmpty()) {
+          Text(
+            stringResource(R.string.settings_server_empty),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        } else {
+          // A name that is no longer on the server is said out loud rather than silently
+          // unselected: the setting is still there, and the user is the one who decides what
+          // replaces it.
+          if (picked.isNotEmpty() && state.models.none { it.name == picked }) {
+            Text(
+              stringResource(R.string.settings_server_missing_pick, picked),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.error,
+            )
+          }
+          Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+              for (model in state.models) {
+                ServerModelRow(
+                  model = model,
+                  selected = model.name == picked,
+                  onPick = { onPick(model.name) },
+                )
+              }
+            }
+          }
+        }
+    }
+  }
+}
+
+@Composable
+private fun ServerModelRow(model: ServerModel, selected: Boolean, onPick: () -> Unit) {
+  Row(
+    // The whole row, not just the button: a radio button is a small target on a phone, and this
+    // list is read with a thumb.
+    modifier = Modifier.fillMaxWidth().clickable(onClick = onPick).padding(horizontal = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    RadioButton(selected = selected, onClick = onPick)
+    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+      Text(model.name, style = MaterialTheme.typography.bodyLarge)
+      val detail = describe(model)
+      if (detail.isNotEmpty()) {
+        Text(
+          detail,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+    }
+  }
+}
+
+/**
+ * The line under a server model's name: size, parameter count, quantisation.
+ *
+ * Assembled from whatever the server actually reported rather than from a format string with
+ * placeholders, because any of the three can be missing - an older server does not send the
+ * details block - and "20.0 GB · ·" is worse than "20.0 GB".
+ */
+private fun describe(model: ServerModel): String =
+  listOf(
+      if (model.sizeBytes > 0) "%.1f GB".format(model.sizeBytes / 1_000_000_000.0) else "",
+      model.parameterSize,
+      model.quantization,
+    )
+    .filter { it.isNotEmpty() }
+    .joinToString(" · ")
