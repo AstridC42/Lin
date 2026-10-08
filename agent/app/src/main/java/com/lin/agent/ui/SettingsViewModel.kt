@@ -76,6 +76,7 @@ data class SettingsState(
   /** The chosen server model's name, or empty. May name one the server no longer has. */
   val serverModel: String = "",
   val answerOnServer: Boolean = false,
+  val allowDirectCalls: Boolean = false,
 )
 
 @HiltViewModel
@@ -113,6 +114,7 @@ constructor(
           ollamaAuthHeader = settings.serverAuthHeader.first(),
           serverModel = settings.serverModelName.first(),
           answerOnServer = settings.answerOnServer.first(),
+          allowDirectCalls = settings.allowDirectCalls.first(),
           memoryGb = memoryGb,
           socModel = com.lin.agent.core.models.currentSocModel(),
           modelsDirectory = store.directory().absolutePath,
@@ -224,6 +226,20 @@ constructor(
       // re-decides. Without this, picking a model does nothing until the app is restarted.
       backends.refresh()
     }
+  }
+
+  /**
+   * Turns direct calling on or off.
+   *
+   * [granted] is whether the phone permission is actually held - the switch asks for it as it
+   * goes on, and a refusal has to leave this off rather than quietly storing an intent that
+   * cannot be acted on. The policy needs both anyway; storing a true that the permission does
+   * not back would only make the setting lie about what Lin can do.
+   */
+  fun setAllowDirectCalls(allow: Boolean, granted: Boolean) {
+    val effective = allow && granted
+    _state.update { it.copy(allowDirectCalls = effective) }
+    viewModelScope.launch { settings.setAllowDirectCalls(effective) }
   }
 
   fun setAnswerOnServer(onServer: Boolean) {

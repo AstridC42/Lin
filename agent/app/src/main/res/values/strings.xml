@@ -18,6 +18,13 @@
     address can use it.</string>
   <string name="settings_save">Save</string>
   <string name="settings_saved">Saved</string>
+  <string name="settings_phone_heading">The phone</string>
+  <string name="settings_direct_calls">Let Lin place calls itself</string>
+  <string name="settings_direct_calls_off">Off: a call opens the dialer with the number in it
+    and you tap to call. A message always waits in the composer, whatever this is set to.</string>
+  <string name="settings_direct_calls_on">On: Lin can ring someone without you tapping. A
+    misheard name or a mistyped digit then becomes a call you cannot take back.</string>
+
   <string name="settings_answer_heading">Who answers</string>
   <string name="settings_answer_detail">Your choice, not a guess. Deciding automatically needs a
     model that can judge which requests are hard, and that comes with delegation.</string>
