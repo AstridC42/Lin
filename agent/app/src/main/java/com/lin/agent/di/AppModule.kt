@@ -18,6 +18,7 @@ package com.lin.agent.di
 
 import android.content.Context
 import com.lin.agent.core.models.ModelDownloads
+import com.lin.agent.core.memory.MemoryStore
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.OllamaServer
@@ -46,6 +47,10 @@ object AppModule {
 
   // Stateless and injected rather than constructed where it is used, so a test can hand the
   // settings screen a server that answers without one existing.
+  @Provides @Singleton
+  fun provideMemoryStore(@ApplicationContext context: Context): MemoryStore =
+    MemoryStore(context)
+
   @Provides @Singleton fun provideOllamaServer(): OllamaServer = OllamaServer()
 
   @Provides @Singleton

@@ -28,7 +28,11 @@ import com.lin.agent.engine.Message
 import com.lin.agent.engine.ToolRegistry
 import com.lin.agent.engine.TurnLoop
 import com.lin.agent.model.DelegateTool
+import com.lin.agent.model.Embedders
 import com.lin.agent.model.PhoneTool
+import com.lin.agent.model.RecallTool
+import com.lin.agent.model.RememberTool
+import com.lin.agent.core.memory.MemoryStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,6 +81,8 @@ class ConversationViewModel
 constructor(
   private val backends: ChatBackends,
   private val phoneTool: PhoneTool,
+  private val memories: MemoryStore,
+  private val embedders: Embedders,
   private val saved: SavedStateHandle,
 ) : ViewModel() {
 
@@ -88,7 +94,14 @@ constructor(
    * tools into every prompt and relied on discipline to keep that appropriate.
    */
   private val registry =
-    ToolRegistry(listOf(DelegateTool { backends.serverSubAgent() }, phoneTool))
+    ToolRegistry(
+      listOf(
+        DelegateTool { backends.serverSubAgent() },
+        phoneTool,
+        RememberTool(memories, embedders),
+        RecallTool(memories, embedders),
+      )
+    )
 
   private val _state = MutableStateFlow(ConversationState(messages = restored()))
   val state: StateFlow<ConversationState> = _state.asStateFlow()
@@ -241,7 +254,10 @@ constructor(
         "word for word; never invent one they did not say. " +
         "To ring someone or text them, call phone_action; it opens the dialer or the composer " +
         "for the user to confirm, so say what you have put on screen rather than claiming it " +
-        "is done. Never invent a phone number - pass the name instead."
+        "is done. Never invent a phone number - pass the name instead. " +
+        "Call remember when the user says to keep something, and recall when they refer to " +
+        "something you were not told in this conversation. If recall finds nothing, say so " +
+        "rather than filling the gap."
 
     const val KEY_ROLES = "conversation_roles"
     const val KEY_TEXTS = "conversation_texts"
