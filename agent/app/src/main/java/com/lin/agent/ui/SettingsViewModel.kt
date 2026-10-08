@@ -75,6 +75,7 @@ data class SettingsState(
   val serverModels: ServerModelsState = ServerModelsState.Unknown,
   /** The chosen server model's name, or empty. May name one the server no longer has. */
   val serverModel: String = "",
+  val answerOnServer: Boolean = false,
 )
 
 @HiltViewModel
@@ -111,6 +112,7 @@ constructor(
           ollamaUrl = settings.serverUrl.first(),
           ollamaAuthHeader = settings.serverAuthHeader.first(),
           serverModel = settings.serverModelName.first(),
+          answerOnServer = settings.answerOnServer.first(),
           memoryGb = memoryGb,
           socModel = com.lin.agent.core.models.currentSocModel(),
           modelsDirectory = store.directory().absolutePath,
@@ -216,7 +218,20 @@ constructor(
 
   fun pickServerModel(name: String) {
     _state.update { it.copy(serverModel = name) }
-    viewModelScope.launch { settings.setServerModelName(name) }
+    viewModelScope.launch {
+      settings.setServerModelName(name)
+      // The conversation holds a resolved backend, so a change here is invisible to it until it
+      // re-decides. Without this, picking a model does nothing until the app is restarted.
+      backends.refresh()
+    }
+  }
+
+  fun setAnswerOnServer(onServer: Boolean) {
+    _state.update { it.copy(answerOnServer = onServer) }
+    viewModelScope.launch {
+      settings.setAnswerOnServer(onServer)
+      backends.refresh()
+    }
   }
 
   fun save() {

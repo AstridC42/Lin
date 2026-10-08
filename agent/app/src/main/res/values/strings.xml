@@ -18,9 +18,18 @@
     address can use it.</string>
   <string name="settings_save">Save</string>
   <string name="settings_saved">Saved</string>
+  <string name="settings_answer_heading">Who answers</string>
+  <string name="settings_answer_detail">Your choice, not a guess. Deciding automatically needs a
+    model that can judge which requests are hard, and that comes with delegation.</string>
+  <string name="settings_answer_phone">This phone</string>
+  <string name="settings_answer_phone_detail">Works with no network and no server.</string>
+  <string name="settings_answer_server">The server</string>
+  <string name="settings_answer_server_detail">Uses the model picked below. Falls back to the
+    phone when the server cannot be reached, and says so.</string>
+
   <string name="settings_server_models_heading">Models on the server</string>
-  <string name="settings_server_models_detail">What the server already has pulled. Your pick is
-    saved here; sending work to it is the next piece of the build.</string>
+  <string name="settings_server_models_detail">What the server already has pulled. The one you
+    pick is what answers when "The server" is chosen above.</string>
   <string name="settings_server_check">Check server</string>
   <string name="settings_server_recheck">Check again</string>
   <string name="settings_server_checking">Asking the server…</string>

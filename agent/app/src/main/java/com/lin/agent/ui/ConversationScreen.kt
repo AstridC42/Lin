@@ -114,6 +114,17 @@ fun ConversationScreen(
     modifier = Modifier.imePadding(),
   ) { padding ->
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+      // Said once, above the conversation, when what is answering is not what was asked for -
+      // the server was chosen and could not be reached. Staying quiet would mean a reply from a
+      // model on the phone while the user believed they were talking to the one on the server.
+      if (state.notice.isNotEmpty()) {
+        Text(
+          state.notice,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+      }
       LazyColumn(
         state = listState,
         modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),

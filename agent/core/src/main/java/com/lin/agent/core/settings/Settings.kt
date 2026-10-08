@@ -22,6 +22,7 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.lin.agent.core.diag.CrashReport
@@ -110,6 +111,20 @@ class SettingsRepository(private val context: Context) {
   suspend fun setServerModelName(value: String) = write(SERVER_MODEL_NAME, value)
 
   /**
+   * Whether the server answers, rather than the phone.
+   *
+   * An explicit choice rather than a rule the app applies on its own. Deciding automatically -
+   * send the hard ones to the server, keep the easy ones here - is the orchestration this app is
+   * eventually for, and it needs a model that can judge "hard" before it can be trusted with the
+   * choice. Until then, guessing would mean the user never knowing which model answered or why.
+   *
+   * Off by default: the phone works with no network, no server and no configuration.
+   */
+  val answerOnServer: Flow<Boolean> = read(ANSWER_ON_SERVER, false)
+
+  suspend fun setAnswerOnServer(value: Boolean) = write(ANSWER_ON_SERVER, value)
+
+  /**
    * Reads one setting, with [default] on any failure.
    *
    * `catch` rather than a bare flow: the corruption handler above covers a file that cannot be
@@ -153,5 +168,6 @@ class SettingsRepository(private val context: Context) {
     val SERVER_AUTH_HEADER = stringPreferencesKey("ollama_auth_header")
     val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
     val SERVER_MODEL_NAME = stringPreferencesKey("server_model_name")
+    val ANSWER_ON_SERVER = booleanPreferencesKey("answer_on_server")
   }
 }
