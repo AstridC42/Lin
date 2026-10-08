@@ -75,7 +75,11 @@ import com.lin.agent.R
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(
+  onBack: () -> Unit,
+  onOpenMemory: () -> Unit = {},
+  viewModel: SettingsViewModel = hiltViewModel(),
+) {
   val state by viewModel.state.collectAsStateWithLifecycle()
 
   Scaffold(
@@ -147,6 +151,13 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             modifier = Modifier.padding(top = 14.dp),
           )
         }
+      }
+
+      OutlinedButton(
+        onClick = onOpenMemory,
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+      ) {
+        Text(stringResource(R.string.settings_open_memory))
       }
 
       Text(

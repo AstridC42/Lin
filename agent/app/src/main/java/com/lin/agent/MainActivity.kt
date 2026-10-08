@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import com.lin.agent.core.diag.CrashReport
 import com.lin.agent.core.diag.LaunchHealth
 import com.lin.agent.ui.ConversationScreen
+import com.lin.agent.ui.MemoryScreen
 import com.lin.agent.ui.RecoveryScreen
 import com.lin.agent.ui.SettingsScreen
 import com.lin.agent.ui.theme.LinTheme
@@ -91,18 +92,26 @@ class MainActivity : ComponentActivity() {
     LaunchHealth.mark(this, "content set")
     setContent {
       LinTheme {
-        // A boolean rather than a navigation graph. There are two screens; a navigation library
-        // for two screens is ceremony, and rememberSaveable means the choice survives a fold.
-        var showSettings by rememberSaveable { mutableStateOf(false) }
-        if (showSettings) {
-          SettingsScreen(onBack = { showSettings = false })
-        } else {
-          ConversationScreen(
-            onOpenSettings = { showSettings = true },
-            // The empty state's button goes to the same screen the gear does, which is where
-            // the downloads live. One place to manage models, not two.
-            onGetModel = { showSettings = true },
-          )
+        // A saved string rather than a navigation graph. There are three screens now; a
+        // navigation library for three is still ceremony, and rememberSaveable means the
+        // choice survives a fold, which on this hardware happens constantly.
+        var screen by rememberSaveable { mutableStateOf(CONVERSATION) }
+        when (screen) {
+          SETTINGS ->
+            SettingsScreen(
+              onBack = { screen = CONVERSATION },
+              onOpenMemory = { screen = MEMORY },
+            )
+          // Back goes to settings, not the conversation: that is where it was opened from, and
+          // landing somewhere else after deleting something reads as the app losing its place.
+          MEMORY -> MemoryScreen(onBack = { screen = SETTINGS })
+          else ->
+            ConversationScreen(
+              onOpenSettings = { screen = SETTINGS },
+              // The empty state's button goes to the same screen the gear does, which is where
+              // the downloads live. One place to manage models, not two.
+              onGetModel = { screen = SETTINGS },
+            )
         }
         // Recorded from inside the composition rather than at the end of onCreate: onCreate
         // returning only means the work was scheduled, so a crash in the first composition would
@@ -115,3 +124,8 @@ class MainActivity : ComponentActivity() {
     }
   }
 }
+
+/** The screens, as saveable strings. See the note where they are switched on. */
+private const val CONVERSATION = "conversation"
+private const val SETTINGS = "settings"
+private const val MEMORY = "memory"

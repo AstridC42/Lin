@@ -18,6 +18,22 @@
     address can use it.</string>
   <string name="settings_save">Save</string>
   <string name="settings_saved">Saved</string>
+  <string name="memory_title">What Lin remembers</string>
+  <string name="memory_detail">Everything Lin has kept, newest first. Delete anything here and
+    it is gone — it will not be recalled again.</string>
+  <string name="memory_empty">Nothing yet. Lin writes something down when you ask it to
+    remember.</string>
+  <string name="memory_forget">Forget this</string>
+  <string name="memory_forget_all">Forget everything</string>
+  <string name="memory_forget_all_detail">This deletes all %1$d of them. It cannot be
+    undone.</string>
+  <string name="memory_forget_all_confirm">Forget everything</string>
+  <string name="memory_cancel">Keep them</string>
+  <string name="memory_source_told">You asked Lin to remember this · %1$s</string>
+  <string name="memory_source_conversation">Lin kept this from a conversation · %1$s</string>
+  <string name="memory_source_photo">From a photo · %1$s</string>
+  <string name="settings_open_memory">See what Lin remembers</string>
+
   <string name="settings_phone_heading">The phone</string>
   <string name="settings_direct_calls">Let Lin place calls itself</string>
   <string name="settings_direct_calls_off">Off: a call opens the dialer with the number in it
