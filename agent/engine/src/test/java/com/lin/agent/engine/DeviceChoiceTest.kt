@@ -100,12 +100,12 @@ class DeviceChoiceTest {
   }
 
   /**
-   * The rule that cost a working app: GPU is tried, and CPU always follows it.
+   * GPU is tried, and CPU always follows it.
    *
-   * A Galaxy Z Fold 7 - a current flagship, not an obscure device - fails the GPU load with "Can
-   * not find OpenCL library on this device", and with one accelerator and no fallback that was
-   * the end of every conversation. No list of device names would have predicted it, which is why
-   * the fallback is the mechanism and the device list is only an optimisation.
+   * With one accelerator and no fallback, a GPU that would not load was the end of every
+   * conversation the app could have. That is too much to lose to a vendor library being absent,
+   * a driver refusing, or - as actually happened - the app forgetting to declare the library it
+   * wanted to open. A slower reply is the right price for being wrong about an accelerator.
    */
   @Test
   fun gpuAlwaysFallsBackToCpu() {

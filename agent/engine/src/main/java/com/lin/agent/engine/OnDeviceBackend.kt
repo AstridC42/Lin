@@ -318,12 +318,13 @@ internal fun explain(error: Throwable): String {
 
     text.contains("not initialized") -> "The model is still loading."
 
-    // Seen on a Galaxy Z Fold 7. LiteRT's GPU path needs OpenCL, which is not part of Android,
-    // and plenty of phones will not let an app load the vendor's copy. Reaching the user at all
-    // means every accelerator failed, so the advice is about the model rather than the GPU.
+    // Reaching the user means every accelerator failed, CPU included, so the GPU is no longer
+    // the actionable part. Note for whoever sees this during development rather than in the
+    // wild: an OpenCL failure on a device that plainly has OpenCL means libOpenCL.so is missing
+    // from the manifest's uses-native-library list, not that the hardware is incapable.
     text.contains("opencl") ->
-      "This phone will not run the model on its graphics processor, and the fallback to the " +
-        "processor did not work either. A smaller model is the next thing to try."
+      "The model would not start on the graphics processor or the main one. A smaller model is " +
+        "the next thing to try."
 
     else -> error.message ?: "The model failed for a reason it did not explain."
   }

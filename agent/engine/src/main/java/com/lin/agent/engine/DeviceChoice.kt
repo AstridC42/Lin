@@ -54,21 +54,22 @@ object DeviceChoice {
   /**
    * The accelerators to try for [requested], in order, until one loads.
    *
-   * A list rather than a single answer, and that is the correction this file needed. The idea
-   * here was that the devices whose GPU path does not work could be named - [gpuIsUnreliable] is
-   * that list - and it cannot be. LiteRT's GPU path needs OpenCL, OpenCL is not part of Android,
-   * and whether an app can load the vendor's copy depends on the vendor, the Android version and
-   * the device's public-library list. On a Galaxy Z Fold 7 - a current flagship, and exactly the
-   * hardware this app is written for - it fails with "Can not find OpenCL library on this
-   * device", and no amount of adding names to that list would have predicted it.
+   * A list rather than a single answer. The original idea was that the devices whose GPU path
+   * does not work could be named - [gpuIsUnreliable] is that list - and a list of names is the
+   * wrong shape for this: whether an accelerator is usable depends on the vendor libraries
+   * actually present on the device, which is not something a model name predicts.
    *
-   * So GPU is still asked for first, because when it works it is several times faster, and CPU
-   * always follows it. CPU needs no vendor anything and is the floor every device has. Falling
-   * back costs one failed load; not falling back cost an app that could not hold a conversation
-   * at all.
+   * Worth recording what this was first blamed on, because the wrong lesson is easy to draw. A
+   * Galaxy Z Fold 7 failed every GPU load with "Can not find OpenCL library on this device", and
+   * that was read as the device lacking OpenCL. It does not: the same phone runs these models on
+   * the GPU in Google's own Gallery app. The app had simply not declared `libOpenCL.so` in its
+   * manifest, and since Android 12 an undeclared vendor library cannot be opened. The
+   * declaration is the fix; this chain is the safety net, and it should not be mistaken for one.
    *
-   * NPU falls back the same way, and for the same kind of reason: it needs vendor runtime
-   * libraries that may simply not be present.
+   * It still earns its place. A vendor library really can be absent, a driver really can refuse,
+   * and the cost of being wrong about it should be a slower reply rather than an app that cannot
+   * answer at all. CPU needs no vendor anything and is the floor every device has, so it goes
+   * last on every chain.
    */
   fun acceleratorChain(
     requested: Accelerator,
