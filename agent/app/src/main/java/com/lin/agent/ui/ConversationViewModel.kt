@@ -153,10 +153,7 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
             persist(complete)
           }
           is TurnEvent.Failed -> {
-            // The engine's own words are kept underneath the sentence, because on a phone with no
-            // computer attached they are the only account of the failure there is.
-            val shown =
-              if (event.detail.isBlank()) event.message else "${event.message}\n\n${event.detail}"
+            val shown = event.display
             _state.update {
               it.copy(streaming = "", inProgress = false, error = shown, backendId = backend.id)
             }

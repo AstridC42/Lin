@@ -17,6 +17,7 @@
 package com.lin.agent.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -74,5 +75,49 @@ class EngineErrorsTest {
   @Test
   fun aFailureWithNoMessageAtAllStillSaysSomething() {
     assertTrue(explain(RuntimeException()).isNotEmpty())
+  }
+
+  /**
+   * Greedy decoding must not ask for a zero temperature.
+   *
+   * It reads like a harmless way to say "no randomness", and on the GPU it is not: the sampler's
+   * annealing step rejects zero, and the turn comes back as "Status Code: 13 ... Task failed
+   * with state: 7" - which names neither the sampler nor the temperature. The CPU path tolerated
+   * it, so this stayed hidden until the GPU started working.
+   *
+   * Determinism comes from topK instead, which this also pins: one candidate is the argmax.
+   */
+  @Test
+  fun greedyDecodingDoesNotUseAZeroTemperature() {
+    assertEquals("one candidate is what makes it greedy", 1, OnDeviceBackend.GREEDY_TOP_K)
+    assertNotEquals(
+      "the GPU sampler rejects a zero annealing temperature",
+      0.0,
+      OnDeviceBackend.SAFE_TEMPERATURE,
+      0.0,
+    )
+  }
+
+  /** A failure whose detail repeats its message shows one line, not the same line twice. */
+  @Test
+  fun aFailureThatExplainsItselfIsNotPrintedTwice() {
+    val raw = "Status Code: 13. Message: Task failed with state: 7"
+    assertEquals(raw, TurnEvent.Failed(raw, raw).display)
+    assertEquals(raw, TurnEvent.Failed(raw, " $raw ").display)
+  }
+
+  /** A detail that adds something is kept, underneath the sentence. */
+  @Test
+  fun aDetailThatAddsSomethingIsKept() {
+    val failure = TurnEvent.Failed("The model is too large for this phone.", "OutOfMemoryError")
+    assertEquals(
+      "The model is too large for this phone.\n\nOutOfMemoryError",
+      failure.display,
+    )
+  }
+
+  @Test
+  fun noDetailIsJustTheMessage() {
+    assertEquals("Gone wrong.", TurnEvent.Failed("Gone wrong.").display)
   }
 }

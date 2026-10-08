@@ -161,9 +161,21 @@ class OnDeviceBackend(
       conversation =
         started.createConversation(
           ConversationConfig(
-            // Greedy. Sampling many candidates at temperature while emitting an exact grammar is
-            // how a tool call comes out malformed, and it cost the previous app days to find.
-            samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0)
+            // Greedy, and greedy comes from topK - not from the temperature.
+            //
+            // topK = 1 keeps exactly one candidate, so whatever scaling happens the survivor is
+            // the argmax: deterministic, which is what emitting an exact grammar needs. Sampling
+            // many candidates at temperature is how a tool call comes out malformed, and it cost
+            // the previous app days to find.
+            //
+            // The temperature is 1.0 rather than 0.0 and that is not cosmetic. The GPU sampler
+            // runs a temperature-annealing step that rejects zero outright - the library carries
+            // the string "Annealing temperature cannot be zero" - and the turn comes back as
+            // "Status Code: 13 ... Task failed with state: 7", which names neither the sampler
+            // nor the temperature. The CPU path tolerated it, so this only appeared once the GPU
+            // started working. With one candidate the value cannot change the output anyway.
+            samplerConfig =
+              SamplerConfig(topK = GREEDY_TOP_K, topP = 1.0, temperature = SAFE_TEMPERATURE)
           )
         )
       null
@@ -277,8 +289,8 @@ class OnDeviceBackend(
       DeviceChoice.Accelerator.NPU -> Backend.NPU(nativeLibraryDir.orEmpty())
     }
 
-  private companion object {
-    const val TAG = "LinOnDeviceBackend"
+  internal companion object {
+    private const val TAG = "LinOnDeviceBackend"
 
     /**
      * Context asked for by default.
@@ -289,6 +301,15 @@ class OnDeviceBackend(
      * forty-four, so 8,192 is room rather than a floor.
      */
     const val DEFAULT_CONTEXT_TOKENS = 8192
+
+    /** One candidate, so decoding is the argmax and nothing is sampled. */
+    const val GREEDY_TOP_K = 1
+
+    /**
+     * Any non-zero value. See the note where the sampler is built: zero is rejected by the GPU
+     * sampler's annealing step, and with [GREEDY_TOP_K] candidates it cannot affect the output.
+     */
+    const val SAFE_TEMPERATURE = 1.0
   }
 }
 
