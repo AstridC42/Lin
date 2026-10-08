@@ -46,7 +46,23 @@ sealed interface TurnEvent {
    * [detail] keeps the engine's own words, because on a phone with no computer attached it is the
    * only account of the failure that exists. [message] is what to show first.
    */
-  data class Failed(val message: String, val detail: String = "") : TurnEvent
+  data class Failed(val message: String, val detail: String = "") : TurnEvent {
+
+    /**
+     * The whole failure as one block of text to show.
+     *
+     * The detail is kept underneath the sentence because on a phone with no computer attached it
+     * is the only account of the failure there is - but only when it adds something. An
+     * unrecognised engine error explains itself as its own raw message, so [message] and
+     * [detail] come out identical, and printing both put the same line on screen twice. That
+     * happened on the two failures this app has actually shown a user, which is not a good
+     * record for a one-line check.
+     */
+    val display: String
+      get() =
+        if (detail.isBlank() || detail.trim() == message.trim()) message
+        else "$message\n\n$detail"
+  }
 }
 
 /** What to run, and how. */
