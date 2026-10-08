@@ -14,6 +14,8 @@ hilt = "2.60.1"
 hiltNavigation = "1.3.0"
 splashscreen = "1.2.0-beta01"
 junit = "4.13.2"
+# Test-only. See the note in engine/build.gradle.kts.
+orgJson = "20240303"
 coroutines = "1.10.2"
 # Matched to the archived fork, where this version is known to work with these models.
 litertlm = "0.18.0"
@@ -42,6 +44,7 @@ hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", ve
 hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigation" }
 litertlm = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 
 [plugins]

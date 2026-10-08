@@ -25,6 +25,9 @@ import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.engine.OllamaServer
+import com.lin.agent.engine.ServerModel
+import com.lin.agent.engine.ServerModelsResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +37,7 @@ import com.lin.agent.model.ChatBackends
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /** One line about a model, for the settings screen to show. */
@@ -47,6 +51,19 @@ data class ModelLine(
     get() = model.name
 }
 
+/** What the settings screen knows about the server's model list. */
+sealed interface ServerModelsState {
+  /** Nothing asked yet - no address, or the address was just edited. */
+  data object Unknown : ServerModelsState
+
+  data object Checking : ServerModelsState
+
+  /** The server answered. Empty means reachable with nothing pulled, which is worth saying. */
+  data class Found(val models: List<ServerModel>) : ServerModelsState
+
+  data class Failed(val message: String) : ServerModelsState
+}
+
 data class SettingsState(
   val ollamaUrl: String = "",
   val ollamaAuthHeader: String = "",
@@ -55,6 +72,9 @@ data class SettingsState(
   val models: List<ModelLine> = emptyList(),
   val modelsDirectory: String = "",
   val saved: Boolean = false,
+  val serverModels: ServerModelsState = ServerModelsState.Unknown,
+  /** The chosen server model's name, or empty. May name one the server no longer has. */
+  val serverModel: String = "",
 )
 
 @HiltViewModel
@@ -65,10 +85,22 @@ constructor(
   private val store: ModelStore,
   private val downloads: ModelDownloads,
   private val backends: ChatBackends,
+  private val server: OllamaServer,
 ) : ViewModel() {
 
   private val _state = MutableStateFlow(SettingsState())
   val state: StateFlow<SettingsState> = _state.asStateFlow()
+
+  /**
+   * The server probe in flight, so a second one can replace it.
+   *
+   * Declared above the `init` blocks rather than below, which is not style. Property initialisers
+   * run in declaration order, after nothing and before whatever comes next - so a `probe` written
+   * at the foot of the class would have its `= null` applied *after* the init block had started a
+   * probe and stored its job here, silently discarding it. The next check would then have nothing
+   * to cancel and two probes would race, with the older one free to win.
+   */
+  private var probe: Job? = null
 
   init {
     viewModelScope.launch {
@@ -78,6 +110,7 @@ constructor(
         it.copy(
           ollamaUrl = settings.serverUrl.first(),
           ollamaAuthHeader = settings.serverAuthHeader.first(),
+          serverModel = settings.serverModelName.first(),
           memoryGb = memoryGb,
           socModel = com.lin.agent.core.models.currentSocModel(),
           modelsDirectory = store.directory().absolutePath,
@@ -101,6 +134,10 @@ constructor(
             },
         )
       }
+      // Asked on open rather than behind a button, because the first question anybody has on this
+      // screen is whether the phone can reach the server at all - and from outside the house that
+      // answer changes without anything in the app changing.
+      if (_state.value.ollamaUrl.isNotBlank()) checkServer()
     }
   }
 
@@ -137,10 +174,50 @@ constructor(
 
   fun cancelDownload(model: CatalogModel) = downloads.cancel(model)
 
-  fun onUrlChanged(value: String) = _state.update { it.copy(ollamaUrl = value, saved = false) }
+  fun onUrlChanged(value: String) =
+    // The old list belonged to the old address, so it stops being shown the moment the address is
+    // edited. Leaving it up would invite picking a model from a server that is no longer named.
+    _state.update {
+      it.copy(ollamaUrl = value, saved = false, serverModels = ServerModelsState.Unknown)
+    }
 
   fun onAuthHeaderChanged(value: String) =
-    _state.update { it.copy(ollamaAuthHeader = value, saved = false) }
+    _state.update {
+      it.copy(ollamaAuthHeader = value, saved = false, serverModels = ServerModelsState.Unknown)
+    }
+
+  /**
+   * Asks the server what it has, using what is in the fields rather than what is saved.
+   *
+   * Deliberately the unsaved values: the point of this button is to find out whether an address
+   * works before committing to it, and making somebody save a wrong address to discover it is
+   * wrong is the opposite of that.
+   */
+  fun checkServer() {
+    val current = _state.value
+    // One probe at a time. Tapping again means "use what I have just typed", so the older answer
+    // is not merely redundant, it is about a different address.
+    probe?.cancel()
+    _state.update { it.copy(serverModels = ServerModelsState.Checking) }
+    probe =
+      viewModelScope.launch {
+        val result = server.models(current.ollamaUrl, current.ollamaAuthHeader)
+        _state.update {
+          it.copy(
+            serverModels =
+              when (result) {
+                is ServerModelsResult.Found -> ServerModelsState.Found(result.models)
+                is ServerModelsResult.Failed -> ServerModelsState.Failed(result.message)
+              }
+          )
+        }
+      }
+  }
+
+  fun pickServerModel(name: String) {
+    _state.update { it.copy(serverModel = name) }
+    viewModelScope.launch { settings.setServerModelName(name) }
+  }
 
   fun save() {
     val current = _state.value
@@ -151,5 +228,8 @@ constructor(
       settings.setServerAuthHeader(current.ollamaAuthHeader.trim())
       _state.update { it.copy(saved = true) }
     }
+    // Saving an address is also a claim that it works, so it is checked.
+    if (current.ollamaUrl.isNotBlank()) checkServer()
   }
+
 }

@@ -59,4 +59,10 @@ dependencies {
 
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+  // org.json ships inside Android, so the app needs no dependency for it - but the android.jar
+  // a unit test compiles against is stubbed, and every stubbed method throws. Without a real
+  // implementation on the test classpath the JSON parsing would be the one part of the server
+  // client that could not be tested, which is also the part most likely to be wrong. Test-only,
+  // so nothing reaches the APK.
+  testImplementation(libs.org.json)
 }
