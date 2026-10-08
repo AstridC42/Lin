@@ -74,6 +74,32 @@
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
+
+        <!--
+          The vendor libraries the engine is allowed to load, and the reason the GPU works.
+
+          Since Android 12 an app may only dlopen a vendor or system native library it declares
+          here. Nothing else gates it: the library is on the device, the engine asks for it by
+          name, and the linker refuses because this list did not mention it. The failure reads
+          "Can not find OpenCL library on this device", which is why it was first taken at face
+          value - the phone in question has OpenCL and runs these same models on the GPU in
+          Google's own Gallery app, which declares exactly this list.
+
+          libOpenCL      - the GPU path for LiteRT. Without it every model runs on the CPU.
+          libvndksupport - what lets a vendor library be opened at all.
+          libcdsprpc     - Qualcomm's compute DSP, which is the NPU path on Snapdragon.
+          libedgetpu_*   - the same for Google Tensor.
+
+          All optional: a device without one simply does not offer that accelerator, and the
+          engine falls back. Declaring a library a device does not have costs nothing.
+        -->
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libcdsprpc.so" android:required="false" />
+        <uses-native-library android:name="libedgetpu_litert.so" android:required="false" />
+        <uses-native-library android:name="libedgetpu_util.so" android:required="false" />
+        <uses-native-library android:name="libedgetpu_client.google.so" android:required="false" />
+        <uses-native-library android:name="libedgetpu_tachyon.google.so" android:required="false" />
     </application>
 
 </manifest>
