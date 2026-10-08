@@ -484,8 +484,14 @@ without one every query returns its five nearest memories however unrelated —
 and a model handed three irrelevant "memories" states them as fact in the
 user's own words, with nothing downstream marking them false.
 
-**Still to do:** the media half — photo indexing and search — plus the
-background digest, and a screen for reading and deleting what is held.
+**Also done:** a screen for reading and deleting what is held, built before
+anything writes unprompted. That order is the point: a digest filing away what
+it thinks is worth keeping is only acceptable if the user can see what it
+decided and undo it, so shipping the writing first would leave a period where
+the app holds things about somebody they cannot look at.
+
+**Still to do:** the media half — photo indexing and search — and the
+background digest.
 
 Port `memory/`. Replace word-overlap search with embedding retrieval using
 **EmbeddingGemma 2 Text 270M**, 164 MB and co-resident with the chat model,
