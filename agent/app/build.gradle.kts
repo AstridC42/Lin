@@ -16,6 +16,30 @@
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+/**
+ * Version, supplied by the release workflow.
+ *
+ * The fallbacks are what a local build gets. CI packs the semantic version and a build number into
+ * versionCode so that every build Android sees is newer than the last - literals here would make
+ * them all look identical and block the upgrade.
+ */
+val linVersionName: String = System.getenv("LIN_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "0.1.0"
+val linVersionCode: Int = System.getenv("LIN_VERSION_CODE")?.toIntOrNull() ?: 1
+
+/**
+ * The signing key, supplied by CI.
+ *
+ * This matters more than it looks. A downloaded model lives in the app's own files directory, so
+ * uninstalling takes two and a half gigabytes with it - which means builds that cannot be
+ * installed over each other cost a full re-download every time. Debug keys are generated per
+ * machine, so CI has to sign with one stable key or every update is an uninstall.
+ *
+ * Without one configured, the release build falls back to the debug key: `assembleRelease` still
+ * works on a fresh clone, and the result is installable but not upgrade-compatible.
+ */
+val linKeystoreFile: File? =
+    System.getenv("LIN_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.exists() }
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -33,14 +57,40 @@ android {
     applicationId = "com.lin.agent"
     minSdk = 31
     targetSdk = 37
-    versionCode = 1
-    versionName = "0.1.0"
+    versionCode = linVersionCode
+    versionName = linVersionName
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+  }
+
+  signingConfigs {
+    if (linKeystoreFile != null) {
+      create("release") {
+        storeFile = linKeystoreFile
+        storePassword = System.getenv("LIN_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("LIN_KEY_ALIAS")
+        keyPassword = System.getenv("LIN_KEY_PASSWORD")
+      }
+    }
   }
 
   buildTypes {
     release {
       isMinifyEnabled = false
+      signingConfig =
+        if (linKeystoreFile != null) signingConfigs.getByName("release")
+        else signingConfigs.getByName("debug")
+    }
+  }
+
+  // One APK per ABI, plus a universal fallback. The LiteRT native libraries dominate the download
+  // - the universal APK is around 87 MB and a device-matched one is closer to 40 - and on a phone
+  // connection that difference is worth the extra build time.
+  splits {
+    abi {
+      isEnable = true
+      reset()
+      include("arm64-v8a", "armeabi-v7a", "x86_64")
+      isUniversalApk = true
     }
   }
 

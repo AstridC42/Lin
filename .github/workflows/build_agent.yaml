@@ -1,13 +1,14 @@
-# Builds the new Lin app (agent/) and publishes an installable APK.
+# Checks that Lin compiles and its tests pass, on every branch and pull request.
 #
-# Separate from build_android.yaml, which builds the archived Edge Gallery fork. Two apps with
-# different ids, different Gradle projects and different lifecycles; one workflow that built both
-# would couple a frozen reference implementation to the app under active development.
+# It deliberately produces nothing installable. It used to attach a debug APK, and that was a
+# mistake twice over: Actions artifacts count against a 500 MB allowance the previous app had
+# already filled, so the upload failed; and enabling ABI splits renamed the debug output, so the
+# step that copied app-debug.apk broke. Delivery is release_lin.yml's job - it publishes signed,
+# per-ABI builds to the Releases page, which has no such allowance.
 #
-# Debug-signed on purpose for now. The fork's release key is held in an Actions cache and the two
-# apps have different application ids, so there is no signature clash and nothing to coordinate -
-# release signing arrives when this app starts cutting releases.
-name: Build Lin
+# What is left is a fast gate: does it build, do the tests pass. That is worth having on a branch,
+# and it is all this needs to be.
+name: Check Lin
 
 on:
   push:
@@ -27,7 +28,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build Lin APK
+    name: Check Lin
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -72,61 +73,9 @@ jobs:
           echo "--- installed platforms ---"
           "$SDKMANAGER" --list_installed 2>&1 | grep -i "platforms;" || true
 
-      # Before the build, so a broken test fails the run quickly rather than after an APK.
+      # Before the build, so a broken test fails the run quickly.
       - name: Run the unit tests
         run: ./gradlew --no-daemon :core:testDebugUnitTest :engine:testDebugUnitTest --console=plain
 
       - name: Build
         run: ./gradlew --no-daemon :app:assembleDebug --console=plain
-
-      - name: Name the APK after the commit
-        id: rename
-        env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -euo pipefail
-          short="${HEAD_SHA:0:7}"
-          mkdir -p "$RUNNER_TEMP/apks"
-          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/apks/lin-${short}.apk"
-          ls -lh "$RUNNER_TEMP/apks"
-          echo "short=$short" >> "$GITHUB_OUTPUT"
-
-      # Three days, one file. The fork filled a 500 MB allowance by keeping four APKs for
-      # fourteen, and then every build failed on the upload with the compile and tests green
-      # above it - a red tick that said nothing about the code.
-      - name: Upload the APK
-        id: upload
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: lin-${{ steps.rename.outputs.short }}
-          path: ${{ runner.temp }}/apks/*.apk
-          if-no-files-found: error
-          retention-days: 3
-
-      # continue-on-error above keeps a storage problem from failing a build whose compile and
-      # tests passed - but it also reports the step as succeeded, which once produced a green run
-      # with no APK attached and nothing saying why. So the outcome is checked explicitly and the
-      # summary says which of the two happened.
-      - name: Say where the APK is
-        run: |
-          {
-            echo "### Lin \`${{ steps.rename.outputs.short }}\`"
-            echo
-            if [ "${{ steps.upload.outcome }}" = "success" ]; then
-              echo "Scroll to **Artifacts** at the bottom of this page, download"
-              echo "\`lin-${{ steps.rename.outputs.short }}\`, unzip it, put the \`.apk\` on your"
-              echo "phone and tap it."
-            else
-              echo "> [!WARNING]"
-              echo "> **The APK built but could not be stored.** The compile and the unit tests"
-              echo "> passed; only the upload failed, and the usual cause is the account's"
-              echo "> Actions artifact allowance being full."
-              echo
-              echo "Free it by deleting old artifacts, or publish this build to a release"
-              echo "instead - release assets do not count against that allowance."
-            fi
-            echo
-            echo "Debug-signed, and a different application id from the archived Gallery fork, so"
-            echo "it installs alongside it rather than over it."
-          } >> "$GITHUB_STEP_SUMMARY"

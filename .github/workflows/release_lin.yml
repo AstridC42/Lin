@@ -1,0 +1,306 @@
+# Builds and publishes Lin.
+#
+# Two modes, one workflow, because the signing arrangement below is long and having two copies of
+# it is how they drift apart:
+#
+#   * every push to main that touches agent/ updates a rolling `lin-dev` pre-release, so the
+#     newest build always has a stable download link;
+#   * run by hand with a version, it publishes `lin-v<version>` as a real release.
+#
+# Release assets rather than Actions artifacts, deliberately. Artifacts count against a 500 MB
+# allowance that the previous app filled, after which every upload failed silently and there was
+# no way to install anything. Release assets have no such limit, and a link that does not change
+# is easier to use from a phone than digging into a workflow run.
+name: Release Lin
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'agent/**'
+      - '.github/workflows/release_lin.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the leading v (e.g. 0.2.0). Empty updates lin-dev.'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  # Run level, so a newer push supersedes an in-flight build of an older one.
+  group: release-lin-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: Build and publish Lin
+    runs-on: ubuntu-latest
+
+    # Job level, and shared with keep-signing-key.yml. Two workflows racing to fill an empty
+    # signing-key cache is not theoretical: it happened, and it produced two releases signed with
+    # different keys that would not install over each other. The run-level group above still
+    # cancels superseded pushes, which is why this one cannot live there.
+    concurrency:
+      group: star-signing-key
+
+    env:
+      # Lifted to the job so steps can branch on whether a real upload key is configured; the
+      # `secrets` context is not available in an `if:` on a step.
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      CI_KEYSTORE_PASSWORD: star-storyteller-ci
+
+    steps:
+      - name: Checkout the source code
+        uses: actions/checkout@v4
+        with:
+          # Enough history for the release notes to list what changed.
+          fetch-depth: 50
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-agent-${{ runner.os }}-${{ hashFiles('agent/**/*.gradle.kts', 'agent/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-agent-${{ runner.os }}-
+
+      - name: Work out the version
+        id: version
+        env:
+          ASKED: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$ASKED" ]; then
+            name="$ASKED"
+            tag="lin-v$ASKED"
+            prerelease=false
+          else
+            name="0.1.0-dev.${GITHUB_RUN_NUMBER}"
+            tag="lin-dev"
+            prerelease=true
+          fi
+          # The run number, which only ever goes up across every run of this workflow. Deriving a
+          # code from the semantic version instead invites two builds sharing one, and Android
+          # refuses to install a versionCode that is not higher than what is already there.
+          code=$((1000 + GITHUB_RUN_NUMBER))
+          {
+            echo "name=$name"
+            echo "tag=$tag"
+            echo "code=$code"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building $name ($code) as $tag"
+
+      # One stable signing key, which matters more here than it looks: a downloaded model lives in
+      # the app's own files directory, so an uninstall takes two and a half gigabytes with it. A
+      # per-runner debug key would make every update an uninstall and a re-download.
+      - name: Restore the CI signing key
+        id: signing-cache
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ci-keystore
+          key: star-ci-signing-key-v2
+
+      - name: Create the CI signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' && steps.signing-cache.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ci-keystore
+          keytool -genkeypair -v \
+            -keystore ci-keystore/star-ci.jks -storetype PKCS12 -alias star \
+            -keyalg RSA -keysize 4096 -validity 10950 \
+            -storepass "$CI_KEYSTORE_PASSWORD" -keypass "$CI_KEYSTORE_PASSWORD" \
+            -dname "CN=Lin Test Builds, OU=CI, O=Lin"
+
+      - name: Save the CI signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' && steps.signing-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ci-keystore
+          key: star-ci-signing-key-v2
+
+      - name: Install Android SDK Platform 37
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platforms;android-37.0" || true
+
+      - name: Work out which key to sign with
+        id: keystore
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+            path="$RUNNER_TEMP/upload.jks"
+            password="${{ secrets.KEYSTORE_PASSWORD }}"
+            alias="${{ secrets.KEY_ALIAS }}"
+            key_password="${{ secrets.KEY_PASSWORD }}"
+          else
+            path="$GITHUB_WORKSPACE/ci-keystore/star-ci.jks"
+            password="$CI_KEYSTORE_PASSWORD"
+            alias=star
+            key_password="$CI_KEYSTORE_PASSWORD"
+          fi
+
+          # Read out of the keystore, not out of the APK. `keytool -printcert -jarfile` reports
+          # nothing for a v2/v3-only APK, and minSdk 31 means there is no v1 signature to read -
+          # it would print an empty fingerprint and look fine.
+          fingerprint="$(keytool -list -v -keystore "$path" -alias "$alias" \
+            -storepass "$password" 2>/dev/null \
+            | grep -m1 'SHA256:' | sed 's/.*SHA256: *//' | tr -d ': ' | tr 'A-Z' 'a-z' || true)"
+          if [ -z "$fingerprint" ]; then
+            echo "::error::Could not read the signing certificate out of $path"
+            exit 1
+          fi
+          echo "Signing with SHA-256 $fingerprint"
+          {
+            echo "path=$path"
+            echo "password=$password"
+            echo "alias=$alias"
+            echo "key_password=$key_password"
+            echo "fingerprint=$fingerprint"
+          } >> "$GITHUB_OUTPUT"
+
+      # Before the build, so a broken test stops a release rather than being noticed after it.
+      - name: Run the unit tests
+        working-directory: agent
+        run: ./gradlew --no-daemon :core:testDebugUnitTest :engine:testDebugUnitTest --console=plain
+
+      - name: Build the release APKs
+        working-directory: agent
+        env:
+          LIN_VERSION_NAME: ${{ steps.version.outputs.name }}
+          LIN_VERSION_CODE: ${{ steps.version.outputs.code }}
+          LIN_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+          LIN_KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.password }}
+          LIN_KEY_ALIAS: ${{ steps.keystore.outputs.alias }}
+          LIN_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
+        run: ./gradlew --no-daemon :app:assembleRelease --console=plain
+
+      - name: Collect and rename the APKs
+        env:
+          VERSION: ${{ steps.version.outputs.name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          shopt -s nullglob
+          for apk in agent/app/build/outputs/apk/release/*.apk; do
+            base="$(basename "$apk" .apk)"
+            # app-arm64-v8a-release -> arm64-v8a
+            abi="${base#app-}"
+            abi="${abi%-release}"
+            cp "$apk" "dist/lin-${VERSION}-${abi}.apk"
+          done
+          if [ -z "$(ls -A dist)" ]; then
+            echo "::error::No APKs were produced"
+            exit 1
+          fi
+          ( cd dist && sha256sum *.apk > SHA256SUMS.txt )
+          ls -lh dist
+
+      - name: Write the release notes
+        env:
+          VERSION: ${{ steps.version.outputs.name }}
+          FINGERPRINT: ${{ steps.keystore.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Lin ${VERSION}, built from \`${GITHUB_SHA:0:7}\`."
+            echo
+            echo "**Take \`lin-${VERSION}-arm64-v8a.apk\`** unless you know your phone is"
+            echo "something else. The universal APK works everywhere and is about half again as"
+            echo "large."
+            echo
+            echo "Lin needs a model, and fetches it itself: open the app, tap **Get a model**,"
+            echo "then Download. Gemma 4 E2B is about 2.6 GB, so start it on Wi-Fi. There is no"
+            echo "stand-in - until a model is on the phone, the app says so rather than"
+            echo "pretending to answer."
+            echo
+            echo "Signing certificate SHA-256: \`${FINGERPRINT}\`"
+            echo
+            echo "## What changed"
+            echo
+            git log --no-merges --pretty='- %s' -n 15 || true
+          } > release-notes.md
+          cat release-notes.md
+
+      # action-gh-release creates a missing tag but will not move one that already exists, and the
+      # rolling tag has to follow main.
+      #
+      # Through the git data API rather than `git push`: GitHub refuses a push from this token when
+      # the commit touches workflow files, and GITHUB_TOKEN cannot ask for that permission. The
+      # APKs would build fine and simply never reach the Releases page, which is the one failure
+      # this workflow exists to prevent.
+      #
+      # Never fatal. A finished build is worth publishing even against a tag left pointing at an
+      # older commit - the notes name the real commit either way.
+      - name: Point the rolling tag at this commit
+        if: ${{ steps.version.outputs.tag == 'lin-dev' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/git/refs"
+          code="$(curl -sS -o /tmp/ref.json -w '%{http_code}' -X PATCH \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${api}/tags/lin-dev" \
+            -d "{\"sha\":\"${GITHUB_SHA}\",\"force\":true}")"
+          # 404/422 is the tag not existing yet, which is the normal first run - the publish step
+          # creates it.
+          if [ "$code" = "422" ] || [ "$code" = "404" ]; then
+            echo "lin-dev does not exist yet; the release will create it."
+          elif [ "$code" != "200" ]; then
+            echo "::warning::Could not move lin-dev (HTTP $code); publishing anyway."
+            cat /tmp/ref.json || true
+          fi
+
+      # A rolling release accumulates assets otherwise: the previous version's APKs stay attached
+      # beside the new ones, and the names differ because they carry the version, so nothing
+      # overwrites anything.
+      - name: Clear the rolling release's old assets
+        if: ${{ steps.version.outputs.tag == 'lin-dev' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ids=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/lin-dev" --jq '.assets[].id' 2>/dev/null || true)
+          for id in $ids; do
+            echo "Removing asset $id"
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/$id" || true
+          done
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Lin ${{ steps.version.outputs.name }}
+          body_path: release-notes.md
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
+
+      - name: Say where it went
+        run: |
+          {
+            echo "### Lin ${{ steps.version.outputs.name }}"
+            echo
+            echo "Published to [${{ steps.version.outputs.tag }}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${{ steps.version.outputs.tag }})."
+            echo
+            echo "Take \`lin-${{ steps.version.outputs.name }}-arm64-v8a.apk\`."
+          } >> "$GITHUB_STEP_SUMMARY"
