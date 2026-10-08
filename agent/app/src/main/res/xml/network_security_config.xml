@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright 2026 The Lin Authors
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<!--
+  Plain HTTP is allowed, and this file exists so the reason is on the record rather than inferred
+  from a one-word manifest attribute.
+
+  Android has blocked cleartext by default since API 28, which is right for an app that talks to
+  the internet. This one also has to talk to a model server on the home network, at an address its
+  owner types in - `http://192.168.1.50:11434` - and Ollama serves plain HTTP with no option to do
+  otherwise. Without this, every LAN address fails with "Cleartext HTTP traffic not permitted",
+  which from the settings screen is indistinguishable from the server being switched off.
+
+  This cannot be narrowed to the addresses that need it. A domain-config takes literal hostnames,
+  and the whole point is that the address is unknown until the user supplies it - there is no
+  wildcard for "the private address ranges".
+
+  What is *not* loosened: certificate validation is untouched, so an https address is still
+  checked against the system trust store, which is what a Cloudflare tunnel will use. Model
+  downloads go to huggingface.co over https and stay there. The exposure this accepts is that a
+  server address typed as http is readable on the local network - which is true of Ollama itself,
+  and is the reason the settings screen asks for an auth header the moment the server is reachable
+  from outside.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

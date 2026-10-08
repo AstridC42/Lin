@@ -92,10 +92,22 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setServerAuthHeader(value: String) = write(SERVER_AUTH_HEADER, value)
 
-  /** Which chat model the user chose, by name. Empty means "decide from the device". */
+  /** Which on-device chat model the user chose, by name. Empty means "decide from the device". */
   val chatModelName: Flow<String> = read(CHAT_MODEL_NAME, "")
 
   suspend fun setChatModelName(value: String) = write(CHAT_MODEL_NAME, value)
+
+  /**
+   * Which of the server's models to send work to, by the name the server uses: `qwen3:32b`.
+   *
+   * Stored by name rather than by anything structural on purpose. The server's list is the
+   * server's to change - somebody pulls a model, removes another - so the only durable reference
+   * is the name, and a name that is no longer there has to read as "pick again" rather than as a
+   * broken setting. Empty means nothing has been picked.
+   */
+  val serverModelName: Flow<String> = read(SERVER_MODEL_NAME, "")
+
+  suspend fun setServerModelName(value: String) = write(SERVER_MODEL_NAME, value)
 
   /**
    * Reads one setting, with [default] on any failure.
@@ -140,5 +152,6 @@ class SettingsRepository(private val context: Context) {
     val SERVER_URL = stringPreferencesKey("ollama_url")
     val SERVER_AUTH_HEADER = stringPreferencesKey("ollama_auth_header")
     val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
+    val SERVER_MODEL_NAME = stringPreferencesKey("server_model_name")
   }
 }
