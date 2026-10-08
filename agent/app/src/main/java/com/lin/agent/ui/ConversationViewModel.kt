@@ -117,7 +117,14 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
           is TurnEvent.Done -> {
             val complete = outgoing + Message(Message.Role.ASSISTANT, event.fullText)
             _state.update {
-              it.copy(messages = complete, streaming = "", inProgress = false)
+              // backendId again: it only names the accelerator once the engine has settled on
+              // one, which happens during the first turn rather than when readiness was read.
+              it.copy(
+                messages = complete,
+                streaming = "",
+                inProgress = false,
+                backendId = backend.id,
+              )
             }
             persist(complete)
           }
@@ -126,7 +133,9 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
             // computer attached they are the only account of the failure there is.
             val shown =
               if (event.detail.isBlank()) event.message else "${event.message}\n\n${event.detail}"
-            _state.update { it.copy(streaming = "", inProgress = false, error = shown) }
+            _state.update {
+              it.copy(streaming = "", inProgress = false, error = shown, backendId = backend.id)
+            }
           }
         }
       }

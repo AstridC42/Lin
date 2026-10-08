@@ -93,7 +93,7 @@ class ChatBackends @Inject constructor(private val store: ModelStore) {
           contextTokens = model.contextTokens,
           supportsImages = model.supportsImages,
           supportsAudio = model.supportsAudio,
-          id = model.name,
+          baseId = model.name,
         ),
       model = model,
     )
