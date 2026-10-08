@@ -95,6 +95,7 @@ jobs:
       # fourteen, and then every build failed on the upload with the compile and tests green
       # above it - a red tick that said nothing about the code.
       - name: Upload the APK
+        id: upload
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
@@ -103,14 +104,28 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      # continue-on-error above keeps a storage problem from failing a build whose compile and
+      # tests passed - but it also reports the step as succeeded, which once produced a green run
+      # with no APK attached and nothing saying why. So the outcome is checked explicitly and the
+      # summary says which of the two happened.
       - name: Say where the APK is
         run: |
           {
             echo "### Lin \`${{ steps.rename.outputs.short }}\`"
             echo
-            echo "Scroll to **Artifacts** at the bottom of this page, download"
-            echo "\`lin-${{ steps.rename.outputs.short }}\`, unzip it, put the \`.apk\` on your"
-            echo "phone and tap it."
+            if [ "${{ steps.upload.outcome }}" = "success" ]; then
+              echo "Scroll to **Artifacts** at the bottom of this page, download"
+              echo "\`lin-${{ steps.rename.outputs.short }}\`, unzip it, put the \`.apk\` on your"
+              echo "phone and tap it."
+            else
+              echo "> [!WARNING]"
+              echo "> **The APK built but could not be stored.** The compile and the unit tests"
+              echo "> passed; only the upload failed, and the usual cause is the account's"
+              echo "> Actions artifact allowance being full."
+              echo
+              echo "Free it by deleting old artifacts, or publish this build to a release"
+              echo "instead - release assets do not count against that allowance."
+            fi
             echo
             echo "Debug-signed, and a different application id from the archived Gallery fork, so"
             echo "it installs alongside it rather than over it."
