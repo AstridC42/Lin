@@ -98,4 +98,75 @@ class DeviceChoiceTest {
   fun audioIsAlwaysCpu() {
     assertEquals(DeviceChoice.Accelerator.CPU, DeviceChoice.audioAccelerator())
   }
+
+  /**
+   * The rule that cost a working app: GPU is tried, and CPU always follows it.
+   *
+   * A Galaxy Z Fold 7 - a current flagship, not an obscure device - fails the GPU load with "Can
+   * not find OpenCL library on this device", and with one accelerator and no fallback that was
+   * the end of every conversation. No list of device names would have predicted it, which is why
+   * the fallback is the mechanism and the device list is only an optimisation.
+   */
+  @Test
+  fun gpuAlwaysFallsBackToCpu() {
+    assertEquals(
+      listOf(DeviceChoice.Accelerator.GPU, DeviceChoice.Accelerator.CPU),
+      DeviceChoice.acceleratorChain(
+        DeviceChoice.Accelerator.GPU,
+        manufacturer = "samsung",
+        model = "SM-F966B",
+      ),
+    )
+  }
+
+  /** A device already known to fail on GPU does not waste a load attempt on it. */
+  @Test
+  fun aKnownBadGpuIsNotEvenTried() {
+    assertEquals(
+      listOf(DeviceChoice.Accelerator.CPU),
+      DeviceChoice.acceleratorChain(
+        DeviceChoice.Accelerator.GPU,
+        manufacturer = "Google",
+        model = "Pixel 10 Pro",
+      ),
+    )
+  }
+
+  /** NPU needs vendor runtime libraries that may not be there, so it falls back too. */
+  @Test
+  fun npuFallsBackToCpu() {
+    assertEquals(
+      listOf(DeviceChoice.Accelerator.NPU, DeviceChoice.Accelerator.CPU),
+      DeviceChoice.acceleratorChain(
+        DeviceChoice.Accelerator.NPU,
+        manufacturer = "samsung",
+        model = "SM-F966B",
+      ),
+    )
+  }
+
+  /** CPU is the floor. There is nothing under it to fall back to, so the chain is one long. */
+  @Test
+  fun cpuIsTheEndOfEveryChain() {
+    val chain =
+      DeviceChoice.acceleratorChain(
+        DeviceChoice.Accelerator.CPU,
+        manufacturer = "samsung",
+        model = "SM-F966B",
+      )
+    assertEquals(listOf(DeviceChoice.Accelerator.CPU), chain)
+  }
+
+  /** Whatever is asked for, the walk ends somewhere every device can run. */
+  @Test
+  fun everyChainEndsOnCpu() {
+    for (requested in DeviceChoice.Accelerator.entries) {
+      val chain = DeviceChoice.acceleratorChain(requested, manufacturer = "x", model = "y")
+      assertEquals(
+        "$requested should end on CPU",
+        DeviceChoice.Accelerator.CPU,
+        chain.last(),
+      )
+    }
+  }
 }

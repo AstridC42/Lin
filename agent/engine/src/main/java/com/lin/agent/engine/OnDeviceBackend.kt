@@ -27,10 +27,13 @@ import com.google.ai.edge.litertlm.MessageCallback
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.Message as LiteRtMessage
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 
 /**
  * A model running on the phone, through LiteRT-LM.
@@ -47,15 +50,28 @@ class OnDeviceBackend(
   /** Where the engine may write its own cache. Null lets it decide. */
   private val cacheDir: String? = null,
   private val contextTokens: Int = DEFAULT_CONTEXT_TOKENS,
-  private val accelerator: DeviceChoice.Accelerator = DeviceChoice.acceleratorFor(
-    DeviceChoice.Accelerator.GPU
-  ),
+  /** Tried in order until one loads. See [DeviceChoice.acceleratorChain]. */
+  private val accelerators: List<DeviceChoice.Accelerator> =
+    DeviceChoice.acceleratorChain(DeviceChoice.Accelerator.GPU),
   private val supportsImages: Boolean = false,
   private val supportsAudio: Boolean = false,
   /** Only used for an NPU backend, which needs to find its vendor libraries. */
   private val nativeLibraryDir: String? = null,
-  override val id: String = "on-device",
+  private val baseId: String = "on-device",
 ) : LlmBackend, AutoCloseable {
+
+  /**
+   * The name shown to the user, with the accelerator once one has been settled on.
+   *
+   * Worth showing rather than hiding. CPU is several times slower than GPU on these models, so a
+   * reply that takes twenty seconds is the expected behaviour on one and a symptom on the other -
+   * and the only way to tell from the outside is to be told which is running.
+   */
+  override val id: String
+    get() = activeAccelerator?.let { "$baseId · $it" } ?: baseId
+
+  /** Which accelerator the loaded engine is actually using. Null until it loads. */
+  @Volatile private var activeAccelerator: DeviceChoice.Accelerator? = null
 
   override val capabilities =
     BackendCapabilities(
@@ -98,21 +114,48 @@ class OnDeviceBackend(
       return "The model file is not on the device yet.".also { loadFailure = it }
     }
 
-    return try {
-      val started = Engine(
-        EngineConfig(
-          modelPath = modelPath,
-          backend = asLiteRtBackend(accelerator),
-          visionBackend =
-            if (supportsImages) {
-              DeviceChoice.visionAccelerator()?.let { asLiteRtBackend(it) }
-            } else null,
-          audioBackend =
-            if (supportsAudio) asLiteRtBackend(DeviceChoice.audioAccelerator()) else null,
-          maxNumTokens = contextTokens,
-          cacheDir = cacheDir,
+    // Each accelerator in turn, keeping the last failure to report if none of them work. The
+    // first attempt failing is ordinary - see DeviceChoice.acceleratorChain - so it is logged
+    // rather than shown, and only an exhausted chain becomes an error in the conversation.
+    var lastFailure: String? = null
+    for (attempt in accelerators) {
+      val failure = tryLoad(attempt)
+      if (failure == null) {
+        activeAccelerator = attempt
+        return null
+      }
+      Log.w(TAG, "Could not load $modelPath on $attempt: $failure")
+      lastFailure = failure
+      closeQuietly()
+    }
+
+    val message = lastFailure ?: "The model could not be loaded."
+    loadFailure = message
+    return message
+  }
+
+  /** One load attempt, on one accelerator. Returns null on success, or a message. */
+  private fun tryLoad(accelerator: DeviceChoice.Accelerator): String? =
+    try {
+      val started =
+        Engine(
+          EngineConfig(
+            modelPath = modelPath,
+            backend = asLiteRtBackend(accelerator),
+            // Vision is a GPU-only path in these builds, so it is available exactly when the
+            // engine itself is on the GPU. Asking for a GPU vision encoder beside a CPU engine
+            // is how the fallback attempt would fail for the same reason as the attempt before
+            // it - which would make the fallback pointless.
+            visionBackend =
+              if (supportsImages && accelerator == DeviceChoice.Accelerator.GPU) {
+                asLiteRtBackend(DeviceChoice.Accelerator.GPU)
+              } else null,
+            audioBackend =
+              if (supportsAudio) asLiteRtBackend(DeviceChoice.audioAccelerator()) else null,
+            maxNumTokens = contextTokens,
+            cacheDir = cacheDir,
+          )
         )
-      )
       started.initialize()
       engine = started
       conversation =
@@ -120,31 +163,55 @@ class OnDeviceBackend(
           ConversationConfig(
             // Greedy. Sampling many candidates at temperature while emitting an exact grammar is
             // how a tool call comes out malformed, and it cost the previous app days to find.
-            samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
+            samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0)
           )
         )
       null
     } catch (e: Throwable) {
-      Log.e(TAG, "Could not load $modelPath", e)
-      val message = explain(e)
-      loadFailure = message
-      closeQuietly()
-      message
+      // Throwable, not Exception: a model too large for the device fails with OutOfMemoryError,
+      // which is an Error. It went straight past the previous app's handler and killed the
+      // process, and a crash during model load is one the user cannot be shown or escape from.
+      explain(e)
     }
-  }
 
-  override fun converse(request: TurnRequest): Flow<TurnEvent> {
-    val failure = ensureLoaded()
-    if (failure != null) return flow { emit(TurnEvent.Failed(message = failure)) }
-    val live = conversation ?: return flow { emit(TurnEvent.Failed("The model is not loaded.")) }
+  /**
+   * Streams a reply, loading the model first if it is not already loaded.
+   *
+   * `flowOn(Dispatchers.IO)` is the important part and it is not a detail. Loading these weights
+   * takes seconds to tens of seconds, and this used to run wherever `converse` was called from -
+   * which is a view model's scope, which is the main thread. Two and a half gigabytes read on the
+   * main thread is a frozen app and then an ANR, and it happened before the first token of the
+   * first conversation, where it looks like the app simply not responding to Send.
+   */
+  override fun converse(request: TurnRequest): Flow<TurnEvent> =
+    flow {
+        val failure = ensureLoaded()
+        if (failure != null) {
+          emit(TurnEvent.Failed(message = failure))
+          return@flow
+        }
+        val live = conversation
+        if (live == null) {
+          emit(TurnEvent.Failed("The model is not loaded."))
+          return@flow
+        }
+        val prompt = request.messages.lastOrNull { it.role == Message.Role.USER }?.text
+        if (prompt == null) {
+          emit(TurnEvent.Failed("There was nothing to send."))
+          return@flow
+        }
+        emitAll(stream(live, prompt))
+      }
+      .flowOn(Dispatchers.IO)
 
-    val prompt =
-      request.messages.lastOrNull { it.role == Message.Role.USER }?.text
-        ?: return flow { emit(TurnEvent.Failed("There was nothing to send.")) }
-
-    // callbackFlow rather than the engine's own Flow overload, because the callback form is the
-    // one the previous app proved against these models, and it gives somewhere to cancel the
-    // native work from when the collector goes away.
+  /**
+   * The reply itself, once there is a loaded conversation to ask.
+   *
+   * callbackFlow rather than the engine's own Flow overload, because the callback form is the one
+   * the previous app proved against these models, and it gives somewhere to cancel the native
+   * work from when the collector goes away.
+   */
+  private fun stream(live: Conversation, prompt: String): Flow<TurnEvent> {
     return callbackFlow {
       val accumulated = StringBuilder()
       val callback =
@@ -250,6 +317,13 @@ internal fun explain(error: Throwable): String {
         "often works."
 
     text.contains("not initialized") -> "The model is still loading."
+
+    // Seen on a Galaxy Z Fold 7. LiteRT's GPU path needs OpenCL, which is not part of Android,
+    // and plenty of phones will not let an app load the vendor's copy. Reaching the user at all
+    // means every accelerator failed, so the advice is about the model rather than the GPU.
+    text.contains("opencl") ->
+      "This phone will not run the model on its graphics processor, and the fallback to the " +
+        "processor did not work either. A smaller model is the next thing to try."
 
     else -> error.message ?: "The model failed for a reason it did not explain."
   }

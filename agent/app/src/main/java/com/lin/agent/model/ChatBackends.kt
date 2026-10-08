@@ -20,82 +20,130 @@ import com.lin.agent.core.models.CatalogModel
 import com.lin.agent.core.models.ModelCatalog
 import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
+import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.LlmBackend
+import com.lin.agent.engine.OllamaBackend
 import com.lin.agent.engine.OnDeviceBackend
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Whether there is anything to talk to. */
 sealed interface ChatReadiness {
-  /** Nothing downloaded. The UI offers the download rather than a conversation. */
+  /** Nothing downloaded and no server. The UI offers the download rather than a conversation. */
   data class NoModel(val suggested: CatalogModel?) : ChatReadiness
 
-  data class Ready(val backend: LlmBackend, val model: CatalogModel) : ChatReadiness
+  /**
+   * Something can answer.
+   *
+   * [notice] is set when what answers is not what was asked for - the server was chosen and
+   * could not be reached, so the phone is standing in. Silence there would be the worst option:
+   * the reply would come from a 2B model while the user believed they were talking to a 32B one.
+   */
+  data class Ready(val backend: LlmBackend, val notice: String = "") : ChatReadiness
 }
 
 /**
- * Decides which model answers, and says so when none can.
+ * Decides which model answers, and says so when it is not the one that was asked for.
  *
- * There is deliberately no fallback here. For one commit this returned a stand-in backend when no
- * model was present, so that the app could always hold a conversation - and that was a mistake:
- * the point of the app is the real engine, and an echo that looks like a reply is worse than an
- * empty screen that says what is missing. The stand-in now lives in test sources, so this cannot
- * reach it even by accident.
+ * There is deliberately no stand-in. For one commit this returned an echo backend when no model
+ * was present, so that the app could always hold a conversation - and that was a mistake: the
+ * point of the app is a real model, and a reply that only looks like one is worse than a screen
+ * that says what is missing. The stand-in now lives in test sources, so this cannot reach it even
+ * by accident.
  *
- * Resolution is lazy and re-checkable rather than decided once at injection, because the model
- * usually arrives *after* the app first opens - somebody downloads it, and the conversation has to
- * become possible without a restart.
+ * Resolution is lazy and re-checkable rather than decided once at injection, because what is
+ * available changes while the app is open: a download finishes, a server comes back, somebody
+ * changes their mind in settings.
  */
 @Singleton
-class ChatBackends @Inject constructor(private val store: ModelStore) {
+class ChatBackends
+@Inject
+constructor(private val store: ModelStore, private val settings: SettingsRepository) {
+
+  private val lock = Mutex()
 
   @Volatile private var cached: ChatReadiness? = null
 
-  /** The current state, loading nothing until a turn actually needs it. */
-  fun readiness(): ChatReadiness {
+  /**
+   * The current state, loading nothing until a turn actually needs it.
+   *
+   * Suspending, which it has to be: choosing between the phone and the server means reading
+   * settings and asking the server whether it is there. Doing either of those from a property
+   * getter would have put a network round trip on whatever thread asked.
+   */
+  suspend fun readiness(): ChatReadiness {
     cached?.let {
       return it
     }
-    return resolve().also { cached = it }
+    return lock.withLock { cached ?: resolve().also { cached = it } }
   }
 
-  /** Called when a download finishes, so the next turn picks the new model up. */
-  @Synchronized
-  fun refresh() {
-    (cached as? ChatReadiness.Ready)?.let { ready ->
-      // Closing the old engine matters: two loaded models is several gigabytes, and on a 12 GB
-      // phone that is the difference between working and being killed.
-      (ready.backend as? AutoCloseable)?.let { closeable -> runCatching { closeable.close() } }
+  /** Called when a download finishes or a setting changes, so the next turn re-decides. */
+  suspend fun refresh() {
+    lock.withLock {
+      (cached as? ChatReadiness.Ready)?.let { ready ->
+        // Closing the old engine matters: two loaded models is several gigabytes, and on a 12 GB
+        // phone that is the difference between working and being killed. The server backend
+        // holds nothing, so this does nothing for it.
+        (ready.backend as? AutoCloseable)?.let { closeable -> runCatching { closeable.close() } }
+      }
+      cached = null
     }
-    cached = null
   }
 
-  @Synchronized
-  private fun resolve(): ChatReadiness {
-    val memoryGb = store.memoryGb()
+  private suspend fun resolve(): ChatReadiness {
+    val onDevice = localBackend()
+
+    if (!settings.answerOnServer.first()) return onDevice?.let { ChatReadiness.Ready(it) } ?: none()
+
+    val url = settings.serverUrl.first()
+    val model = settings.serverModelName.first()
+    if (url.isBlank() || model.isBlank()) {
+      return onDevice?.let {
+        ChatReadiness.Ready(it, notice = "No server model is chosen, so this phone is answering.")
+      } ?: none()
+    }
+
+    val server = OllamaBackend(baseUrl = url, authHeader = settings.serverAuthHeader.first(),
+      modelName = model)
+    // Asked once here rather than per turn. A turn against a server that has gone away still
+    // fails with its own message; this is what lets the phone take over before that happens.
+    if (server.reachable()) return ChatReadiness.Ready(server)
+
+    return onDevice?.let {
+      ChatReadiness.Ready(
+        it,
+        notice = "$model is not reachable right now, so this phone is answering.",
+      )
+    } ?: none()
+  }
+
+  private fun none(): ChatReadiness =
+    ChatReadiness.NoModel(suggested = ModelCatalog.defaultChatModel(store.memoryGb()))
+
+  private fun localBackend(): OnDeviceBackend? {
     val present = store.available(ModelRole.CHAT)
-    if (present.isEmpty()) {
-      return ChatReadiness.NoModel(suggested = ModelCatalog.defaultChatModel(memoryGb))
-    }
+    if (present.isEmpty()) return null
 
     // Of what is actually here, prefer the one this phone should be running. On 12 GB that is
     // E2B even when E4B is also downloaded, for the reason recorded in the catalogue - but a user
     // who has deliberately fetched only E4B gets E4B rather than nothing.
-    val preferred = ModelCatalog.defaultChatModel(memoryGb)
+    val preferred = ModelCatalog.defaultChatModel(store.memoryGb())
     val model =
-      present.firstOrNull { it == preferred } ?: present.minByOrNull { it.build.sizeBytes } ?: present[0]
+      present.firstOrNull { it == preferred }
+        ?: present.minByOrNull { it.build.sizeBytes }
+        ?: present[0]
 
-    return ChatReadiness.Ready(
-      backend =
-        OnDeviceBackend(
-          modelPath = store.fileFor(model).absolutePath,
-          cacheDir = store.cacheDirectory().absolutePath,
-          contextTokens = model.contextTokens,
-          supportsImages = model.supportsImages,
-          supportsAudio = model.supportsAudio,
-          id = model.name,
-        ),
-      model = model,
+    return OnDeviceBackend(
+      modelPath = store.fileFor(model).absolutePath,
+      cacheDir = store.cacheDirectory().absolutePath,
+      contextTokens = model.contextTokens,
+      supportsImages = model.supportsImages,
+      supportsAudio = model.supportsAudio,
+      baseId = model.name,
     )
   }
 }

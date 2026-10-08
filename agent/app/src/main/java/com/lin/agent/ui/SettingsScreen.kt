@@ -146,6 +146,33 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
       }
 
       Text(
+        stringResource(R.string.settings_answer_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_answer_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+          ChoiceRow(
+            title = stringResource(R.string.settings_answer_phone),
+            detail = stringResource(R.string.settings_answer_phone_detail),
+            selected = !state.answerOnServer,
+            onPick = { viewModel.setAnswerOnServer(false) },
+          )
+          ChoiceRow(
+            title = stringResource(R.string.settings_answer_server),
+            detail = stringResource(R.string.settings_answer_server_detail),
+            selected = state.answerOnServer,
+            onPick = { viewModel.setAnswerOnServer(true) },
+          )
+        }
+      }
+
+      Text(
         stringResource(R.string.settings_server_models_heading),
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = 12.dp),
@@ -370,17 +397,21 @@ private fun ServerModels(
 }
 
 @Composable
-private fun ServerModelRow(model: ServerModel, selected: Boolean, onPick: () -> Unit) {
+private fun ServerModelRow(model: ServerModel, selected: Boolean, onPick: () -> Unit) =
+  ChoiceRow(title = model.name, detail = describe(model), selected = selected, onPick = onPick)
+
+/** One pickable row: a radio button, a name, and a line about what picking it means. */
+@Composable
+private fun ChoiceRow(title: String, detail: String, selected: Boolean, onPick: () -> Unit) {
   Row(
-    // The whole row, not just the button: a radio button is a small target on a phone, and this
-    // list is read with a thumb.
+    // The whole row, not just the button: a radio button is a small target on a phone, and these
+    // lists are read with a thumb.
     modifier = Modifier.fillMaxWidth().clickable(onClick = onPick).padding(horizontal = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     RadioButton(selected = selected, onClick = onPick)
-    Column(modifier = Modifier.padding(vertical = 6.dp)) {
-      Text(model.name, style = MaterialTheme.typography.bodyLarge)
-      val detail = describe(model)
+    Column(modifier = Modifier.padding(top = 6.dp, bottom = 6.dp, end = 8.dp)) {
+      Text(title, style = MaterialTheme.typography.bodyLarge)
       if (detail.isNotEmpty()) {
         Text(
           detail,

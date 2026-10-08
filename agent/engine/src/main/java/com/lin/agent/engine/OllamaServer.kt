@@ -145,10 +145,11 @@ class OllamaServer(
 }
 
 /**
- * The address to ask, built out of whatever the user typed, or null if they typed nothing.
+ * The address of one Ollama endpoint, built out of whatever the user typed, or null if they typed
+ * nothing.
  *
- * All of the forgiveness lives here, because this field is typed on a phone keyboard and every
- * one of these mistakes looks identical to the server being down:
+ * All of the forgiveness lives here, because this field is typed on a phone keyboard and every one
+ * of these mistakes looks identical to the server being down:
  *
  *  - no scheme, which is what typing a LAN address from memory produces
  *  - a trailing slash, which is what a browser's address bar hands over
@@ -161,19 +162,15 @@ class OllamaServer(
  * The port default is only applied to `http`. Under `https` something is terminating TLS - a
  * tunnel or a reverse proxy - and that listens on 443, not on Ollama's port.
  */
-internal fun tagsUrl(typed: String): String? {
+internal fun apiUrl(typed: String, endpoint: String): String? {
   var text = typed.trim()
   if (text.isEmpty()) return null
   if (!text.contains("://")) text = "http://$text"
 
   text = text.trimEnd('/')
-  // A pasted `.../api/tags` or `.../api` would otherwise be asked for twice over.
-  for (suffix in listOf("/api/tags", "/api")) {
-    if (text.endsWith(suffix)) {
-      text = text.removeSuffix(suffix).trimEnd('/')
-      break
-    }
-  }
+  // A pasted `.../api/tags` or `.../api/chat` or `.../api` would otherwise be asked for twice
+  // over. Any endpoint, not just this call's: the address field is shared between them.
+  text = text.replace(API_SUFFIX, "").trimEnd('/')
 
   val uri = runCatching { URI(text) }.getOrNull() ?: return null
   val host = uri.host ?: return null
@@ -183,8 +180,14 @@ internal fun tagsUrl(typed: String): String? {
     } else {
       text
     }
-  return "$base/api/tags"
+  return "$base/api/$endpoint"
 }
+
+/** What the server has pulled. */
+internal fun tagsUrl(typed: String): String? = apiUrl(typed, "tags")
+
+/** Where a conversation is sent. */
+internal fun chatUrl(typed: String): String? = apiUrl(typed, "chat")
 
 /**
  * The headers to send, parsed from one free-text field as `Name: value` per line.
@@ -278,3 +281,6 @@ internal fun describeFailure(error: Throwable): String =
   }
 
 private const val OLLAMA_DEFAULT_PORT = 11434
+
+/** A trailing `/api` or `/api/<endpoint>`, which is what pasting from the docs leaves. */
+private val API_SUFFIX = Regex("/api(/[A-Za-z]+)?$")

@@ -49,6 +49,8 @@ data class ConversationState(
    * back to - an echo that looks like a reply is worse than a screen that says what is missing.
    */
   val missingModel: CatalogModel? = null,
+  /** Set when what answered is not what was asked for - see [ChatReadiness.Ready.notice]. */
+  val notice: String = "",
 )
 
 /**
@@ -83,30 +85,52 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
    * restart.
    */
   fun refreshReadiness(afterDownload: Boolean = false) {
-    if (afterDownload) backends.refresh()
-    when (val readiness = backends.readiness()) {
-      is ChatReadiness.NoModel ->
-        _state.update { it.copy(missingModel = readiness.suggested, backendId = "") }
-      is ChatReadiness.Ready ->
-        _state.update { it.copy(missingModel = null, backendId = readiness.backend.id) }
+    viewModelScope.launch {
+      if (afterDownload) backends.refresh()
+      when (val readiness = backends.readiness()) {
+        is ChatReadiness.NoModel ->
+          _state.update {
+            it.copy(missingModel = readiness.suggested, backendId = "", notice = "")
+          }
+        is ChatReadiness.Ready ->
+          _state.update {
+            it.copy(
+              missingModel = null,
+              backendId = readiness.backend.id,
+              notice = readiness.notice,
+            )
+          }
+      }
     }
   }
 
   fun send(text: String) {
     val trimmed = text.trim()
     if (trimmed.isEmpty() || _state.value.inProgress) return
-    val backend =
-      (backends.readiness() as? ChatReadiness.Ready)?.backend
-        ?: run {
-          refreshReadiness()
-          return
-        }
 
+    // The user's message goes up immediately, before anything is resolved. Choosing a backend
+    // can mean asking the server whether it is there, and a message that only appears once that
+    // round trip finishes reads as a Send button that did nothing.
     val outgoing = _state.value.messages + Message(Message.Role.USER, trimmed)
     _state.update { it.copy(messages = outgoing, inProgress = true, streaming = "", error = "") }
     persist(outgoing)
 
     viewModelScope.launch {
+      val readiness = backends.readiness()
+      val backend =
+        (readiness as? ChatReadiness.Ready)?.backend
+          ?: run {
+            _state.update {
+              it.copy(
+                inProgress = false,
+                missingModel = (readiness as? ChatReadiness.NoModel)?.suggested,
+                error = "There is no model to answer with yet.",
+              )
+            }
+            return@launch
+          }
+      _state.update { it.copy(notice = (readiness as ChatReadiness.Ready).notice) }
+
       val builder = StringBuilder()
       backend.converse(TurnRequest(messages = outgoing)).collect { event ->
         when (event) {
@@ -117,7 +141,14 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
           is TurnEvent.Done -> {
             val complete = outgoing + Message(Message.Role.ASSISTANT, event.fullText)
             _state.update {
-              it.copy(messages = complete, streaming = "", inProgress = false)
+              // backendId again: it only names the accelerator once the engine has settled on
+              // one, which happens during the first turn rather than when readiness was read.
+              it.copy(
+                messages = complete,
+                streaming = "",
+                inProgress = false,
+                backendId = backend.id,
+              )
             }
             persist(complete)
           }
@@ -126,7 +157,9 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
             // computer attached they are the only account of the failure there is.
             val shown =
               if (event.detail.isBlank()) event.message else "${event.message}\n\n${event.detail}"
-            _state.update { it.copy(streaming = "", inProgress = false, error = shown) }
+            _state.update {
+              it.copy(streaming = "", inProgress = false, error = shown, backendId = backend.id)
+            }
           }
         }
       }

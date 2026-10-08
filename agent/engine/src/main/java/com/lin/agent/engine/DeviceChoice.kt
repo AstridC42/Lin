@@ -51,7 +51,42 @@ object DeviceChoice {
     if (requested == Accelerator.GPU && gpuIsUnreliable(manufacturer, model)) Accelerator.CPU
     else requested
 
-  /** Devices whose GPU path is known not to work for these models. */
+  /**
+   * The accelerators to try for [requested], in order, until one loads.
+   *
+   * A list rather than a single answer, and that is the correction this file needed. The idea
+   * here was that the devices whose GPU path does not work could be named - [gpuIsUnreliable] is
+   * that list - and it cannot be. LiteRT's GPU path needs OpenCL, OpenCL is not part of Android,
+   * and whether an app can load the vendor's copy depends on the vendor, the Android version and
+   * the device's public-library list. On a Galaxy Z Fold 7 - a current flagship, and exactly the
+   * hardware this app is written for - it fails with "Can not find OpenCL library on this
+   * device", and no amount of adding names to that list would have predicted it.
+   *
+   * So GPU is still asked for first, because when it works it is several times faster, and CPU
+   * always follows it. CPU needs no vendor anything and is the floor every device has. Falling
+   * back costs one failed load; not falling back cost an app that could not hold a conversation
+   * at all.
+   *
+   * NPU falls back the same way, and for the same kind of reason: it needs vendor runtime
+   * libraries that may simply not be present.
+   */
+  fun acceleratorChain(
+    requested: Accelerator,
+    manufacturer: String = Build.MANUFACTURER,
+    model: String = Build.MODEL,
+  ): List<Accelerator> =
+    when (acceleratorFor(requested, manufacturer, model)) {
+      Accelerator.CPU -> listOf(Accelerator.CPU)
+      Accelerator.GPU -> listOf(Accelerator.GPU, Accelerator.CPU)
+      Accelerator.NPU -> listOf(Accelerator.NPU, Accelerator.CPU)
+    }
+
+  /**
+   * Devices whose GPU path is known not to work for these models.
+   *
+   * Retained because skipping a load that is known to fail is still worth a device name, but it
+   * is no longer what keeps the app working - [acceleratorChain] is. See the note there.
+   */
   fun gpuIsUnreliable(manufacturer: String, model: String): Boolean {
     val isGoogle = manufacturer.lowercase() == "google"
     // "Pixel 10", "Pixel 10 Pro", "Pixel 10 Pro XL" - and deliberately not "Pixel 1", which a
