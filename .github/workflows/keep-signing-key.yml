@@ -17,16 +17,20 @@
 # one place, on a schedule, with nothing racing it.
 name: Own the signing key
 
-# ARCHIVED. The Edge Gallery fork is no longer built or shipped.
+# Keeps the CI signing key alive.
 #
-# Its source stays in the repository as reference material for the Lin app under agent/ - engine
-# setup and its device quirks, HuggingFace auth, semantic retrieval, and a hundred small Android
-# details that are easier to read than to rederive. What is gone is the app itself: no builds, no
-# releases, nothing to install.
+# Actions caches are evicted after seven days without a read, and this one holds the only copy of
+# the key that Lin's releases are signed with - there is no copy in the repository, by design. If
+# it is ever lost, builds get a fresh key and stop installing over the ones already on a phone,
+# which for this app means an uninstall and a two-and-a-half gigabyte model re-download.
 #
-# The triggers below are reduced to workflow_dispatch so this cannot fire on its own. Nothing is
-# deleted, so if the fork ever needs to be built again the automatic triggers are a diff away.
+# Un-archived when the release pipeline moved to the new app: the fork no longer needs it, Lin
+# does.
 on:
+  schedule:
+    # Mondays and Thursdays, so the longest gap is four days against a seven-day deadline. Not on
+    # the hour: schedules that land on :00 queue behind everybody else's.
+    - cron: '17 4 * * 1,4'
   workflow_dispatch:
 
 permissions:
