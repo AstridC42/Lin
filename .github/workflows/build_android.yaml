@@ -9,18 +9,17 @@
 # RELEASING.md.
 name: Build Android APK
 
+# ARCHIVED. The Edge Gallery fork is no longer built or shipped.
+#
+# Its source stays in the repository as reference material for the Lin app under agent/ - engine
+# setup and its device quirks, HuggingFace auth, semantic retrieval, and a hundred small Android
+# details that are easier to read than to rederive. What is gone is the app itself: no builds, no
+# releases, nothing to install.
+#
+# The triggers below are reduced to workflow_dispatch so this cannot fire on its own. Nothing is
+# deleted, so if the fork ever needs to be built again the automatic triggers are a diff away.
 on:
   workflow_dispatch:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'Android/**'
-      - '.github/workflows/build_android.yaml'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - 'Android/**'
-      - '.github/workflows/build_android.yaml'
 
 jobs:
   build_apk:

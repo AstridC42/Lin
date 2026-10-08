@@ -151,6 +151,12 @@ object BuiltInTaskId {
   const val LLM_TINY_GARDEN = "llm_tiny_garden"
   const val MP_SCRAPBOOK = "mp_scrapbook"
   const val LLM_AGENT_CHAT = "llm_agent_chat"
+
+  /** Search your own photos and videos by describing them. Upstream's "Instant Media Search". */
+  const val SMART_ALBUM = "smart_album"
+
+  /** Find and cut the moment you describe out of a long video. */
+  const val VIDEO_MOMENT_FINDER = "video_moment_finder"
 }
 
 private val allLegacyTaskIds: Set<String> =

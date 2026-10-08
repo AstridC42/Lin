@@ -111,7 +111,7 @@ private const val UNPACKED_FILE_EXT = "unpacked"
  * versionName requests a file that has never existed and 404s on every launch. Bump this when
  * upstream publishes a newer one worth picking up.
  */
-private const val UPSTREAM_ALLOWLIST_VERSION = "1_0_19"
+private const val UPSTREAM_ALLOWLIST_VERSION = "1_0_20"
 
 /**
  * How long the whole remote fetch of the model list may take.

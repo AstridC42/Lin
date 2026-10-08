@@ -199,6 +199,13 @@ dependencies {
   implementation(libs.ktor.client.android)
   implementation(libs.ktor.client.core)
   implementation(libs.tasks.vision)
+  // Instant Media Search's embeddings and vector store, and Video Moment Finder's
+  // playback, trimming and thumbnail loading. Both tasks ported from upstream.
+  implementation(libs.tasks.retrieval)
+  implementation(libs.androidx.media3.exoplayer)
+  implementation(libs.androidx.media3.transformer)
+  implementation(libs.androidx.media3.ui)
+  implementation(libs.coil.compose)
 }
 
 configurations.all {

@@ -16,7 +16,7 @@
 
 package com.google.ai.edge.gallery.ui.llmchat
 
-import com.google.ai.edge.litertlm.Capabilities
+import com.google.ai.edge.litertlm.ModelInfo
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
@@ -155,9 +155,15 @@ object LlmChatModelHelper : LlmModelHelper {
 
     var supportsSpeculativeDecoding = false
     // Check if the model file supports speculative decoding.
+    //
+    // litertlm 0.18 replaced the Capabilities class with ModelInfo, which reports the same thing
+    // for an LLM and reports other shapes of model too - hence the type check rather than a bare
+    // call. A model that is not an Llm simply does not support it.
     try {
-      Capabilities(modelPath).use {
-        supportsSpeculativeDecoding = it.hasSpeculativeDecodingSupport()
+      ModelInfo.from(modelPath).use { modelInfo ->
+        if (modelInfo is ModelInfo.Llm) {
+          supportsSpeculativeDecoding = modelInfo.hasSpeculativeDecodingSupport()
+        }
       }
     } catch (e: Exception) {
       // Ignore exceptions and assume not supported.

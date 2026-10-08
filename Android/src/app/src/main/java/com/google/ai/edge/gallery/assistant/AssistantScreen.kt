@@ -72,6 +72,7 @@ import com.google.ai.edge.gallery.customtasks.agentchat.AgentChatScreen
 import com.google.ai.edge.gallery.customtasks.agentchat.AgentTools
 import com.google.ai.edge.gallery.customtasks.agentchat.McpManagerBottomSheet
 import com.google.ai.edge.gallery.customtasks.agentchat.McpManagerViewModel
+import com.google.ai.edge.gallery.customtasks.agentchat.ExternalPromptConfirmationDialog
 import com.google.ai.edge.gallery.customtasks.agentchat.SkillManagerViewModel
 import com.google.ai.edge.gallery.customtasks.agentchat.resetSessionWithCurrentSkillsAndMcps
 import com.google.ai.edge.gallery.data.DataStoreRepository
@@ -205,6 +206,25 @@ fun AssistantScreen(
   // so a summon made before the model finished loading still asks its question rather than losing
   // it.
   var dictatedQuery by rememberSaveable { mutableStateOf<String?>(null) }
+
+  /**
+   * A prompt that arrived from outside the app, held until the user has read it.
+   *
+   * Deep links, shares and push notifications are externally controlled: any app, web page, QR
+   * code or notification can open one, and nothing about arriving that way says the person holding
+   * the phone intended it. Upstream added this confirmation for its agent chat, and it matters
+   * more here, because Lin can place a call, send a message and switch things off in somebody's
+   * house. An unreviewed prompt that reaches the model is an instruction from a stranger.
+   *
+   * Only external prompts go through it. Dictation, a wake-word summon and the suggestion chips
+   * all arrive as [dictatedQuery] and are sent as before - the user has just spoken or tapped, so
+   * asking them to confirm it would be asking twice, and it would break hands-free entirely.
+   *
+   * Keyed on [initialQuery] so a second share or assist gesture re-arms the dialog rather than
+   * being swallowed by the first one having been dismissed.
+   */
+  var pendingExternalPrompt by
+    remember(initialQuery) { mutableStateOf(initialQuery?.takeIf { it.isNotEmpty() }) }
   val listening =
     rememberHandsFreeListening(
       enabled = startListening || handsFree || listenTurn > 0,
@@ -381,7 +401,10 @@ fun AssistantScreen(
       viewModel = viewModel,
       skillManagerViewModel = skillManagerViewModel,
       mcpManagerViewModel = mcpManagerViewModel,
-      initialQuery = dictatedQuery ?: initialQuery,
+      // Not `dictatedQuery ?: initialQuery` any more: an external prompt reaches the chat only
+      // by being confirmed below, which sets dictatedQuery. Leaving the fallback here would send
+      // it immediately and make the dialog decorative.
+      initialQuery = dictatedQuery,
       initialImageUris = initialImageUris,
       baseSystemPromptResolver = systemPromptResolver,
       onSettingsClicked = { showSettings = true },
@@ -552,6 +575,23 @@ fun AssistantScreen(
     MusicAppDialog(
       dataStoreRepository = dataStoreRepository,
       onDismiss = { showMusicApp = false },
+    )
+  }
+
+  pendingExternalPrompt?.let { prompt ->
+    ExternalPromptConfirmationDialog(
+      prompt = prompt,
+      // The chat holds an initial query until the model has loaded and sends it then, so there is
+      // no need to gate the button on readiness - and a disabled button with no explanation on a
+      // screen the user did not ask for reads as broken.
+      sendEnabled = true,
+      onConfirm = {
+        pendingExternalPrompt = null
+        // Through the same path a dictated question takes, so it is queued if the model is still
+        // loading rather than dropped.
+        dictatedQuery = prompt
+      },
+      onDismiss = { pendingExternalPrompt = null },
     )
   }
 

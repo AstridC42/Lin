@@ -1,0 +1,95 @@
+# One-shot: delete every release except the most recent.
+#
+# This exists because the Edge Gallery fork has been retired and its back-catalogue of builds is
+# no longer wanted. It is a workflow rather than a direct API call because deleting a release needs
+# the repository's own token — the session driving this cannot do it, by design.
+#
+# Deliberately awkward to run. It asks for a typed confirmation, it says what it will do before it
+# does it, and it is meant to be deleted from the repository once it has served its purpose: a
+# workflow whose entire job is destroying published artifacts is not something to leave lying
+# around where a stray click can reach it.
+#
+# Tags are left alone. Deleting a release does not delete its tag, and the tags are small, harmless
+# and part of the history of what was built.
+name: Prune releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: 'How many of the most recent releases to keep'
+        required: true
+        default: '1'
+        type: string
+      confirm:
+        description: 'Type "delete" to confirm. Anything else lists what would go and stops.'
+        required: true
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    name: Prune releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Work out what would go, then go
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          KEEP: ${{ inputs.keep }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+
+          # Newest first, by publication date, so "keep the last one" means what it says.
+          gh api "repos/$REPO/releases?per_page=100" \
+            --jq 'sort_by(.published_at) | reverse | .[] | "\(.id)\t\(.tag_name)\t\(.published_at)"' \
+            > all.tsv
+
+          total=$(wc -l < all.tsv)
+          echo "Found $total releases. Keeping the newest $KEEP."
+          echo
+
+          head -n "$KEEP" all.tsv | while IFS=$'\t' read -r id tag when; do
+            echo "KEEP    $tag  ($when)"
+          done
+          tail -n +"$((KEEP + 1))" all.tsv > doomed.tsv || true
+          while IFS=$'\t' read -r id tag when; do
+            echo "DELETE  $tag  ($when)"
+          done < doomed.tsv
+
+          {
+            echo "### Prune releases"
+            echo
+            echo "Keeping the newest **$KEEP** of **$total**."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$CONFIRM" != "delete" ]; then
+            echo
+            echo '::notice::Not confirmed — nothing was deleted. Re-run with confirm=delete.'
+            echo "_Not confirmed. Nothing was deleted._" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          deleted=0
+          while IFS=$'\t' read -r id tag when; do
+            # A release that cannot be deleted must not stop the rest: report and carry on, so one
+            # oddity does not leave the catalogue half pruned with no record of which half.
+            if gh api -X DELETE "repos/$REPO/releases/$id"; then
+              echo "deleted $tag"
+              echo "- deleted \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
+              deleted=$((deleted + 1))
+            else
+              echo "::warning::Could not delete $tag"
+              echo "- **could not delete** \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done < doomed.tsv
+
+          echo
+          echo "Deleted $deleted release(s)."
+          gh api "repos/$REPO/releases?per_page=100" --jq 'length' \
+            | xargs -I{} echo "{} release(s) remain."
