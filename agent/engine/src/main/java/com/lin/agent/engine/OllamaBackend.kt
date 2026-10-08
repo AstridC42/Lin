@@ -62,11 +62,11 @@ class OllamaBackend(
 
   override val capabilities =
     BackendCapabilities(
-      // Both reported false on purpose rather than optimistically. Ollama supports tool calling
-      // and vision for *some* models, and nothing here knows which - claiming a capability the
-      // chosen model does not have would fail at the point of use, where it is hardest to
-      // explain. They turn on when there is a loop that can verify them.
-      supportsTools = false,
+      // Tools are offered because the protocol supports them and a model that does not
+      // understand them simply never asks for one - which the loop handles as an ordinary reply.
+      // Images stay false: that would fail at the point of use, where it is hardest to explain,
+      // and nothing here knows which model was picked.
+      supportsTools = true,
       supportsImages = false,
       supportsAudio = false,
       // Zero means "the server's own setting". It is configured per model on the server, this
@@ -114,6 +114,7 @@ class OllamaBackend(
                 answer.append(chunk.text)
                 emit(TurnEvent.Token(chunk.text))
               }
+              if (chunk.toolCalls.isNotEmpty()) emit(TurnEvent.ToolCalls(chunk.toolCalls))
               if (chunk.done) {
                 emit(TurnEvent.Done(answer.toString()))
                 return@use
@@ -201,6 +202,7 @@ internal data class ChatChunk(
   val text: String = "",
   val done: Boolean = false,
   val error: String = "",
+  val toolCalls: List<ToolInvocation> = emptyList(),
 )
 
 /**
@@ -218,10 +220,31 @@ internal fun readChunk(line: String): ChatChunk? {
   val error = json.optString("error")
   if (error.isNotEmpty()) return ChatChunk(error = error)
 
+  val message = json.optJSONObject("message")
   return ChatChunk(
-    text = json.optJSONObject("message")?.optString("content").orEmpty(),
+    text = message?.optString("content").orEmpty(),
     done = json.optBoolean("done", false),
+    toolCalls = message?.let(::readToolCalls).orEmpty(),
   )
+}
+
+/**
+ * The tool calls on one message, in Ollama's shape: `tool_calls[].function.{name,arguments}`.
+ *
+ * Anything without a name is dropped rather than passed on. A call the loop cannot look up would
+ * only come back as "there is no tool called null", which wastes a round trip to say nothing.
+ */
+internal fun readToolCalls(message: JSONObject): List<ToolInvocation> {
+  val calls = message.optJSONArray("tool_calls") ?: return emptyList()
+  return (0 until calls.length()).mapNotNull { index ->
+    val function = calls.optJSONObject(index)?.optJSONObject("function") ?: return@mapNotNull null
+    val name = function.optString("name").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+    val arguments = function.optJSONObject("arguments")
+    ToolInvocation(
+      name = name,
+      arguments = arguments?.keys()?.asSequence()?.associateWith { arguments.get(it) }.orEmpty(),
+    )
+  }
 }
 
 /**
@@ -239,17 +262,45 @@ internal fun chatRequestBody(model: String, request: TurnRequest): String {
     messages.put(JSONObject().put("role", "system").put("content", request.systemPrompt))
   }
   for (message in request.messages) {
-    messages.put(JSONObject().put("role", wireRole(message.role)).put("content", message.text))
-  }
-  return JSONObject()
-    .put("model", model)
-    .put("messages", messages)
-    .put("stream", true)
-    .put(
-      "options",
-      JSONObject().put("temperature", request.temperature).put("top_k", request.topK),
+    messages.put(
+      JSONObject().put("role", wireRole(message.role)).put("content", message.text).apply {
+        if (message.toolName.isNotEmpty()) put("tool_name", message.toolName)
+      }
     )
-    .toString()
+  }
+
+  val body =
+    JSONObject()
+      .put("model", model)
+      .put("messages", messages)
+      .put("stream", true)
+      .put(
+        "options",
+        JSONObject().put("temperature", request.temperature).put("top_k", request.topK),
+      )
+
+  if (request.tools.isNotEmpty()) {
+    val tools = JSONArray()
+    for (tool in request.tools) {
+      tools.put(
+        JSONObject()
+          .put("type", "function")
+          .put(
+            "function",
+            JSONObject()
+              .put("name", tool.name)
+              .put("description", tool.description)
+              .put("parameters", JSONObject(tool.parametersSchema)),
+          )
+      )
+    }
+    body.put("tools", tools)
+  }
+
+  // Ollama takes the schema itself as `format`, which is its constrained-decoding switch.
+  request.responseSchema?.let { body.put("format", JSONObject(it)) }
+
+  return body.toString()
 }
 
 private fun wireRole(role: Message.Role): String =
@@ -257,4 +308,5 @@ private fun wireRole(role: Message.Role): String =
     Message.Role.USER -> "user"
     Message.Role.ASSISTANT -> "assistant"
     Message.Role.SYSTEM -> "system"
+    Message.Role.TOOL -> "tool"
   }

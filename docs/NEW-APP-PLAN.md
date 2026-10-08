@@ -412,6 +412,22 @@ and says so. With it on, a request routed to it returns.
 The turn loop, the five orchestrator tools, the brief schema under constrained
 decoding, sub-agent execution on Ollama, result folding.
 
+**Done:** the spine — `AgentRole`, `AgentTool`/`ToolRegistry` with role scoping,
+`Brief` with its schema and parser, and `TurnLoop` with a budget, a loop
+breaker and visible tool activity. One tool so far, `delegate`, which runs a
+brief on the server model and folds the answer back. Tool calling reaches both
+backends: Ollama's `tools`/`tool_calls`, and LiteRT-LM's via `OpenApiTool` with
+`automaticToolCalling = false` so the loop keeps the role scoping and the
+budget.
+
+Written so a turn with no tools never touches any of it — that path is the code
+already answering on the device, and tool calling is the part that cannot be
+checked without a phone.
+
+**Still to do:** the other four tools (`recall`, `phoneAction`, `ask`,
+`answer`), the brief under `ResponseFormat.json` rather than as tool arguments,
+and the eval set. The gate below needs a device, so it is the user's to run.
+
 **Deliverable:** "research X and summarise it" delegates and comes back.
 **Measurement:** an eval set of ~20 requests, scored on whether the brief
 preserved the binding constraint.

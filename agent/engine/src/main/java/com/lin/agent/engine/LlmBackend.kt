@@ -19,8 +19,15 @@ package com.lin.agent.engine
 import kotlinx.coroutines.flow.Flow
 
 /** One message in a conversation. */
-data class Message(val role: Role, val text: String) {
-  enum class Role { USER, ASSISTANT, SYSTEM }
+data class Message(val role: Role, val text: String, val toolName: String = "") {
+  enum class Role {
+    USER,
+    ASSISTANT,
+    SYSTEM,
+
+    /** The result of a tool the model asked for. [toolName] says which. */
+    TOOL,
+  }
 }
 
 /** What a backend can do, so callers can ask rather than assume. */
@@ -39,6 +46,15 @@ sealed interface TurnEvent {
 
   /** The turn finished normally. */
   data class Done(val fullText: String) : TurnEvent
+
+  /**
+   * The model wants tools run before it can answer.
+   *
+   * A separate event rather than text to be parsed: both backends report tool calls as
+   * structured data, and turning that back into a string so something upstream can pick it apart
+   * again is how a tool call comes out malformed.
+   */
+  data class ToolCalls(val calls: List<ToolInvocation>) : TurnEvent
 
   /**
    * The turn failed, with something a person can act on.
@@ -73,6 +89,15 @@ data class TurnRequest(
    * call comes out malformed, which cost the previous app several days. */
   val temperature: Double = 0.0,
   val topK: Int = 1,
+  /** What the model may ask for this turn. Already narrowed to one role by the registry. */
+  val tools: List<ToolSpec> = emptyList(),
+  /**
+   * A JSON Schema the reply must satisfy, or null for ordinary prose.
+   *
+   * This is what makes a [Brief] workable on a 2B model: the decoder is constrained to the
+   * schema, so the model fills slots instead of writing JSON by hand and hoping.
+   */
+  val responseSchema: String? = null,
 )
 
 /**

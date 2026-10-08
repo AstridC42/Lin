@@ -22,9 +22,12 @@ import androidx.lifecycle.viewModelScope
 import com.lin.agent.core.models.CatalogModel
 import com.lin.agent.model.ChatBackends
 import com.lin.agent.model.ChatReadiness
+import com.lin.agent.engine.AgentRole
+import com.lin.agent.engine.LoopEvent
 import com.lin.agent.engine.Message
-import com.lin.agent.engine.TurnEvent
-import com.lin.agent.engine.TurnRequest
+import com.lin.agent.engine.ToolRegistry
+import com.lin.agent.engine.TurnLoop
+import com.lin.agent.model.DelegateTool
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +54,8 @@ data class ConversationState(
   val missingModel: CatalogModel? = null,
   /** Set when what answered is not what was asked for - see [ChatReadiness.Ready.notice]. */
   val notice: String = "",
+  /** The tool running right now, so a long delegation reads as busy rather than stuck. */
+  val runningTool: String = "",
 )
 
 /**
@@ -69,6 +74,15 @@ data class ConversationState(
 class ConversationViewModel
 @Inject
 constructor(private val backends: ChatBackends, private val saved: SavedStateHandle) : ViewModel() {
+
+  /**
+   * What the orchestrator may do, which is currently one thing.
+   *
+   * Built here, once, from role-scoped tools - so the prompt the model sees can only ever
+   * contain what an orchestrator is allowed to ask for. The previous app assembled forty-four
+   * tools into every prompt and relied on discipline to keep that appropriate.
+   */
+  private val registry = ToolRegistry(listOf(DelegateTool { backends.serverSubAgent() }))
 
   private val _state = MutableStateFlow(ConversationState(messages = restored()))
   val state: StateFlow<ConversationState> = _state.asStateFlow()
@@ -132,34 +146,57 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
       _state.update { it.copy(notice = (readiness as ChatReadiness.Ready).notice) }
 
       val builder = StringBuilder()
-      backend.converse(TurnRequest(messages = outgoing)).collect { event ->
-        when (event) {
-          is TurnEvent.Token -> {
-            builder.append(event.text)
-            _state.update { it.copy(streaming = builder.toString()) }
-          }
-          is TurnEvent.Done -> {
-            val complete = outgoing + Message(Message.Role.ASSISTANT, event.fullText)
-            _state.update {
-              // backendId again: it only names the accelerator once the engine has settled on
-              // one, which happens during the first turn rather than when readiness was read.
-              it.copy(
-                messages = complete,
-                streaming = "",
-                inProgress = false,
-                backendId = backend.id,
-              )
+      TurnLoop(
+          backend = backend,
+          registry = registry,
+          role = AgentRole.ORCHESTRATOR,
+          systemPrompt = ORCHESTRATOR_PROMPT,
+        )
+        .run(outgoing)
+        .collect { event ->
+          when (event) {
+            is LoopEvent.Token -> {
+              builder.append(event.text)
+              _state.update { it.copy(streaming = builder.toString()) }
             }
-            persist(complete)
-          }
-          is TurnEvent.Failed -> {
-            val shown = event.display
-            _state.update {
-              it.copy(streaming = "", inProgress = false, error = shown, backendId = backend.id)
+            // Shown while it runs. A delegated task can take a minute on a big model, and
+            // silence for a minute is indistinguishable from the app having given up.
+            is LoopEvent.ToolStarted -> _state.update { it.copy(runningTool = event.name) }
+            is LoopEvent.ToolFinished -> _state.update { it.copy(runningTool = "") }
+            is LoopEvent.Done -> {
+              val complete = outgoing + Message(Message.Role.ASSISTANT, event.text)
+              _state.update {
+                // backendId again: it only names the accelerator once the engine has settled on
+                // one, which happens during the first turn rather than when readiness was read.
+                it.copy(
+                  messages = complete,
+                  streaming = "",
+                  inProgress = false,
+                  runningTool = "",
+                  backendId = backend.id,
+                )
+              }
+              persist(complete)
+            }
+            is LoopEvent.Failed -> {
+              val shown =
+                if (event.detail.isBlank() || event.detail.trim() == event.message.trim()) {
+                  event.message
+                } else {
+                  "${event.message}\n\n${event.detail}"
+                }
+              _state.update {
+                it.copy(
+                  streaming = "",
+                  inProgress = false,
+                  runningTool = "",
+                  error = shown,
+                  backendId = backend.id,
+                )
+              }
             }
           }
         }
-      }
     }
   }
 
@@ -184,6 +221,19 @@ constructor(private val backends: ChatBackends, private val saved: SavedStateHan
   }
 
   private companion object {
+    /**
+     * Short, and that is the design rather than an omission.
+     *
+     * The app this replaces carried a prompt long enough to crowd out the conversation, because
+     * forty-four tools each needed explaining. An orchestrator with one tool needs a sentence
+     * about when to use it and a sentence about what not to lose.
+     */
+    const val ORCHESTRATOR_PROMPT =
+      "You are Lin, an assistant running on this phone. Answer directly whenever you can. " +
+        "For work that needs a much larger model - real research, long writing, heavy analysis " +
+        "- call delegate. When you do, copy every condition the user stated into constraints, " +
+        "word for word; never invent one they did not say."
+
     const val KEY_ROLES = "conversation_roles"
     const val KEY_TEXTS = "conversation_texts"
   }
