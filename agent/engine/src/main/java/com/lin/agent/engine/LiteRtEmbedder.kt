@@ -82,10 +82,7 @@ class LiteRtEmbedder(
   private fun asInputData(part: EmbedPart): InputData? =
     when (part) {
       is EmbedPart.Text -> InputData.Text(part.text)
-      is EmbedPart.Image ->
-        runCatching { InputData.Image(File(part.path).readBytes()) }
-          .onFailure { Log.w(TAG, "Could not read ${part.path}", it) }
-          .getOrNull()
+      is EmbedPart.Image -> InputData.Image(part.bytes)
       // Audio takes a path through the engine this has no caller for yet, and guessing at the
       // encoding it wants would be inventing a format. Dropped rather than mis-sent.
       is EmbedPart.Audio -> null

@@ -144,6 +144,52 @@ class MemoryStore(context: Context) {
         .getOrDefault(false)
     }
 
+  /**
+   * The references already indexed for [source], so a run can skip them.
+   *
+   * What makes photo indexing resumable. Thousands of images take long enough that it will be
+   * interrupted - the phone sleeps, the user leaves - and starting again from the beginning
+   * each time means it never finishes on a library of any size.
+   */
+  suspend fun referencesFor(source: MemorySource): Set<String> =
+    withContext(Dispatchers.IO) {
+      runCatching {
+          helper.readableDatabase
+            .query(
+              TABLE,
+              arrayOf(REFERENCE),
+              "$SOURCE = ? AND $REFERENCE != ''",
+              arrayOf(source.name),
+              null,
+              null,
+              null,
+            )
+            .use { cursor -> buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) } }
+        }
+        .onFailure { Log.w(TAG, "Could not list indexed references", it) }
+        .getOrDefault(emptySet())
+    }
+
+  /** Removes everything from one source. Used to un-index the photo library. */
+  suspend fun forgetAllFrom(source: MemorySource): Int =
+    withContext(Dispatchers.IO) {
+      runCatching {
+          helper.writableDatabase.delete(TABLE, "$SOURCE = ?", arrayOf(source.name))
+        }
+        .onFailure { Log.w(TAG, "Could not clear $source", it) }
+        .getOrDefault(0)
+    }
+
+  suspend fun countFrom(source: MemorySource): Int =
+    withContext(Dispatchers.IO) {
+      runCatching {
+          helper.readableDatabase
+            .rawQuery("SELECT COUNT(*) FROM $TABLE WHERE $SOURCE = ?", arrayOf(source.name))
+            .use { if (it.moveToFirst()) it.getInt(0) else 0 }
+        }
+        .getOrDefault(0)
+    }
+
   suspend fun forget(id: Long): Boolean =
     withContext(Dispatchers.IO) {
       runCatching { helper.writableDatabase.delete(TABLE, "$ID = ?", arrayOf(id.toString())) > 0 }

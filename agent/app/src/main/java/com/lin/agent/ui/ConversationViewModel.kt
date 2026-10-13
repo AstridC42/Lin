@@ -29,6 +29,7 @@ import com.lin.agent.engine.ToolRegistry
 import com.lin.agent.engine.TurnLoop
 import com.lin.agent.model.DelegateTool
 import com.lin.agent.model.Embedders
+import com.lin.agent.model.FindPhotoTool
 import com.lin.agent.model.PhoneTool
 import com.lin.agent.model.RecallTool
 import com.lin.agent.model.RememberTool
@@ -70,6 +71,8 @@ data class ConversationState(
    * not saved. The model's account of what it did is not evidence that it did it.
    */
   val failedTools: List<String> = emptyList(),
+  /** Pictures a tool found, shown directly rather than described by a model that cannot see. */
+  val shows: List<String> = emptyList(),
 )
 
 /**
@@ -109,6 +112,7 @@ constructor(
         phoneTool,
         RememberTool(memories, embedders),
         RecallTool(memories, embedders),
+        FindPhotoTool(memories, embedders),
       )
     )
 
@@ -161,6 +165,7 @@ constructor(
         streaming = "",
         error = "",
         failedTools = emptyList(),
+        shows = emptyList(),
       )
     }
     persist(outgoing)
@@ -203,6 +208,7 @@ constructor(
                 it.copy(
                   runningTool = "",
                   failedTools = if (event.ok) it.failedTools else it.failedTools + event.name,
+                  shows = it.shows + event.shows,
                 )
               }
             is LoopEvent.Done -> {
@@ -280,7 +286,9 @@ constructor(
         "is done. Never invent a phone number - pass the name instead. " +
         "Call remember when the user says to keep something, and recall when they refer to " +
         "something you were not told in this conversation. If recall finds nothing, say so " +
-        "rather than filling the gap."
+        "rather than filling the gap. " +
+        "Use find_photo to look through the user\'s pictures; they appear on screen, and you " +
+        "cannot see them, so never describe what is in one."
 
     const val KEY_ROLES = "conversation_roles"
     const val KEY_TEXTS = "conversation_texts"

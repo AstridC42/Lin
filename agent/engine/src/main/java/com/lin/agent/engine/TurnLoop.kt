@@ -27,7 +27,12 @@ sealed interface LoopEvent {
   /** A tool is about to run. Worth showing: it is the difference between slow and stuck. */
   data class ToolStarted(val name: String) : LoopEvent
 
-  data class ToolFinished(val name: String, val ok: Boolean) : LoopEvent
+  /** [shows] is anything the tool produced for the screen rather than for the model. */
+  data class ToolFinished(
+    val name: String,
+    val ok: Boolean,
+    val shows: List<String> = emptyList(),
+  ) : LoopEvent
 
   data class Done(val text: String) : LoopEvent
 
@@ -109,7 +114,13 @@ class TurnLoop(
 
             emit(LoopEvent.ToolStarted(call.name))
             val result = runTool(call)
-            emit(LoopEvent.ToolFinished(call.name, result is ToolResult.Ok))
+            emit(
+              LoopEvent.ToolFinished(
+                name = call.name,
+                ok = result is ToolResult.Ok,
+                shows = (result as? ToolResult.Ok)?.shows.orEmpty(),
+              )
+            )
             messages.add(
               Message(
                 Message.Role.TOOL,

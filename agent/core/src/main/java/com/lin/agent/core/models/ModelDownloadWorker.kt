@@ -309,5 +309,5 @@ class ModelDownloadWorker(private val context: Context, params: WorkerParameters
  * foreground with no type at all throws `MissingForegroundServiceTypeException`, which WorkManager
  * does not catch either, so "ask for nothing" is the same crash by another name.
  */
-internal fun foregroundTypeFor(declaredInManifest: Int, wanted: Int): Int? =
+fun foregroundTypeFor(declaredInManifest: Int, wanted: Int): Int? =
   (declaredInManifest and wanted).takeIf { it != 0 }
