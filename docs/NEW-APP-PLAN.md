@@ -657,6 +657,60 @@ active, the output escaping into the unconstrained reasoning channel; the
 documented way around it is to turn thinking off explicitly, which this app
 already does on every structured turn, so it now says so on the wire.
 
+### Phase 9 — A corpus of its own use
+
+Asked for: a copy of every conversation, packed in thirties, as training data
+for the user's own models. Taken off the phone by hand for now; an uploader to
+their own server comes later.
+
+The output is JSONL with a `messages` key — one conversation per line, each a
+list of role/content turns. That is the conversational format TRL's SFT
+trainer reads directly, applying the model's own chat template; ShareGPT-style
+data has to be converted into it anyway. Getting the shape wrong would make
+the whole corpus useless, so it is pinned by tests rather than assumed.
+
+Three kinds of example are refused, and each would damage a fine-tune rather
+than merely bulk it out. Blank turns teach the model to say nothing. A
+trailing question with no answer is what a failed turn leaves behind — train
+on that and the next thing in the file becomes the answer to it. And the
+system prompt is not content: the trainer applies its own template, and a
+prompt repeated across every example is a prompt being learnt as data.
+
+**This needed a conversation boundary, and there was none.** Nothing in the
+app ended a conversation — the thread simply continued, which also meant it
+grew past the model's context eventually. Half an hour away now starts a new
+one, which is both how people think about it and what bounds the thread. The
+visible cost is that the scrollback goes after a gap; what it buys is a corpus
+of complete conversations rather than thirty prefixes of one, and turns that
+do not get slower all week.
+
+One file per conversation while it is open, named by its id, so continuing a
+conversation replaces its record instead of leaving a second partial copy.
+Only closed conversations count towards a pack.
+
+Two bugs the tests found, both the same shape — a number silently reused:
+deleting an exported pack made the next one take its number, and so did
+clearing the archive. Either would have had `lin-0002-….jsonl` overwrite an
+earlier `lin-0002-….jsonl` the moment both were copied into one folder:
+thirty conversations gone from a corpus nobody counts the lines of. The
+counter is now remembered rather than derived, and survives a clear.
+
+**Said plainly on the screen, because it is the honest part:** everything said
+to Lin is written to the phone in readable text, and a conversation that used a
+tool carries whatever the tool returned — which can include other people's
+messages and the contents of documents. On by default, unlike the digest,
+because this one was asked for.
+
+**Not captured:** the model's thinking. It is dropped at the end of each turn
+and never enters the message history, so recording it would mean carrying it
+through `Message` — worth doing if reasoning traces are wanted in the corpus,
+but not quietly half-done.
+
+**The seam for later:** packs are plain files in one directory with stable
+names, and are never deleted on being sent — sharing a file does not report
+whether it arrived. An uploader reads that directory; nothing about the API
+has been invented here.
+
 ### Phase 7 — Replace
 
 Take over `com.lin.assistant`, migrate the memory vault out of the fork, retire
