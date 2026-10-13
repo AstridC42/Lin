@@ -89,6 +89,7 @@ fun SettingsScreen(
   onBack: () -> Unit,
   onOpenMemory: () -> Unit = {},
   onOpenDocuments: () -> Unit = {},
+  onOpenTraining: () -> Unit = {},
   viewModel: SettingsViewModel = hiltViewModel(),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
@@ -289,6 +290,10 @@ fun SettingsScreen(
 
       OutlinedButton(onClick = onOpenDocuments, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.documents_title))
+      }
+
+      OutlinedButton(onClick = onOpenTraining, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.training_title))
       }
 
       OutlinedButton(

@@ -190,6 +190,23 @@ class SettingsRepository(private val context: Context) {
   suspend fun setServerKind(value: String) = write(SERVER_KIND, value)
 
   /**
+   * Whether to keep a copy of every conversation, for training a model on later.
+   *
+   * On by default, which is the opposite of the digest and deliberately so. The digest writes
+   * notes *about* somebody that then steer later answers, and it was not asked for; this keeps
+   * a copy of what they said for them to train on, and it was. A feature somebody requested
+   * should not have to be found afterwards.
+   *
+   * What it means is said on its own screen rather than only here: everything said to Lin is
+   * written to this phone in readable text, and a conversation that used a tool carries
+   * whatever the tool returned - which can include other people's messages and the contents of
+   * documents.
+   */
+  val keepTranscripts: Flow<Boolean> = read(KEEP_TRANSCRIPTS, true)
+
+  suspend fun setKeepTranscripts(value: Boolean) = write(KEEP_TRANSCRIPTS, value)
+
+  /**
    * Reads one setting, with [default] on any failure.
    *
    * `catch` rather than a bare flow: the corruption handler above covers a file that cannot be
@@ -239,5 +256,6 @@ class SettingsRepository(private val context: Context) {
     val DIGEST_CONVERSATIONS = booleanPreferencesKey("digest_conversations")
     val REASONING = stringPreferencesKey("reasoning")
     val SERVER_KIND = stringPreferencesKey("server_kind")
+    val KEEP_TRANSCRIPTS = booleanPreferencesKey("keep_transcripts")
   }
 }

@@ -49,6 +49,9 @@ import com.lin.agent.core.documents.DocumentLibrary
 import com.lin.agent.core.documents.Documents
 import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.memory.Digest
+import com.lin.agent.core.training.TrainingArchive
+import com.lin.agent.core.training.TrainingData
+import com.lin.agent.core.training.TrainingTurn
 import com.lin.agent.model.ConversationLog
 import com.lin.agent.model.DigestWorker
 import com.lin.agent.model.Embedders
@@ -143,6 +146,7 @@ constructor(
   private val documentLibrary: DocumentLibrary,
   private val documents: Documents,
   private val pdfPages: PdfPages,
+  private val archive: TrainingArchive,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
@@ -283,6 +287,10 @@ constructor(
     asked = if (spoken) Asked.SPOKEN else Asked.TYPED
     speaker.stop()
 
+    // Before the message is added, because this is what decides whether it joins the previous
+    // conversation or begins one - and beginning one clears what came before.
+    conversationNow()
+
     // The user's message goes up immediately, before anything is resolved. Choosing a backend
     // can mean asking the server whether it is there, and a message that only appears once that
     // round trip finishes reads as a Send button that did nothing.
@@ -396,6 +404,68 @@ constructor(
   // Saved as two parallel string lists rather than a serialised blob: SavedStateHandle survives a
   // configuration change, and keeping the shape trivial means a format mistake cannot throw during
   // one.
+  /**
+   * The conversation being had now, starting a new one after a long enough gap.
+   *
+   * Nothing in this app ends a conversation - the thread simply continues - so there has to be
+   * a boundary somewhere for "a conversation" to mean anything at all. Half an hour away is
+   * both how people think about it and what keeps the thread from growing past the model's
+   * context for ever, which it otherwise does.
+   *
+   * Starting a new one clears what came before, which is visible: the scrollback goes. That is
+   * the cost of the boundary and it buys two things - a corpus of complete conversations rather
+   * than thirty prefixes of one, and turns that do not get slower all week.
+   */
+  private fun conversationNow(): String {
+    val now = System.currentTimeMillis()
+    val last: Long = saved[KEY_LAST_ACTIVE] ?: 0L
+    val existing: String? = saved[KEY_CONVERSATION_ID]
+
+    val id =
+      if (existing == null || TrainingData.startsNewConversation(last, now)) {
+        // The one that just ended is recorded before it is let go of, so a conversation is never
+        // lost by walking away from it for an hour.
+        if (existing != null) captureNow(existing)
+        val fresh = java.util.UUID.randomUUID().toString()
+        saved[KEY_CONVERSATION_ID] = fresh
+        _state.update { it.copy(messages = emptyList(), streaming = "", error = "") }
+        persist(emptyList())
+        fresh
+      } else {
+        existing
+      }
+    saved[KEY_LAST_ACTIVE] = now
+    return id
+  }
+
+  /**
+   * Writes the current conversation into the training archive, if that is turned on.
+   *
+   * Keyed by the conversation's id, so continuing one replaces its record rather than leaving a
+   * second partial copy of it - see [com.lin.agent.core.training.TrainingArchive].
+   */
+  private fun captureNow(conversationId: String) {
+    val turns = _state.value.messages.map(::asTrainingTurn)
+    viewModelScope.launch {
+      if (!settings.keepTranscripts.first()) return@launch
+      archive.record(conversationId, turns)
+      archive.packIfReady(currentId = saved[KEY_CONVERSATION_ID])
+    }
+  }
+
+  private fun asTrainingTurn(message: Message) =
+    TrainingTurn(
+      role =
+        when (message.role) {
+          Message.Role.USER -> TrainingTurn.Role.USER
+          Message.Role.ASSISTANT -> TrainingTurn.Role.ASSISTANT
+          Message.Role.SYSTEM -> TrainingTurn.Role.SYSTEM
+          Message.Role.TOOL -> TrainingTurn.Role.TOOL
+        },
+      text = message.text,
+      toolName = message.toolName,
+    )
+
   private fun persist(messages: List<Message>) {
     saved[KEY_ROLES] = ArrayList(messages.map { it.role.name })
     saved[KEY_TEXTS] = ArrayList(messages.map { it.text })
@@ -421,6 +491,13 @@ constructor(
    */
   fun onStopped() {
     val messages = _state.value.messages
+
+    // The training copy first, and on its own terms. It is a different feature with a different
+    // switch and a much lower bar - a two-message exchange is a perfectly good training
+    // example, while it is nothing to write a memory about - so it must not sit behind the
+    // digest's threshold or the digest's setting.
+    saved.get<String>(KEY_CONVERSATION_ID)?.let { captureNow(it) }
+
     if (messages.size < Digest.MIN_MESSAGES) return
     viewModelScope.launch {
       if (!settings.digestConversations.first()) return@launch
@@ -480,5 +557,7 @@ constructor(
 
     const val KEY_ROLES = "conversation_roles"
     const val KEY_TEXTS = "conversation_texts"
+    const val KEY_CONVERSATION_ID = "conversation_id"
+    const val KEY_LAST_ACTIVE = "conversation_last_active"
   }
 }

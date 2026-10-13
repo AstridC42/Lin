@@ -24,6 +24,7 @@ import com.lin.agent.core.documents.DocumentLibrary
 import com.lin.agent.core.documents.Documents
 import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.core.training.TrainingArchive
 import com.lin.agent.engine.ModelServer
 import com.lin.agent.model.PhoneTool
 import com.lin.agent.core.media.PhotoLibrary
@@ -57,6 +58,10 @@ object AppModule {
 
   @Provides @Singleton
   fun providePdfPages(@ApplicationContext context: Context): PdfPages = PdfPages(context)
+
+  @Provides @Singleton
+  fun provideTrainingArchive(@ApplicationContext context: Context): TrainingArchive =
+    TrainingArchive(context.filesDir)
 
   @Provides @Singleton
   fun provideModelDownloads(@ApplicationContext context: Context): ModelDownloads =

@@ -135,6 +135,28 @@
     Unsloth printed, and put its sk-unsloth key in the header field below as
     "Authorization: Bearer sk-unsloth-…".</string>
 
+  <string name="training_title">Training data</string>
+  <string name="training_explain">Lin keeps a copy of every conversation and packs them into a
+    .jsonl file every %1$d. One conversation per line, in the messages format a trainer reads
+    directly. Everything said to Lin is written to this phone in readable text — and a
+    conversation that used a tool carries whatever the tool returned, which can include other
+    people\'s messages and the contents of documents you gave it.</string>
+  <string name="training_keep">Keep conversations</string>
+  <string name="training_keep_detail">Turning this off stops new ones being recorded. It does not
+    delete what is already here.</string>
+  <string name="training_pending">%1$d of %2$d conversations collected</string>
+  <string name="training_until_next">%1$d more and the next file is written.</string>
+  <string name="training_packs">%1$d file(s), %2$d KB</string>
+  <string name="training_no_packs">No files yet — the first is written once there are %1$d
+    conversations.</string>
+  <string name="training_pack_detail">%1$d conversations · %2$d KB</string>
+  <string name="training_send">Save or send this file</string>
+  <string name="training_delete_pack">Delete this file</string>
+  <string name="training_clear">Delete all training data</string>
+  <string name="training_clear_detail">This deletes %1$d packed file(s) and %2$d conversations
+    waiting to be packed. It cannot be undone, and they cannot be collected again.</string>
+  <string name="training_clear_confirm">Delete it all</string>
+
   <string name="documents_title">Documents</string>
   <string name="documents_explain">Lin can read a document you give it, and write new ones. It
     cannot browse your storage — each file here is one you added or shared to Lin, and removing it
