@@ -529,6 +529,28 @@ phone is not shippable however good the search is.
 Dictation, spoken replies, wake word, resident service, the assistant role, the
 power-button summon, notification replies.
 
+**Done:** dictation, spoken replies, the assistant role and the power-button
+summon — which between them are the point of the whole project stated in one
+intent filter. Lin is selectable under Android's digital assistant app, and
+being summoned that way opens listening, because there is no keyboard in that
+gesture.
+
+The microphone rules are a tested function rather than care taken in the UI.
+It opens only when summoned as the assistant or when the button is pressed,
+never because the app came to the front, and the permission is asked for at
+the button rather than at launch. Replies are spoken only when the question
+was spoken: a switch set last week should not answer a typed question out loud
+in a quiet room.
+
+Dictation prefers the on-device recogniser where the platform has one. That is
+a privacy choice rather than a performance one — the rest of this app keeps
+what is said on the phone unless the user pointed it at their own server, and
+a cloud recogniser would quietly undo that for every spoken word.
+
+**Still to do:** the wake word and the resident service, which need a
+wake-word model this app does not have and a continuously open microphone it
+has not earned; and notification replies with their read-back.
+
 ### Phase 7 — Replace
 
 Take over `com.lin.assistant`, migrate the memory vault out of the fork, retire
