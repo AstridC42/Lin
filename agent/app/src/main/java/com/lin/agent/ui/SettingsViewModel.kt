@@ -81,6 +81,7 @@ data class SettingsState(
   val serverModel: String = "",
   val answerOnServer: Boolean = false,
   val allowDirectCalls: Boolean = false,
+  val spokenReplies: Boolean = true,
   val photoIndex: IndexState = IndexState.Idle,
   val photosIndexed: Int = 0,
 )
@@ -123,6 +124,7 @@ constructor(
           serverModel = settings.serverModelName.first(),
           answerOnServer = settings.answerOnServer.first(),
           allowDirectCalls = settings.allowDirectCalls.first(),
+          spokenReplies = settings.spokenReplies.first(),
           memoryGb = memoryGb,
           socModel = com.lin.agent.core.models.currentSocModel(),
           modelsDirectory = store.directory().absolutePath,
@@ -275,6 +277,11 @@ constructor(
       memories.forgetAllFrom(MemorySource.PHOTO)
       _state.update { it.copy(photosIndexed = 0) }
     }
+  }
+
+  fun setSpokenReplies(on: Boolean) {
+    _state.update { it.copy(spokenReplies = on) }
+    viewModelScope.launch { settings.setSpokenReplies(on) }
   }
 
   fun setAllowDirectCalls(allow: Boolean, granted: Boolean) {

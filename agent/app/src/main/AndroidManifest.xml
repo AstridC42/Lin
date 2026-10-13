@@ -40,6 +40,9 @@
       the library query simply returns the photos the user picked, which is a reasonable answer
       rather than a failure.
     -->
+    <!-- Dictation. Asked for at the microphone button, never at launch. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
         android:minSdkVersion="33" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
@@ -84,6 +87,21 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!--
+              What makes Lin selectable as the phone's digital assistant, and so what the power
+              button and the assistant gesture summon. This is the whole point of the project
+              stated in one intent filter.
+
+              The simple ASSIST filter rather than a VoiceInteractionService: the full form
+              brings an overlay session and "Hey Google"-style always-listening, which needs a
+              wake-word model this app does not have and a microphone open continuously, which
+              it has not earned. This gets the role and the summon; the rest is Phase 6's
+              remaining half.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 

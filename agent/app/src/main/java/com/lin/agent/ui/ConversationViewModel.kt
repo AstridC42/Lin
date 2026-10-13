@@ -27,7 +27,17 @@ import com.lin.agent.engine.LoopEvent
 import com.lin.agent.engine.Message
 import com.lin.agent.engine.ToolRegistry
 import com.lin.agent.engine.TurnLoop
+import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.core.voice.Asked
+import com.lin.agent.core.voice.Launch
+import com.lin.agent.core.voice.shouldListenOnLaunch
+import com.lin.agent.core.voice.shouldSpeak
 import com.lin.agent.model.DelegateTool
+import com.lin.agent.voice.Dictation
+import com.lin.agent.voice.Heard
+import com.lin.agent.voice.Speaker
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import com.lin.agent.model.Embedders
 import com.lin.agent.model.FindPhotoTool
 import com.lin.agent.model.PhoneTool
@@ -73,6 +83,10 @@ data class ConversationState(
   val failedTools: List<String> = emptyList(),
   /** Pictures a tool found, shown directly rather than described by a model that cannot see. */
   val shows: List<String> = emptyList(),
+  /** True while the microphone is open. Shown, because an open microphone must be visible. */
+  val listening: Boolean = false,
+  /** Words recognised so far, so speaking does not look like nothing happening. */
+  val heard: String = "",
 )
 
 /**
@@ -95,6 +109,9 @@ constructor(
   private val phoneTool: PhoneTool,
   private val memories: MemoryStore,
   private val embedders: Embedders,
+  private val dictation: Dictation,
+  private val speaker: Speaker,
+  private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
 ) : ViewModel() {
 
@@ -119,8 +136,53 @@ constructor(
   private val _state = MutableStateFlow(ConversationState(messages = restored()))
   val state: StateFlow<ConversationState> = _state.asStateFlow()
 
+  /** The microphone, so leaving or sending closes it. */
+  private var listening: Job? = null
+
+  /** How the question in flight arrived. Decides whether the answer is spoken. */
+  private var asked = Asked.TYPED
+
   init {
     refreshReadiness()
+  }
+
+  /**
+   * Called once when the app opens, with how it was opened.
+   *
+   * Summoned as the assistant means somebody held the power button, and there is no keyboard
+   * in that gesture - so the microphone opens. Opened from the launcher, it never does.
+   */
+  fun onLaunched(launch: Launch, microphoneGranted: Boolean) {
+    if (shouldListenOnLaunch(launch, microphoneGranted)) startListening()
+  }
+
+  /** Opens the microphone and sends what it hears. */
+  fun startListening() {
+    if (_state.value.listening) return
+    speaker.stop()
+    listening?.cancel()
+    _state.update { it.copy(listening = true, heard = "", error = "") }
+    listening =
+      viewModelScope.launch {
+        dictation.listen().collect { event ->
+          when (event) {
+            is Heard.Partial -> _state.update { it.copy(heard = event.text) }
+            is Heard.Final -> {
+              _state.update { it.copy(listening = false, heard = "") }
+              asked = Asked.SPOKEN
+              send(event.text, spoken = true)
+            }
+            is Heard.Failed ->
+              _state.update { it.copy(listening = false, heard = "", error = event.message) }
+          }
+        }
+      }
+  }
+
+  fun stopListening() {
+    listening?.cancel()
+    listening = null
+    _state.update { it.copy(listening = false, heard = "") }
   }
 
   /**
@@ -150,9 +212,11 @@ constructor(
     }
   }
 
-  fun send(text: String) {
+  fun send(text: String, spoken: Boolean = false) {
     val trimmed = text.trim()
     if (trimmed.isEmpty() || _state.value.inProgress) return
+    asked = if (spoken) Asked.SPOKEN else Asked.TYPED
+    speaker.stop()
 
     // The user's message goes up immediately, before anything is resolved. Choosing a backend
     // can mean asking the server whether it is there, and a message that only appears once that
@@ -225,6 +289,7 @@ constructor(
                 )
               }
               persist(complete)
+              if (shouldSpeak(settings.spokenReplies.first(), asked)) speaker.say(event.text)
             }
             is LoopEvent.Failed -> {
               val shown =
@@ -266,6 +331,14 @@ constructor(
       val role = Message.Role.entries.firstOrNull { it.name == roles[i] } ?: return@mapNotNull null
       Message(role, texts[i])
     }
+  }
+
+  override fun onCleared() {
+    // The microphone and the voice both stop with the screen. Neither is something to leave
+    // running because a view model was discarded.
+    stopListening()
+    speaker.stop()
+    super.onCleared()
   }
 
   private companion object {

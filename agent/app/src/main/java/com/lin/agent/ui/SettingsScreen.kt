@@ -60,7 +60,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.core.models.DownloadState
 import com.lin.agent.engine.ServerModel
 import com.lin.agent.model.IndexState
+import android.content.Intent
 import android.os.Build
+import android.provider.Settings as AndroidSettings
+import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
 
 /**
@@ -161,6 +164,58 @@ fun SettingsScreen(
       ) {
         Text(stringResource(R.string.settings_open_memory))
       }
+
+      Text(
+        stringResource(R.string.settings_voice_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_voice_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              stringResource(R.string.settings_spoken_replies),
+              style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+              stringResource(R.string.settings_spoken_replies_detail),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(checked = state.spokenReplies, onCheckedChange = viewModel::setSpokenReplies)
+        }
+      }
+      val context = LocalContext.current
+      OutlinedButton(
+        onClick = {
+          // Android gives no way to request the assistant role directly - it is the user's
+          // choice to make in their own settings, which is correct. This only takes them there.
+          runCatching {
+            context.startActivity(
+              Intent(AndroidSettings.ACTION_VOICE_INPUT_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+          }
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(stringResource(R.string.settings_set_assistant))
+      }
+      Text(
+        stringResource(R.string.settings_assistant_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
 
       Text(
         stringResource(R.string.settings_photos_heading),

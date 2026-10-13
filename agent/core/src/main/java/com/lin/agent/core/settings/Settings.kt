@@ -139,6 +139,18 @@ class SettingsRepository(private val context: Context) {
   suspend fun setAllowDirectCalls(value: Boolean) = write(ALLOW_DIRECT_CALLS, value)
 
   /**
+   * Whether Lin reads its replies out when it was spoken to.
+   *
+   * On by default, unlike the other switches here, and the reason is the asymmetry: being
+   * answered out loud after speaking is what somebody who just spoke expects, while the cost of
+   * being wrong is a sentence they can interrupt. The rule in `shouldSpeak` is what keeps this
+   * from reading typed conversations aloud.
+   */
+  val spokenReplies: Flow<Boolean> = read(SPOKEN_REPLIES, true)
+
+  suspend fun setSpokenReplies(value: Boolean) = write(SPOKEN_REPLIES, value)
+
+  /**
    * Reads one setting, with [default] on any failure.
    *
    * `catch` rather than a bare flow: the corruption handler above covers a file that cannot be
@@ -184,5 +196,6 @@ class SettingsRepository(private val context: Context) {
     val SERVER_MODEL_NAME = stringPreferencesKey("server_model_name")
     val ANSWER_ON_SERVER = booleanPreferencesKey("answer_on_server")
     val ALLOW_DIRECT_CALLS = booleanPreferencesKey("allow_direct_calls")
+    val SPOKEN_REPLIES = booleanPreferencesKey("spoken_replies")
   }
 }

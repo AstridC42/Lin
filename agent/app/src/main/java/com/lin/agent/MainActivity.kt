@@ -31,6 +31,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.lin.agent.core.diag.CrashReport
 import com.lin.agent.core.diag.LaunchHealth
+import android.content.Intent
+import com.lin.agent.core.voice.Launch
 import com.lin.agent.ui.ConversationScreen
 import com.lin.agent.ui.MemoryScreen
 import com.lin.agent.ui.RecoveryScreen
@@ -107,6 +109,11 @@ class MainActivity : ComponentActivity() {
           MEMORY -> MemoryScreen(onBack = { screen = SETTINGS })
           else ->
             ConversationScreen(
+              // How the app was opened, which decides whether the microphone opens with it.
+              // Read from the intent rather than remembered, so returning to a summoned
+              // session later does not start listening again.
+              launch =
+                if (intent?.action == Intent.ACTION_ASSIST) Launch.ASSIST else Launch.NORMAL,
               onOpenSettings = { screen = SETTINGS },
               // The empty state's button goes to the same screen the gear does, which is where
               // the downloads live. One place to manage models, not two.
