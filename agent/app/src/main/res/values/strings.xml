@@ -135,6 +135,13 @@
     Unsloth printed, and put its sk-unsloth key in the header field below as
     "Authorization: Bearer sk-unsloth-…".</string>
 
+  <string name="settings_server_type_detail">Not every server lists its models. If yours does
+    not, type the model\'s name exactly as the server knows it — it will be used without
+    checking.</string>
+  <string name="settings_server_type_label">Model name</string>
+  <string name="settings_server_type_use">Use this name</string>
+  <string name="settings_server_type_using">Using %1$s</string>
+
   <string name="training_title">Training data</string>
   <string name="training_explain">Lin keeps a copy of every conversation and packs them into a
     .jsonl file every %1$d. One conversation per line, in the messages format a trainer reads

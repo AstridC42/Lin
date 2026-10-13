@@ -29,6 +29,7 @@ import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -94,18 +95,21 @@ class ModelServer(
       val url =
         serverUrl(typedUrl, kind, Endpoint.MODELS)
           ?: return@withContext ServerModelsResult.Failed(NO_ADDRESS)
+      var lastBody = ""
       try {
         openConnection(url, headersFrom(authHeader)).use { response ->
           if (response.status != HTTP_OK) {
-            return@withContext ServerModelsResult.Failed(describeStatus(response.status))
+            return@withContext ServerModelsResult.Failed(describeStatus(response.status, kind))
           }
+          // Held so the parser's failure can quote it - see wrongDialect.
+          lastBody = response.body
           ServerModelsResult.Found(parseModels(response.body, kind))
         }
       } catch (e: CancellationException) {
         throw e
       } catch (e: JSONException) {
         Log.w(TAG, "Not a $kind answer from $url", e)
-        ServerModelsResult.Failed(wrongDialect(kind))
+        ServerModelsResult.Failed(wrongDialect(kind, lastBody))
       } catch (e: Throwable) {
         Log.w(TAG, "Could not reach $url", e)
         ServerModelsResult.Failed(describeFailure(e))
@@ -132,6 +136,26 @@ class ModelServer(
      * setting at a vLLM server and pointing it at a router both produce "that is not Ollama",
      * and only one of them is fixed by changing the port.
      */
+    /**
+     * [wrongDialect], with a glimpse of what actually came back.
+     *
+     * Without this the message is a dead end: it says the answer was not understood and gives
+     * nobody - the user or whoever they ask - any way to find out what it was. A proxy's login
+     * page, an error envelope and an empty body all produce the same sentence otherwise.
+     *
+     * Short, and stripped of newlines so it stays one paragraph on a phone.
+     */
+    internal fun wrongDialect(kind: ServerKind, body: String): String {
+      val glimpse = body.trim().replace(Regex("\\s+"), " ").take(GLIMPSE)
+      if (glimpse.isEmpty()) {
+        return wrongDialect(kind) + " It sent an empty answer."
+      }
+      return wrongDialect(kind) + " It answered with: " + glimpse
+    }
+
+    /** Enough to recognise a login page or an error envelope, not enough to fill the screen. */
+    private const val GLIMPSE = 200
+
     internal fun wrongDialect(kind: ServerKind): String =
       when (kind) {
         ServerKind.OLLAMA -> NOT_OLLAMA
@@ -263,7 +287,16 @@ internal fun parseModels(body: String, kind: ServerKind = ServerKind.OLLAMA): Li
  * parser's, so the caller reports a wrong dialect rather than an empty server.
  */
 internal fun parseOpenAiModels(body: String): List<ServerModel> {
-  val models = JSONObject(body).getJSONArray("data")
+  // Three shapes, because "OpenAI-compatible" is a family rather than a specification. The
+  // standard is {"data":[…]}; some servers send {"models":[…]}; some send the array alone.
+  // Accepting all three costs four lines and is the difference between a working setup and
+  // "something answered, but not the way this expects".
+  val trimmed = body.trim()
+  val models =
+    if (trimmed.startsWith("[")) JSONArray(trimmed)
+    else
+      JSONObject(trimmed).let { it.optJSONArray("data") ?: it.optJSONArray("models") }
+        ?: throw JSONException("No model list in the answer")
   return (0 until models.length())
     .mapNotNull { index ->
       val entry = models.optJSONObject(index) ?: return@mapNotNull null
@@ -295,14 +328,29 @@ internal fun parseOllamaModels(body: String): List<ServerModel> {
 }
 
 /** What a non-200 means, in terms of what to go and change. */
-internal fun describeStatus(status: Int): String =
+internal fun describeStatus(status: Int, kind: ServerKind = ServerKind.OLLAMA): String =
   when (status) {
+    // Named per kind, because 401 means something different on each and the old wording -
+    // written when Ollama was the only option - sent somebody looking at their proxy when what
+    // their server actually wanted was its own API key.
     401,
     403 ->
-      "The server refused the request ($status). If it is behind Cloudflare Access or another " +
-        "proxy, the header field above is what it checks."
+      when (kind) {
+        ServerKind.UNSLOTH ->
+          "Unsloth refused the request ($status). It always wants its key: put it in the header " +
+            "field above, on one line, as\n\nAuthorization: Bearer sk-unsloth-…\n\nThe key is " +
+            "under Settings → API in Unsloth."
+        ServerKind.VLLM ->
+          "vLLM refused the request ($status). If it was started with --api-key, put that key in " +
+            "the header field above as\n\nAuthorization: Bearer your-key"
+        ServerKind.OLLAMA ->
+          "The server refused the request ($status). If it is behind Cloudflare Access or " +
+            "another proxy, the header field above is what it checks."
+      }
     404 ->
-      "Reached that address, but there is no Ollama API there (404). Check the port and the path."
+      "Reached that address, but there is nothing at that path (404). Either the port belongs to " +
+        "something else, or this server does not list its models - in which case type the " +
+        "model's name in below instead."
     in 500..599 ->
       "Reached that address and it returned an error ($status). If it is behind a tunnel, the " +
         "tunnel is up but Ollama behind it may not be."

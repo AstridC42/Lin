@@ -116,6 +116,7 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
       authHeader = settings.serverAuthHeader.first(),
       modelName = model,
       kind = serverKindNamed(settings.serverKind.first()),
+      assumeModelExists = settings.serverModelTyped.first(),
     )
   }
 
@@ -138,6 +139,7 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
         authHeader = settings.serverAuthHeader.first(),
         modelName = model,
         kind = serverKindNamed(settings.serverKind.first()),
+        assumeModelExists = settings.serverModelTyped.first(),
       )
     // Asked once here rather than per turn. A turn against a server that has gone away still
     // fails with its own message; this is what lets the phone take over before that happens.
