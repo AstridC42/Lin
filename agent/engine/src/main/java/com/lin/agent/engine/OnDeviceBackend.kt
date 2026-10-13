@@ -23,6 +23,7 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ResponseFormat
 import com.google.ai.edge.litertlm.MessageCallback
 import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.tool
@@ -36,6 +37,8 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * A model running on the phone, through LiteRT-LM.
@@ -87,23 +90,29 @@ class OnDeviceBackend(
   @Volatile private var conversation: Conversation? = null
 
   /**
-   * A second conversation, created only when a turn actually offers tools.
+   * A second conversation, for everything the plain one cannot express.
    *
-   * Two rather than one, and the separation is the safety property. Tool calling is the part of
-   * this app that cannot be checked without a phone, so the no-tools path stays exactly the code
-   * that is already answering on the device: a turn with no tools never touches any of this, and
-   * a mistake in the tool wiring cannot cost plain conversation.
+   * Two rather than one, and the separation is the safety property. The no-tools, no-prompt path
+   * stays exactly the code that is already answering on the device, and a mistake in any of this
+   * cannot cost plain conversation.
    *
-   * Keyed by the tool set it was built for, because tools are fixed when a conversation is
-   * created rather than per message, so a different set needs a different conversation. Cheap -
-   * the weights belong to the engine and are not reloaded.
+   * Keyed by the shape it was built for, because a system instruction, a tool set and a response
+   * format are all fixed when a conversation is created rather than per message - so a different
+   * shape needs a different conversation. Cheap: the weights belong to the engine and are not
+   * reloaded.
+   *
+   * This used to be keyed on tools alone, and everything else a request carried was dropped
+   * silently - see [shapeOf].
    */
-  @Volatile private var toolConversation: Conversation? = null
+  @Volatile private var shaped: Conversation? = null
 
-  @Volatile private var toolConversationFor: List<ToolSpec> = emptyList()
+  @Volatile private var shapedFor: TurnShape? = null
 
   /** The failure from the last load attempt, so a turn can report it rather than hang. */
   @Volatile private var loadFailure: String? = null
+
+  /** Held for the length of a turn, so two callers cannot generate on one engine at once. */
+  private val generation = Mutex()
 
   /** Reachable means loaded, and loading it is this method's job if it has not happened. */
   override suspend fun reachable(): Boolean = ensureLoaded() == null
@@ -230,7 +239,31 @@ class OnDeviceBackend(
           emit(TurnEvent.Failed("There was nothing to send."))
           return@flow
         }
-        emitAll(stream(conversationFor(request) ?: live, prompt))
+        val shape = shapeOf(request)
+        val built = if (shape == null) null else conversationFor(shape)
+        // One generation at a time, for as long as this one is being collected.
+        //
+        // Until the digest there was only ever one caller - a screen somebody was looking at -
+        // so turns could not overlap. A worker changes that: it can start while the app is
+        // backgrounded and still be running when the user reopens it and asks something. These
+        // are two conversations but one engine, with one set of weights behind them, and
+        // whatever that does under simultaneous generation is not something that can be checked
+        // off a device.
+        //
+        // So the second one waits. A digest is a few short facts against a schema, which is
+        // seconds; waiting seconds is a far better worst case for the user's turn than
+        // whichever error two generations at once produces.
+        generation.withLock {
+          emitAll(
+            stream(
+              live = built?.conversation ?: live,
+              prompt = prompt,
+              format = built?.format,
+              // A structured turn's conversation is closed when the turn ends - see [Built].
+              closeAfter = built?.takeIf { it.throwaway }?.conversation,
+            )
+          )
+        }
       }
       .flowOn(Dispatchers.IO)
 
@@ -252,42 +285,74 @@ class OnDeviceBackend(
   }
 
   /**
-   * The conversation to use for [request], or null to use the plain one.
+   * A conversation, the format it was built to accept, and whether it is this turn's alone.
    *
-   * Returns null for a turn with no tools, which is every turn today, so that path is untouched.
-   * It also returns null when building a tool conversation fails: the tools are then simply not
-   * offered, the model answers without them, and the turn still happens. Degrading to a plain
-   * reply is the right failure for something that cannot be verified off a device.
+   * The format travels with the conversation rather than being read off the request again at
+   * send time. A response format is only honoured by a conversation created to allow one, so
+   * sending it to any other is at best ignored - and if building the structured conversation
+   * failed and the turn fell back to the plain one, reading the request would do exactly that.
+   */
+  private data class Built(
+    val conversation: Conversation,
+    val format: ResponseFormat?,
+    val throwaway: Boolean,
+  )
+
+  /**
+   * A conversation built for [shape], or null to fall back to the plain one.
+   *
+   * Returns null when building fails: the request is then answered by the plain conversation
+   * rather than not at all. Degrading to a plain reply is the right failure for something that
+   * cannot be verified off a device.
+   *
+   * A structured turn gets a fresh conversation every time and never shares one. The only
+   * structured caller is the digest, which sends a whole transcript - so reusing its
+   * conversation would both carry one evening's messages into the next digest and leave them
+   * sitting in the engine's cache in between.
    */
   @Synchronized
-  private fun conversationFor(request: TurnRequest): Conversation? {
-    if (request.tools.isEmpty()) return null
-    toolConversation?.takeIf { toolConversationFor == request.tools }?.let {
-      return it
+  private fun conversationFor(shape: TurnShape): Built? {
+    if (!shape.structured) {
+      shaped?.takeIf { shapedFor == shape }?.let {
+        return Built(it, format = null, throwaway = false)
+      }
     }
 
     val started = engine ?: return null
     return try {
-      runCatching { toolConversation?.close() }
-      val fresh =
-        started.createConversation(
-          ConversationConfig(
-            samplerConfig =
-              SamplerConfig(topK = GREEDY_TOP_K, topP = 1.0, temperature = SAFE_TEMPERATURE),
-            tools = request.tools.map { tool(DeclaredTool(it)) },
-            // The loop runs the tools, not the engine. It is what scopes them by role, counts
-            // the budget and shows the user that something is happening - none of which the
-            // engine's own tool loop can do from in there.
-            automaticToolCalling = false,
-          )
+      val config =
+        ConversationConfig(
+          systemInstruction =
+            shape.systemPrompt.takeIf { it.isNotBlank() }?.let { Contents.of(it) },
+          samplerConfig =
+            SamplerConfig(topK = GREEDY_TOP_K, topP = 1.0, temperature = SAFE_TEMPERATURE),
+          tools = shape.tools.map { tool(DeclaredTool(it)) },
+          // The loop runs the tools, not the engine. It is what scopes them by role, counts
+          // the budget and shows the user that something is happening - none of which the
+          // engine's own tool loop can do from in there.
+          automaticToolCalling = false,
+          // Without this the per-message format is ignored and the schema means nothing.
+          enableResponseFormat = shape.structured,
         )
-      toolConversation = fresh
-      toolConversationFor = request.tools
-      fresh
+      shape.responseSchema?.let { schema ->
+        return Built(
+          conversation = started.createConversation(config),
+          format = ResponseFormat.json(schema),
+          throwaway = true,
+        )
+      }
+
+      runCatching { shaped?.close() }
+      val fresh = started.createConversation(config)
+      shaped = fresh
+      shapedFor = shape
+      Built(fresh, format = null, throwaway = false)
     } catch (e: Throwable) {
-      Log.w(TAG, "Could not offer tools; answering without them", e)
-      toolConversation = null
-      toolConversationFor = emptyList()
+      Log.w(TAG, "Could not build a conversation for $shape; answering plainly", e)
+      if (!shape.structured) {
+        shaped = null
+        shapedFor = null
+      }
       null
     }
   }
@@ -299,7 +364,12 @@ class OnDeviceBackend(
    * the previous app proved against these models, and it gives somewhere to cancel the native
    * work from when the collector goes away.
    */
-  private fun stream(live: Conversation, prompt: String): Flow<TurnEvent> {
+  private fun stream(
+    live: Conversation,
+    prompt: String,
+    format: ResponseFormat?,
+    closeAfter: Conversation?,
+  ): Flow<TurnEvent> {
     return callbackFlow {
       val accumulated = StringBuilder()
       val requested = mutableSetOf<String>()
@@ -344,7 +414,10 @@ class OnDeviceBackend(
       try {
         // The Contents overload rather than the Message one: Message's constructor is internal
         // to the library, and Contents is the form that will carry an image or a clip later.
-        live.sendMessageAsync(Contents.of(prompt), callback)
+        // Branched rather than passing null, so a turn with no schema makes exactly the call
+        // that is already proven against these models.
+        if (format == null) live.sendMessageAsync(Contents.of(prompt), callback)
+        else live.sendMessageAsync(Contents.of(prompt), callback, responseFormat = format)
       } catch (e: Throwable) {
         trySend(TurnEvent.Failed(message = explain(e), detail = e.message.orEmpty()))
         channel.close()
@@ -355,6 +428,9 @@ class OnDeviceBackend(
         // native work matters here: it holds the engine, so leaving it running would make the
         // next turn queue behind a reply nobody is waiting for.
         runCatching { live.cancelProcess() }
+        // A conversation built for this turn alone goes with it, taking what was sent to it out
+        // of the engine's cache rather than leaving it there until the next one.
+        closeAfter?.let { runCatching { it.close() } }
       }
     }
   }
@@ -362,8 +438,11 @@ class OnDeviceBackend(
   override fun close() = closeQuietly()
 
   private fun closeQuietly() {
+    runCatching { shaped?.close() }
     runCatching { conversation?.close() }
     runCatching { engine?.close() }
+    shaped = null
+    shapedFor = null
     conversation = null
     engine = null
   }

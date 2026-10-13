@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,6 +49,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +70,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.R
 import android.content.pm.PackageManager
@@ -98,6 +103,17 @@ fun ConversationScreen(
   val state by viewModel.state.collectAsStateWithLifecycle()
   var draft by rememberSaveable { mutableStateOf("") }
   val context = LocalContext.current
+
+  // "The conversation is over" is what being backgrounded looks like, and onCleared does not
+  // run for that - so the digest is triggered from the lifecycle rather than from teardown.
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_STOP) viewModel.onStopped()
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  }
 
   // Once per launch, not per recomposition - and not after a fold, which is why it is keyed on
   // the launch rather than on Unit alone.
@@ -211,6 +227,45 @@ fun ConversationScreen(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(12.dp),
               )
+            }
+          }
+        }
+      }
+
+      // The reply, in full, with the button that sends it. The model wrote these words; the
+      // person sends them - and a notification reply has no composer and no undo, so the exact
+      // text is shown rather than summarised.
+      val staged by viewModel.stagedReply.collectAsStateWithLifecycle()
+      staged?.let { reply ->
+        val replyContext = LocalContext.current
+        Card(
+          colors =
+            CardDefaults.cardColors(
+              containerColor = MaterialTheme.colorScheme.secondaryContainer
+            ),
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+          Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Text(
+              stringResource(R.string.reply_to, reply.to, reply.app),
+              style = MaterialTheme.typography.labelMedium,
+            )
+            Text(reply.text, style = MaterialTheme.typography.bodyLarge)
+            Text(
+              stringResource(R.string.reply_warning),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              Button(onClick = { viewModel.sendStagedReply(replyContext) }) {
+                Text(stringResource(R.string.reply_send))
+              }
+              OutlinedButton(onClick = viewModel::discardStagedReply) {
+                Text(stringResource(R.string.reply_discard))
+              }
             }
           }
         }

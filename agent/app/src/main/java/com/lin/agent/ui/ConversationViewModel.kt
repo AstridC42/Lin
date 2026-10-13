@@ -38,8 +38,20 @@ import com.lin.agent.voice.Heard
 import com.lin.agent.voice.Speaker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import com.lin.agent.R
+import com.lin.agent.core.memory.Digest
+import com.lin.agent.model.ConversationLog
+import com.lin.agent.model.DigestWorker
 import com.lin.agent.model.Embedders
 import com.lin.agent.model.FindPhotoTool
+import com.lin.agent.model.ReplyTool
+import com.lin.agent.model.UnreadTool
+import com.lin.agent.notifications.NotificationRelay
 import com.lin.agent.model.PhoneTool
 import com.lin.agent.model.RecallTool
 import com.lin.agent.model.RememberTool
@@ -110,13 +122,16 @@ constructor(
   private val memories: MemoryStore,
   private val embedders: Embedders,
   private val dictation: Dictation,
+  private val conversationLog: ConversationLog,
+  private val work: WorkManager,
+  private val relay: NotificationRelay,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
 ) : ViewModel() {
 
   /**
-   * What the orchestrator may do, which is currently one thing.
+   * What the orchestrator may do.
    *
    * Built here, once, from role-scoped tools - so the prompt the model sees can only ever
    * contain what an orchestrator is allowed to ask for. The previous app assembled forty-four
@@ -130,11 +145,40 @@ constructor(
         RememberTool(memories, embedders),
         RecallTool(memories, embedders),
         FindPhotoTool(memories, embedders),
+        UnreadTool(relay),
+        ReplyTool(relay),
       )
     )
 
   private val _state = MutableStateFlow(ConversationState(messages = restored()))
   val state: StateFlow<ConversationState> = _state.asStateFlow()
+
+  /**
+   * The reply written but not sent.
+   *
+   * Exposed straight from the relay rather than copied into the screen's state, so there is
+   * exactly one answer to "is something waiting to be sent" and the Send button cannot be
+   * looking at a stale copy of it.
+   */
+  val stagedReply = relay.staged
+
+  /**
+   * Sends it, or says why not.
+   *
+   * [NotificationRelay.send] can fail for reasons nobody here controls - the notification was
+   * dismissed while the card was on screen, or the app that posted it died and took its pending
+   * intent with it. Dropping that answer would leave the card sitting there after a tap, which
+   * reads as sent. On a feature whose whole point is that you know exactly what went out, a
+   * failure has to be louder than nothing.
+   */
+  fun sendStagedReply(context: android.content.Context) {
+    if (!relay.send(context)) {
+      _state.update { it.copy(error = context.getString(R.string.reply_failed)) }
+      relay.discard()
+    }
+  }
+
+  fun discardStagedReply() = relay.discard()
 
   /** The microphone, so leaving or sending closes it. */
   private var listening: Job? = null
@@ -333,6 +377,39 @@ constructor(
     }
   }
 
+  /**
+   * Called when the screen goes away, so a finished conversation can be read for memories.
+   *
+   * Here rather than in `onCleared`, which does not run when the app is merely backgrounded -
+   * and backgrounded is what "the conversation is over" usually looks like. Enqueued rather
+   * than run: the model takes long enough that doing it on the way out would hold the app
+   * open, and nothing is waiting for the result.
+   */
+  fun onStopped() {
+    val messages = _state.value.messages
+    if (messages.size < Digest.MIN_MESSAGES) return
+    viewModelScope.launch {
+      if (!settings.digestConversations.first()) return@launch
+      conversationLog.write(messages)
+      work.enqueueUniqueWork(
+        DIGEST_WORK,
+        // Replace: a newer conversation supersedes an older one that has not been read yet,
+        // and the log holds one at a time anyway.
+        ExistingWorkPolicy.REPLACE,
+        OneTimeWorkRequestBuilder<DigestWorker>()
+          .setConstraints(
+            // Nothing waits on this, so it can wait for the phone to be idle-ish. No network
+            // constraint: the model it uses is on the phone.
+            Constraints.Builder()
+              .setRequiresBatteryNotLow(true)
+              .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+              .build()
+          )
+          .build(),
+      )
+    }
+  }
+
   override fun onCleared() {
     // The microphone and the voice both stop with the screen. Neither is something to leave
     // running because a view model was discarded.
@@ -361,7 +438,11 @@ constructor(
         "something you were not told in this conversation. If recall finds nothing, say so " +
         "rather than filling the gap. " +
         "Use find_photo to look through the user\'s pictures; they appear on screen, and you " +
-        "cannot see them, so never describe what is in one."
+        "cannot see them, so never describe what is in one. " +
+        "reply_to_message writes a reply onto the screen for the user to send; it does " +
+        "not send, so read the wording back and never say a message has gone."
+
+    const val DIGEST_WORK = "digest"
 
     const val KEY_ROLES = "conversation_roles"
     const val KEY_TEXTS = "conversation_texts"

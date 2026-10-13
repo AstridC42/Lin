@@ -457,9 +457,20 @@ distance on the trimmed tails made `+972 50 123 4567` and `050 123 4567` read
 as a one-digit slip, which would have queried every correctly-copied
 international number.
 
-**Still to do:** notification reply with its read-back, calendar and reminders,
-media control, and MobileActions-270M as the intent parser. The remaining
-orchestrator tools (`recall`, `ask`, `answer`) belong with Phase 5's memory.
+**Also done: notification replies.** `unread_messages` lists what can be
+answered and `reply_to_message` writes a reply onto the screen — it does not
+send. The confirmation is the screen's rather than the model's, deliberately:
+the obvious design is for Lin to read the wording back and send when the user
+agrees, and that puts a 2B model in charge of deciding what agreement sounds
+like, on an action with no composer and no undo. The button is ground truth;
+"yes" is an interpretation. The model cannot reach the send path at all.
+
+The listener keeps only notifications that carry a reply action, in memory,
+for as long as the notification exists. Other people's messages passing
+through a phone are not something to collect.
+
+**Still to do:** calendar and reminders, media control, and
+MobileActions-270M as the intent parser.
 
 **Measurement:** the staged-action policy holds — calls open the dialer unless
 directly authorised, messages wait for a send, and a notification reply is read
@@ -507,7 +518,21 @@ memory with the evidence sitting unexamined next to it. The photo threshold is
 looser than memory's on purpose — a wrong picture costs a glance, a wrong
 memory gets stated as fact.
 
-**Still to do:** the background digest.
+**Also done: the background digest**, last because it writes things about
+somebody without being asked each time and that needed a screen to see it on
+first. Off by default — the one default here chosen against convenience, since
+the other switches decide what Lin may *do* and this decides what it *keeps*.
+
+The quality risk is the whole of it. Ask a 2B model what is worth remembering
+and it answers "the user said hello": a fact about the conversation, not about
+the person, and a store full of those is worse than an empty one because they
+crowd out the real entries in every search. So the schema is narrow, the
+prompt says what not to produce, and everything that comes back is filtered
+again — a prompt is a request and a filter is a rule. New facts are also
+checked against what is already stored, because a digest after every
+conversation rediscovers the same few things forever.
+
+Phase 5 is complete.
 
 Port `memory/`. Replace word-overlap search with embedding retrieval using
 **EmbeddingGemma 2 Text 270M**, 164 MB and co-resident with the chat model,

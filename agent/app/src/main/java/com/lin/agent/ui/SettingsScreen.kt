@@ -158,6 +158,62 @@ fun SettingsScreen(
         }
       }
 
+      Text(
+        stringResource(R.string.settings_messages_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_messages_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      val messagesContext = LocalContext.current
+      OutlinedButton(
+        onClick = {
+          // Notification access cannot be requested - only granted by the user in their own
+          // settings, which for this capability is right.
+          runCatching {
+            messagesContext.startActivity(
+              Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+          }
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(stringResource(R.string.settings_notification_access))
+      }
+
+      Text(
+        stringResource(R.string.settings_memory_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              stringResource(R.string.settings_digest),
+              style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+              stringResource(R.string.settings_digest_detail),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(
+            checked = state.digestConversations,
+            onCheckedChange = viewModel::setDigestConversations,
+          )
+        }
+      }
+
       OutlinedButton(
         onClick = onOpenMemory,
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),

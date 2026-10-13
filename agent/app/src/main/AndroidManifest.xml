@@ -132,6 +132,24 @@
             tools:node="merge" />
 
         <!--
+          Watches for messages that can be replied to. Only those - a notification with no
+          reply action is ignored rather than collected, because this exists to answer messages
+          and not to build a record of everything that crosses somebody's screen.
+
+          Notification access is granted by the user in system settings and cannot be
+          requested; the settings screen links there.
+        -->
+        <service
+            android:name=".notifications.LinNotificationListener"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!--
           The vendor libraries the engine is allowed to load, and the reason the GPU works.
 
           Since Android 12 an app may only dlopen a vendor or system native library it declares

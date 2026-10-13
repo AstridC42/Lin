@@ -6,6 +6,22 @@
   <string name="speak">Speak</string>
   <string name="stop_listening">Stop listening</string>
   <string name="listening">Listening…</string>
+  <string name="settings_messages_heading">Messages</string>
+  <string name="settings_messages_detail">Let Lin see messages that can be replied to, so it can
+    write an answer. Replies never send on their own — Lin writes, you press send.</string>
+  <string name="settings_notification_access">Allow Lin to see notifications</string>
+  <string name="reply_to">Reply to %1$s on %2$s</string>
+  <string name="reply_send">Send it</string>
+  <string name="reply_discard">Discard</string>
+  <string name="reply_warning">This sends immediately. There is no undo.</string>
+  <string name="reply_failed">That reply could not be sent - the message may have been dismissed. Nothing went out.</string>
+
+  <string name="settings_memory_heading">Memory</string>
+  <string name="settings_digest">Remember things from conversations</string>
+  <string name="settings_digest_detail">Off by default. When on, Lin reads a finished
+    conversation for lasting facts about you and writes them down without asking each time.
+    Everything it keeps is listed under what Lin remembers, and you can delete any of it.</string>
+
   <string name="settings_voice_heading">Voice</string>
   <string name="settings_voice_detail">Hold the power button, or use your phone\'s assistant
     gesture, and Lin opens listening. Set it as your assistant below.</string>

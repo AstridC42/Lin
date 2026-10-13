@@ -151,6 +151,19 @@ class SettingsRepository(private val context: Context) {
   suspend fun setSpokenReplies(value: Boolean) = write(SPOKEN_REPLIES, value)
 
   /**
+   * Whether Lin reads finished conversations for things worth remembering.
+   *
+   * Off by default, and that is the one default on this screen chosen against convenience. The
+   * other switches decide what Lin may do; this one decides what it writes down about somebody
+   * without being asked each time, which is a different kind of permission. Everything it
+   * writes is visible and deletable under what Lin remembers - but the first time it happens
+   * should be because the person said yes, not because they had not read the settings.
+   */
+  val digestConversations: Flow<Boolean> = read(DIGEST_CONVERSATIONS, false)
+
+  suspend fun setDigestConversations(value: Boolean) = write(DIGEST_CONVERSATIONS, value)
+
+  /**
    * Reads one setting, with [default] on any failure.
    *
    * `catch` rather than a bare flow: the corruption handler above covers a file that cannot be
@@ -197,5 +210,6 @@ class SettingsRepository(private val context: Context) {
     val ANSWER_ON_SERVER = booleanPreferencesKey("answer_on_server")
     val ALLOW_DIRECT_CALLS = booleanPreferencesKey("allow_direct_calls")
     val SPOKEN_REPLIES = booleanPreferencesKey("spoken_replies")
+    val DIGEST_CONVERSATIONS = booleanPreferencesKey("digest_conversations")
   }
 }
