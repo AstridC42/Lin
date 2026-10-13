@@ -634,6 +634,29 @@ glyph at a coordinate and has no reflowing text to change, so "edit this PDF"
 means rewriting it, which loses its layout. Lin says so rather than
 pretending.
 
+**Also done: vLLM and Unsloth as server options.** Both speak OpenAI's chat
+completions, so they share one backend; they are separate entries in the
+picker because what a person has to type differs, not because the wire
+format does. vLLM listens on 8000 with no key, Unsloth issues an
+`sk-unsloth-…` key and gets its port assigned. Presenting one
+"OpenAI-compatible" option and leaving somebody to work out which fields
+their server needs would be the tidier enum and the worse product.
+
+`OllamaBackend` and `OllamaServer` became `ServerBackend` and `ModelServer`,
+keyed on the dialect, because the streaming loop is identical for all three —
+only the address, the request body and the shape of a chunk differ, and each
+of those is one call.
+
+Two things in the OpenAI dialect were established by reading the current
+documentation rather than from memory, and both would have failed silently.
+The reasoning field was renamed: older vLLM returns `reasoning_content`,
+newer returns `reasoning`, so both are read — one would have shown no
+thinking at all on half the installations in the wild. And vLLM has a known
+bug where a response schema is not enforced while a reasoning parser is
+active, the output escaping into the unconstrained reasoning channel; the
+documented way around it is to turn thinking off explicitly, which this app
+already does on every structured turn, so it now says so on the wire.
+
 ### Phase 7 — Replace
 
 Take over `com.lin.assistant`, migrate the memory vault out of the fork, retire

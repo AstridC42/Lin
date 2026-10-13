@@ -35,6 +35,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -68,6 +69,7 @@ import android.provider.Settings as AndroidSettings
 import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
 import com.lin.agent.engine.Reasoning
+import com.lin.agent.engine.ServerKind
 
 /**
  * Settings, which for now is the server address and what the phone can run.
@@ -125,11 +127,31 @@ fun SettingsScreen(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
+      // Which kind, before the address, because it decides what a correct address looks like
+      // and what the key field is for.
+      Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        ServerKind.entries.forEach { kind ->
+          FilterChip(
+            selected = state.serverKind == kind,
+            onClick = { viewModel.setServerKind(kind) },
+            label = { Text(serverKindLabel(kind)) },
+          )
+        }
+      }
+      Text(
+        stringResource(serverKindDetail(state.serverKind)),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+
       OutlinedTextField(
         value = state.ollamaUrl,
         onValueChange = viewModel::onUrlChanged,
         label = { Text(stringResource(R.string.settings_server_url)) },
-        placeholder = { Text("http://192.168.1.50:11434") },
+        placeholder = { Text(serverKindPlaceholder(state.serverKind)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
       )
@@ -785,3 +807,27 @@ private fun ReasoningChoice(
     }
   }
 }
+
+/** The name shown on a chip. Not localised: these are product names. */
+private fun serverKindLabel(kind: ServerKind): String =
+  when (kind) {
+    ServerKind.OLLAMA -> "Ollama"
+    ServerKind.VLLM -> "vLLM"
+    ServerKind.UNSLOTH -> "Unsloth"
+  }
+
+/** What to type for this kind, which is the whole reason the kinds are listed separately. */
+@StringRes
+private fun serverKindDetail(kind: ServerKind): Int =
+  when (kind) {
+    ServerKind.OLLAMA -> R.string.settings_server_kind_ollama
+    ServerKind.VLLM -> R.string.settings_server_kind_vllm
+    ServerKind.UNSLOTH -> R.string.settings_server_kind_unsloth
+  }
+
+private fun serverKindPlaceholder(kind: ServerKind): String =
+  when (kind) {
+    ServerKind.OLLAMA -> "http://192.168.1.50:11434"
+    ServerKind.VLLM -> "http://192.168.1.50:8000"
+    ServerKind.UNSLOTH -> "http://192.168.1.50:8080"
+  }

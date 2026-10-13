@@ -22,7 +22,8 @@ import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.LlmBackend
-import com.lin.agent.engine.OllamaBackend
+import com.lin.agent.engine.ServerBackend
+import com.lin.agent.engine.serverKindNamed
 import com.lin.agent.engine.OnDeviceBackend
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -110,10 +111,11 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
     val url = settings.serverUrl.first()
     val model = settings.serverModelName.first()
     if (url.isBlank() || model.isBlank()) return null
-    return OllamaBackend(
+    return ServerBackend(
       baseUrl = url,
       authHeader = settings.serverAuthHeader.first(),
       modelName = model,
+      kind = serverKindNamed(settings.serverKind.first()),
     )
   }
 
@@ -130,8 +132,13 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
       } ?: none()
     }
 
-    val server = OllamaBackend(baseUrl = url, authHeader = settings.serverAuthHeader.first(),
-      modelName = model)
+    val server =
+      ServerBackend(
+        baseUrl = url,
+        authHeader = settings.serverAuthHeader.first(),
+        modelName = model,
+        kind = serverKindNamed(settings.serverKind.first()),
+      )
     // Asked once here rather than per turn. A turn against a server that has gone away still
     // fails with its own message; this is what lets the phone take over before that happens.
     if (server.reachable()) return ChatReadiness.Ready(server)

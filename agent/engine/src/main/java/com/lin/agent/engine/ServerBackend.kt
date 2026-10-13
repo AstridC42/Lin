@@ -38,16 +38,24 @@ import org.json.JSONObject
  * the server and it decides what to keep resident - so a backend is cheap to build, cheap to
  * throw away, and safe to rebuild whenever the address or the chosen model changes.
  */
-class OllamaBackend(
+class ServerBackend(
   private val baseUrl: String,
   private val authHeader: String,
   private val modelName: String,
-  private val server: OllamaServer = OllamaServer(),
+  /**
+   * Which dialect to speak.
+   *
+   * Defaults to Ollama, which is what this app shipped with. One backend rather than two
+   * because the loop below is identical for all of them - what differs is the address, the
+   * request body and the shape of a streamed chunk, and each of those is one call.
+   */
+  private val kind: ServerKind = ServerKind.OLLAMA,
+  private val server: ModelServer = ModelServer(),
   private val openStream: (url: String, headers: Map<String, String>, body: String) -> Stream =
     ::httpStream,
 ) : LlmBackend {
 
-  /** A streamed response, one JSON object per line, as Ollama sends them. */
+  /** A streamed response: one JSON object per line from Ollama, or SSE events from the rest. */
   interface Stream : AutoCloseable {
     val status: Int
 
@@ -82,29 +90,33 @@ class OllamaBackend(
    * that somebody removed a model.
    */
   override suspend fun reachable(): Boolean =
-    when (val result = server.models(baseUrl, authHeader)) {
+    when (val result = server.models(baseUrl, authHeader, kind)) {
       is ServerModelsResult.Found -> result.models.any { it.name == modelName }
       is ServerModelsResult.Failed -> false
     }
 
   override fun converse(request: TurnRequest): Flow<TurnEvent> =
     flow {
-        val url = chatUrl(baseUrl)
+        val url = serverUrl(baseUrl, kind, Endpoint.CHAT)
         if (url == null) {
-          emit(TurnEvent.Failed(OllamaServer.NO_ADDRESS))
+          emit(TurnEvent.Failed(ModelServer.NO_ADDRESS))
           return@flow
         }
 
         val answer = StringBuilder()
         var understoodAnything = false
         try {
-          openStream(url, headersFrom(authHeader), chatRequestBody(modelName, request)).use { s ->
+          val body =
+            if (kind.speaksOpenAi) openAiRequestBody(modelName, request)
+            else chatRequestBody(modelName, request)
+          openStream(url, headersFrom(authHeader), body).use { s ->
             if (s.status != HTTP_OK) {
               emit(TurnEvent.Failed(describeStatus(s.status), s.errorBody.take(DETAIL_CHARS)))
               return@use
             }
             for (line in s.lines) {
-              val chunk = readChunk(line) ?: continue
+              val chunk =
+                (if (kind.speaksOpenAi) readOpenAiChunk(line) else readChunk(line)) ?: continue
               understoodAnything = true
               if (chunk.error.isNotEmpty()) {
                 emit(TurnEvent.Failed(serverSaid(chunk.error), chunk.error))
@@ -126,7 +138,7 @@ class OllamaBackend(
             // discarding a reply that was merely cut short.
             when {
               answer.isNotEmpty() -> emit(TurnEvent.Done(answer.toString()))
-              !understoodAnything -> emit(TurnEvent.Failed(OllamaServer.NOT_OLLAMA))
+              !understoodAnything -> emit(TurnEvent.Failed(ModelServer.wrongDialect(kind)))
               else ->
                 emit(TurnEvent.Failed("The server accepted the request and sent nothing back."))
             }
@@ -148,7 +160,7 @@ class OllamaBackend(
     }
 
   companion object {
-    private const val TAG = "LinOllamaBackend"
+    private const val TAG = "LinServerBackend"
     private const val HTTP_OK = 200
     private const val DETAIL_CHARS = 300
 
@@ -325,3 +337,173 @@ private fun wireRole(role: Message.Role): String =
     Message.Role.SYSTEM -> "system"
     Message.Role.TOOL -> "tool"
   }
+
+/**
+ * The request body for an OpenAI-compatible `POST /v1/chat/completions`.
+ *
+ * vLLM and Unsloth both speak this, which is why they share a backend. What differs between them
+ * is what a person types, not what goes on the wire.
+ */
+internal fun openAiRequestBody(model: String, request: TurnRequest): String {
+  val messages = JSONArray()
+  if (request.systemPrompt.isNotBlank()) {
+    messages.put(JSONObject().put("role", "system").put("content", request.systemPrompt))
+  }
+  for (message in request.messages) {
+    messages.put(
+      JSONObject().put("role", wireRole(message.role)).put("content", message.text).apply {
+        // A tool result has to say which tool, and OpenAI's field for that is `name`.
+        if (message.toolName.isNotEmpty()) put("name", message.toolName)
+      }
+    )
+  }
+
+  val body =
+    JSONObject()
+      .put("model", model)
+      .put("messages", messages)
+      .put("stream", true)
+      .put("temperature", request.temperature)
+      // top_k is not an OpenAI field. vLLM accepts it, an OpenAI-faithful server rejects an
+      // unknown one, and greedy is already expressed by temperature 0 - so it is left out
+      // rather than risking the whole request for a parameter that changes nothing here.
+      .put("top_p", 1.0)
+
+  if (request.tools.isNotEmpty()) {
+    val tools = JSONArray()
+    for (tool in request.tools) {
+      tools.put(
+        JSONObject()
+          .put("type", "function")
+          .put(
+            "function",
+            JSONObject()
+              .put("name", tool.name)
+              .put("description", tool.description)
+              .put("parameters", JSONObject(tool.parametersSchema)),
+          )
+      )
+    }
+    body.put("tools", tools)
+  }
+
+  // Structured output, in the form both of these take: a named schema under response_format.
+  // `strict` is what makes it a constraint rather than a suggestion on servers that honour it.
+  request.responseSchema?.let { schema ->
+    body.put(
+      "response_format",
+      JSONObject()
+        .put("type", "json_schema")
+        .put(
+          "json_schema",
+          JSONObject()
+            .put("name", "answer")
+            .put("schema", JSONObject(schema))
+            .put("strict", true),
+        ),
+    )
+  }
+
+  // Thinking, which is not an OpenAI field at all: both of these pass extra arguments into the
+  // model's chat template, and that is where the switch lives.
+  //
+  // Sent on a structured turn too, as false, and that is the one place this says something it
+  // could have left out. vLLM has a known bug where a schema is not enforced while a reasoning
+  // parser is active - the output escapes into the unconstrained reasoning channel - and
+  // turning thinking off explicitly is the documented way around it. This app never thinks on a
+  // structured turn anyway, so saying so costs nothing and buys a working schema.
+  val thinking = thinkingFor(request.reasoning, structured = request.responseSchema != null)
+  if (thinking != null || request.responseSchema != null) {
+    body.put(
+      "chat_template_kwargs",
+      JSONObject().put("enable_thinking", thinking != null),
+    )
+  }
+
+  return body.toString()
+}
+
+/**
+ * Reads one line of an OpenAI-style stream, or null if there is nothing in it worth acting on.
+ *
+ * Server-sent events rather than Ollama's bare JSON lines: each payload arrives as `data: {…}`,
+ * blank lines separate events, and the stream ends with a literal `data: [DONE]`.
+ *
+ * Deltas, not snapshots. A chat-completions chunk carries `choices[0].delta`, which holds only
+ * what is new - so the caller appends, exactly as it does for Ollama.
+ */
+internal fun readOpenAiChunk(line: String): ChatChunk? {
+  val trimmed = line.trim()
+  if (trimmed.isEmpty()) return null
+
+  // An error comes back as a plain JSON object rather than an SSE event, so it is tried first.
+  if (!trimmed.startsWith(SSE_DATA)) {
+    val json = runCatching { JSONObject(trimmed) }.getOrNull() ?: return null
+    val error = errorTextOf(json)
+    return if (error.isEmpty()) null else ChatChunk(error = error)
+  }
+
+  val payload = trimmed.removePrefix(SSE_DATA).trim()
+  if (payload == SSE_DONE) return ChatChunk(done = true)
+
+  val json = runCatching { JSONObject(payload) }.getOrNull() ?: return null
+  errorTextOf(json).takeIf { it.isNotEmpty() }?.let {
+    return ChatChunk(error = it)
+  }
+
+  val choice = json.optJSONArray("choices")?.optJSONObject(0)
+  val delta = choice?.optJSONObject("delta") ?: choice?.optJSONObject("message")
+
+  return ChatChunk(
+    text = delta?.optString("content").orEmpty(),
+    // `finish_reason` is how a chat completion says it is finished. The [DONE] line follows,
+    // but not every server sends one - so the reply must not depend on it arriving.
+    done = choice?.optString("finish_reason").orEmpty().let { it.isNotEmpty() && it != "null" },
+    toolCalls = delta?.let(::readOpenAiToolCalls).orEmpty(),
+    // Both names, because the field was renamed. Older vLLM returns `reasoning_content`; newer
+    // examples use `reasoning`. Reading one would silently show no thinking on half the
+    // versions in the wild, and which half would depend on when somebody installed it.
+    thinking =
+      delta?.optString("reasoning_content").orEmpty().ifEmpty {
+        delta?.optString("reasoning").orEmpty()
+      },
+  )
+}
+
+/** An error object's message, wherever this family of servers put it. */
+private fun errorTextOf(json: JSONObject): String {
+  json.optJSONObject("error")?.let { error ->
+    return error.optString("message").ifEmpty { error.toString() }
+  }
+  return json.optString("error")
+}
+
+/**
+ * Tool calls on one delta, in OpenAI's shape: `tool_calls[].function.{name,arguments}`.
+ *
+ * `arguments` is a JSON *string* here, not an object - that is the format, and parsing it is not
+ * optional. A call whose arguments will not parse is passed on with none rather than dropped:
+ * the loop then runs the tool and the tool says what it needed, which is a better failure than
+ * a model that asked for something and was ignored.
+ *
+ * Streamed tool calls arrive in fragments across deltas on some servers. One whose name has not
+ * arrived yet is skipped, because a call with no name cannot be looked up - the delta that
+ * carries the name is the one that counts.
+ */
+internal fun readOpenAiToolCalls(delta: JSONObject): List<ToolInvocation> {
+  val calls = delta.optJSONArray("tool_calls") ?: return emptyList()
+  return (0 until calls.length()).mapNotNull { index ->
+    val function = calls.optJSONObject(index)?.optJSONObject("function") ?: return@mapNotNull null
+    val name = function.optString("name").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+    val raw = function.optString("arguments")
+    val arguments = runCatching { JSONObject(raw) }.getOrNull()
+    ToolInvocation(
+      name = name,
+      arguments = arguments?.keys()?.asSequence()?.associateWith { arguments.get(it) }.orEmpty(),
+    )
+  }
+}
+
+private const val SSE_DATA = "data:"
+
+private const val SSE_DONE = "[DONE]"
