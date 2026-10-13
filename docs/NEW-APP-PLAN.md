@@ -490,8 +490,24 @@ it thinks is worth keeping is only acceptable if the user can see what it
 decided and undo it, so shipping the writing first would leave a period where
 the app holds things about somebody they cannot look at.
 
-**Still to do:** the media half — photo indexing and search — and the
-background digest.
+**Also done: the media half.** The photo library is indexed on the device into
+the same vector store and the same 768 dimensions as memory, which is what the
+740M multimodal embedder was chosen for — a description and a picture compare
+directly, so "the one from the beach" is one query rather than a captioning
+pipeline and a join.
+
+The run is a resumable foreground worker: thousands of photos take real time,
+the phone sleeps, and anything already indexed is skipped so the next start
+continues rather than begins again. Nothing is uploaded and no picture is
+copied; what is stored is a vector and the content URI the system already has.
+
+Matches go to the screen as pictures and the model is told only how many there
+are. It cannot see them, and letting it describe one would be inventing a
+memory with the evidence sitting unexamined next to it. The photo threshold is
+looser than memory's on purpose — a wrong picture costs a glance, a wrong
+memory gets stated as fact.
+
+**Still to do:** the background digest.
 
 Port `memory/`. Replace word-overlap search with embedding retrieval using
 **EmbeddingGemma 2 Text 270M**, 164 MB and co-resident with the chat model,

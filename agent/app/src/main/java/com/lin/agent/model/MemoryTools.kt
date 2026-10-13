@@ -107,15 +107,22 @@ class RememberTool(
     val fact = (arguments["fact"] as? String)?.trim().orEmpty()
     if (fact.isEmpty()) return ToolResult.Failed("There was nothing to remember.")
 
-    val vector =
-      embedders.withEmbedder { it.embed(listOf(EmbedPart.Text(fact))) }
-        ?: return ToolResult.Failed(NO_EMBEDDER)
-    if (vector.isEmpty()) return ToolResult.Failed("The embedding model could not read that.")
+    // Saved first, embedded if possible. The other order refused to keep anything at all when
+    // the embedding model was not downloaded - so "remember my name is Otto" stored nothing,
+    // while the assistant said it had. Keeping a fact and being able to search for it are two
+    // problems and this used to treat them as one.
+    val vector = embedders.withEmbedder { it.embed(listOf(EmbedPart.Text(fact))) } ?: FloatArray(0)
+    val id = memories.remember(Memory(text = fact, source = MemorySource.TOLD), vector)
+    if (id < 0) return ToolResult.Failed("That could not be saved.")
 
-    val id =
-      memories.remember(Memory(text = fact, source = MemorySource.TOLD), vector)
-    return if (id < 0) ToolResult.Failed("That could not be saved.")
-    else ToolResult.Ok("Remembered: $fact")
+    return if (vector.isEmpty()) {
+      ToolResult.Ok(
+        "Saved: $fact. Tell the user it is kept and visible under what Lin remembers, but " +
+          "cannot be searched until they download EmbeddingGemma 2 in settings."
+      )
+    } else {
+      ToolResult.Ok("Remembered: $fact")
+    }
   }
 }
 
@@ -154,8 +161,12 @@ class RecallTool(
     if (about.isEmpty()) return ToolResult.Failed("There was nothing to look for.")
 
     val vector =
-      embedders.withEmbedder { it.embed(listOf(EmbedPart.Text(about))) }
-        ?: return ToolResult.Failed(NO_EMBEDDER)
+      embedders.withEmbedder { embedder ->
+          // Anything saved before the embedder arrived is embedded now, on the way past. A few
+          // at a time: this runs while somebody waits for an answer.
+          backfill(embedder)
+          embedder.embed(listOf(EmbedPart.Text(about)))
+        } ?: return ToolResult.Failed(unsearchable())
     if (vector.isEmpty()) return ToolResult.Failed("The embedding model could not read that.")
 
     val found = memories.search(vector, sources = setOf(MemorySource.TOLD, MemorySource.CONVERSATION))
@@ -173,5 +184,22 @@ class RecallTool(
         found.forEach { append("\n- ").append(it.memory.text) }
       }
     )
+  }
+
+  private suspend fun backfill(embedder: com.lin.agent.engine.Embedder) {
+    for (memory in memories.withoutVectors()) {
+      val vector = embedder.embed(listOf(EmbedPart.Text(memory.text)))
+      if (vector.isNotEmpty()) memories.setVector(memory.id, vector)
+    }
+  }
+
+  /** Says what is held even when it cannot be searched, so the count is not a mystery. */
+  private suspend fun unsearchable(): String {
+    val held = memories.count()
+    return if (held == 0) NO_EMBEDDER
+    else
+      "$held things are remembered but cannot be searched yet - that needs EmbeddingGemma 2, " +
+        "which is not downloaded. Tell the user they can get it in settings, and that nothing " +
+        "has been lost."
   }
 }

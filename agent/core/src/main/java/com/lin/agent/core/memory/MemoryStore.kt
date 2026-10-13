@@ -40,7 +40,15 @@ class MemoryStore(context: Context) {
 
   private val helper = Helper(context.applicationContext)
 
-  /** Saves something to remember, with the vector to find it by. Returns its id. */
+  /**
+   * Saves something to remember. Returns its id.
+   *
+   * [vector] may be empty, and that is the point. Keeping a fact and being able to search for it
+   * are two problems, and this conflated them: with no embedding model downloaded, "remember my
+   * name is Otto" stored nothing at all. A memory with no vector is held, shown on the memory
+   * screen and backfilled by [withoutVectors] once an embedder exists - which is strictly better
+   * than discarding what somebody asked to be kept because a 484 MB download is missing.
+   */
   suspend fun remember(memory: Memory, vector: FloatArray): Long =
     withContext(Dispatchers.IO) {
       runCatching {
@@ -52,7 +60,9 @@ class MemoryStore(context: Context) {
               put(SOURCE, memory.source.name)
               put(REFERENCE, memory.reference)
               put(CREATED_AT, memory.createdAt.takeIf { it > 0 } ?: System.currentTimeMillis())
-              put(VECTOR, vector.toBytes())
+              // Null rather than an empty blob, so "not embedded yet" is a state the
+              // query below can select on rather than a length somebody has to remember.
+              if (vector.isEmpty()) putNull(VECTOR) else put(VECTOR, vector.toBytes())
             },
           )
         }
@@ -92,6 +102,94 @@ class MemoryStore(context: Context) {
         .getOrDefault(emptyList())
     }
 
+  /**
+   * Memories saved before there was an embedder, oldest first.
+   *
+   * The backfill queue. Bounded because this runs on the way into a search, and a thousand
+   * embeddings is not something to do while somebody waits for an answer.
+   */
+  suspend fun withoutVectors(limit: Int = 25): List<Memory> =
+    withContext(Dispatchers.IO) {
+      runCatching {
+          helper.readableDatabase
+            .query(
+              TABLE,
+              COLUMNS,
+              "$VECTOR IS NULL",
+              null,
+              null,
+              null,
+              "$CREATED_AT ASC",
+              limit.toString(),
+            )
+            .use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.toMemory()) } }
+        }
+        .onFailure { Log.w(TAG, "Could not list un-embedded memories", it) }
+        .getOrDefault(emptyList())
+    }
+
+  /** Attaches a vector to a memory that was saved without one. */
+  suspend fun setVector(id: Long, vector: FloatArray): Boolean =
+    withContext(Dispatchers.IO) {
+      if (vector.isEmpty()) return@withContext false
+      runCatching {
+          helper.writableDatabase.update(
+            TABLE,
+            ContentValues().apply { put(VECTOR, vector.toBytes()) },
+            "$ID = ?",
+            arrayOf(id.toString()),
+          ) > 0
+        }
+        .onFailure { Log.w(TAG, "Could not attach a vector to $id", it) }
+        .getOrDefault(false)
+    }
+
+  /**
+   * The references already indexed for [source], so a run can skip them.
+   *
+   * What makes photo indexing resumable. Thousands of images take long enough that it will be
+   * interrupted - the phone sleeps, the user leaves - and starting again from the beginning
+   * each time means it never finishes on a library of any size.
+   */
+  suspend fun referencesFor(source: MemorySource): Set<String> =
+    withContext(Dispatchers.IO) {
+      runCatching {
+          helper.readableDatabase
+            .query(
+              TABLE,
+              arrayOf(REFERENCE),
+              "$SOURCE = ? AND $REFERENCE != ''",
+              arrayOf(source.name),
+              null,
+              null,
+              null,
+            )
+            .use { cursor -> buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) } }
+        }
+        .onFailure { Log.w(TAG, "Could not list indexed references", it) }
+        .getOrDefault(emptySet())
+    }
+
+  /** Removes everything from one source. Used to un-index the photo library. */
+  suspend fun forgetAllFrom(source: MemorySource): Int =
+    withContext(Dispatchers.IO) {
+      runCatching {
+          helper.writableDatabase.delete(TABLE, "$SOURCE = ?", arrayOf(source.name))
+        }
+        .onFailure { Log.w(TAG, "Could not clear $source", it) }
+        .getOrDefault(0)
+    }
+
+  suspend fun countFrom(source: MemorySource): Int =
+    withContext(Dispatchers.IO) {
+      runCatching {
+          helper.readableDatabase
+            .rawQuery("SELECT COUNT(*) FROM $TABLE WHERE $SOURCE = ?", arrayOf(source.name))
+            .use { if (it.moveToFirst()) it.getInt(0) else 0 }
+        }
+        .getOrDefault(0)
+    }
+
   suspend fun forget(id: Long): Boolean =
     withContext(Dispatchers.IO) {
       runCatching { helper.writableDatabase.delete(TABLE, "$ID = ?", arrayOf(id.toString())) > 0 }
@@ -116,7 +214,7 @@ class MemoryStore(context: Context) {
       .query(
         TABLE,
         COLUMNS + VECTOR,
-        "$SOURCE IN ($placeholders)",
+        "$SOURCE IN ($placeholders) AND $VECTOR IS NOT NULL",
         sources.map { it.name }.toTypedArray(),
         null,
         null,

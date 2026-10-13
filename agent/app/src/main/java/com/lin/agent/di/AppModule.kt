@@ -23,6 +23,7 @@ import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.OllamaServer
 import com.lin.agent.model.PhoneTool
+import com.lin.agent.core.media.PhotoLibrary
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -50,6 +51,10 @@ object AppModule {
   @Provides @Singleton
   fun provideMemoryStore(@ApplicationContext context: Context): MemoryStore =
     MemoryStore(context)
+
+  @Provides @Singleton
+  fun providePhotoLibrary(@ApplicationContext context: Context): PhotoLibrary =
+    PhotoLibrary(context)
 
   @Provides @Singleton fun provideOllamaServer(): OllamaServer = OllamaServer()
 
