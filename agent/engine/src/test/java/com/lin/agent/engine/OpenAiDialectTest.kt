@@ -19,6 +19,7 @@ package com.lin.agent.engine
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -268,6 +269,85 @@ class OpenAiDialectTest {
     assertEquals(0L, model.sizeBytes)
     assertEquals("", model.parameterSize)
     assertEquals("", model.quantization)
+  }
+
+  /**
+   * "OpenAI-compatible" is a family, not a specification.
+   *
+   * The standard is a `data` array; real servers also send `models`, and some send the array
+   * on its own. Requiring one of them produced "something answered, but not the way this
+   * expects" against a server that was working perfectly well.
+   */
+  @Test
+  fun theModelListIsReadInAnyOfTheShapesTheseServersSend() {
+    assertEquals(listOf("a"), parseOpenAiModels("""{"data":[{"id":"a"}]}""").map { it.name })
+    assertEquals(listOf("a"), parseOpenAiModels("""{"models":[{"id":"a"}]}""").map { it.name })
+    assertEquals(listOf("a"), parseOpenAiModels("""[{"id":"a"}]""").map { it.name })
+  }
+
+  @Test
+  fun somethingWithNoModelListInItIsStillRejected() {
+    assertThrows(org.json.JSONException::class.java) { parseOpenAiModels("""{"object":"list"}""") }
+    assertThrows(org.json.JSONException::class.java) { parseOpenAiModels("<html>Login</html>") }
+  }
+
+  /**
+   * The message has to carry what came back.
+   *
+   * Without it there is no way for anyone - the user or whoever they ask - to find out what
+   * answered. A proxy's login page, an error envelope and an empty body all produce the same
+   * sentence otherwise.
+   */
+  @Test
+  fun anUnrecognisedAnswerIsQuotedBackSoItCanBeDiagnosed() {
+    val said = ModelServer.wrongDialect(ServerKind.UNSLOTH, """{"detail":"Not Found"}""")
+    assertTrue(said, said.contains("Not Found"))
+  }
+
+  @Test
+  fun anEmptyAnswerSaysThatRatherThanQuotingNothing() {
+    val said = ModelServer.wrongDialect(ServerKind.VLLM, "   ")
+    assertTrue(said, said.contains("empty"))
+  }
+
+  @Test
+  fun aVeryLongAnswerIsCutRatherThanFillingTheScreen() {
+    val said = ModelServer.wrongDialect(ServerKind.VLLM, "x".repeat(5000))
+    assertTrue(said.length < 500)
+  }
+
+  /** A multi-line HTML page has to stay one paragraph on a phone. */
+  @Test
+  fun aQuotedAnswerIsOneLine() {
+    val said = ModelServer.wrongDialect(ServerKind.VLLM, "<html>\n  <body>\n Login\n</body>")
+    assertFalse(said.contains("\n  "))
+  }
+
+  // ---- what a refusal means, per kind ----
+
+  /**
+   * 401 means something different on each, and the old wording named only Cloudflare.
+   *
+   * On an Unsloth server a refusal almost always means the key is not in the header field, and
+   * being sent to look at a proxy instead is a wasted evening.
+   */
+  @Test
+  fun aRefusalNamesTheThingThatWouldActuallyFixIt() {
+    val unsloth = describeStatus(401, ServerKind.UNSLOTH)
+    assertTrue(unsloth, unsloth.contains("sk-unsloth"))
+    assertTrue(unsloth, unsloth.contains("Authorization: Bearer"))
+
+    val vllm = describeStatus(401, ServerKind.VLLM)
+    assertTrue(vllm, vllm.contains("--api-key"))
+
+    assertTrue(describeStatus(401, ServerKind.OLLAMA).contains("Cloudflare"))
+  }
+
+  /** The 404 text named Ollama, which is wrong for two of the three kinds now. */
+  @Test
+  fun aMissingPathDoesNotBlameOllamaOnAServerThatIsNotOllama() {
+    assertFalse(describeStatus(404, ServerKind.VLLM).contains("Ollama"))
+    assertTrue(describeStatus(404, ServerKind.VLLM).contains("type the"))
   }
 
   @Test

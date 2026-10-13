@@ -83,6 +83,8 @@ data class SettingsState(
   val serverModels: ServerModelsState = ServerModelsState.Unknown,
   /** The chosen server model's name, or empty. May name one the server no longer has. */
   val serverModel: String = "",
+  /** True when [serverModel] was typed rather than picked from the server's list. */
+  val serverModelTyped: Boolean = false,
   val answerOnServer: Boolean = false,
   val allowDirectCalls: Boolean = false,
   val spokenReplies: Boolean = true,
@@ -131,6 +133,7 @@ constructor(
           ollamaUrl = settings.serverUrl.first(),
           ollamaAuthHeader = settings.serverAuthHeader.first(),
           serverModel = settings.serverModelName.first(),
+          serverModelTyped = settings.serverModelTyped.first(),
           answerOnServer = settings.answerOnServer.first(),
           allowDirectCalls = settings.allowDirectCalls.first(),
           spokenReplies = settings.spokenReplies.first(),
@@ -253,10 +256,23 @@ constructor(
       }
   }
 
-  fun pickServerModel(name: String) {
-    _state.update { it.copy(serverModel = name) }
+  fun pickServerModel(name: String) = useServerModel(name, typed = false)
+
+  /**
+   * Uses a model name the user typed instead of one picked from the server's list.
+   *
+   * The way out of a server that will not list its models - which is a real configuration, not
+   * a broken one: Unsloth's own documentation tells people to enter a model id by hand when
+   * their server does not expose `/models`. Recorded as typed, because that is what lets the
+   * app use the server anyway instead of falling back to the phone for ever.
+   */
+  fun typeServerModel(name: String) = useServerModel(name.trim(), typed = true)
+
+  private fun useServerModel(name: String, typed: Boolean) {
+    _state.update { it.copy(serverModel = name, serverModelTyped = typed) }
     viewModelScope.launch {
       settings.setServerModelName(name)
+      settings.setServerModelTyped(typed)
       // The conversation holds a resolved backend, so a change here is invisible to it until it
       // re-decides. Without this, picking a model does nothing until the app is restarted.
       backends.refresh()

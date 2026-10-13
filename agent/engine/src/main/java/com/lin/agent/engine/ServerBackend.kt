@@ -50,6 +50,13 @@ class ServerBackend(
    * request body and the shape of a streamed chunk, and each of those is one call.
    */
   private val kind: ServerKind = ServerKind.OLLAMA,
+  /**
+   * Whether to trust the model name without finding it in the server's list.
+   *
+   * Set when the user typed the name rather than picking it, which is the only case where
+   * there is something to trust. See [reachable].
+   */
+  private val assumeModelExists: Boolean = false,
   private val server: ModelServer = ModelServer(),
   private val openStream: (url: String, headers: Map<String, String>, body: String) -> Stream =
     ::httpStream,
@@ -92,7 +99,13 @@ class ServerBackend(
   override suspend fun reachable(): Boolean =
     when (val result = server.models(baseUrl, authHeader, kind)) {
       is ServerModelsResult.Found -> result.models.any { it.name == modelName }
-      is ServerModelsResult.Failed -> false
+      // A server that will not list its models is not necessarily a server that is down.
+      // Unsloth's own documentation tells people to type a model id in by hand when their
+      // server does not expose /models, so treating the list as proof of life would make this
+      // app fall back to the phone for ever against a server that answers every chat request
+      // perfectly well. When the name was typed rather than picked, the user has asserted the
+      // model exists and the turn itself is what finds out.
+      is ServerModelsResult.Failed -> assumeModelExists
     }
 
   override fun converse(request: TurnRequest): Flow<TurnEvent> =
@@ -111,7 +124,9 @@ class ServerBackend(
             else chatRequestBody(modelName, request)
           openStream(url, headersFrom(authHeader), body).use { s ->
             if (s.status != HTTP_OK) {
-              emit(TurnEvent.Failed(describeStatus(s.status), s.errorBody.take(DETAIL_CHARS)))
+              emit(
+                TurnEvent.Failed(describeStatus(s.status, kind), s.errorBody.take(DETAIL_CHARS))
+              )
               return@use
             }
             for (line in s.lines) {
