@@ -131,7 +131,7 @@ constructor(
 ) : ViewModel() {
 
   /**
-   * What the orchestrator may do, which is currently one thing.
+   * What the orchestrator may do.
    *
    * Built here, once, from role-scoped tools - so the prompt the model sees can only ever
    * contain what an orchestrator is allowed to ask for. The previous app assembled forty-four

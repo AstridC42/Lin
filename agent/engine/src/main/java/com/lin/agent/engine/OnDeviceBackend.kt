@@ -37,6 +37,8 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * A model running on the phone, through LiteRT-LM.
@@ -108,6 +110,9 @@ class OnDeviceBackend(
 
   /** The failure from the last load attempt, so a turn can report it rather than hang. */
   @Volatile private var loadFailure: String? = null
+
+  /** Held for the length of a turn, so two callers cannot generate on one engine at once. */
+  private val generation = Mutex()
 
   /** Reachable means loaded, and loading it is this method's job if it has not happened. */
   override suspend fun reachable(): Boolean = ensureLoaded() == null
@@ -236,15 +241,29 @@ class OnDeviceBackend(
         }
         val shape = shapeOf(request)
         val built = if (shape == null) null else conversationFor(shape)
-        emitAll(
-          stream(
-            live = built?.conversation ?: live,
-            prompt = prompt,
-            format = built?.format,
-            // A structured turn's conversation is closed when the turn ends - see [Built].
-            closeAfter = built?.takeIf { it.throwaway }?.conversation,
+        // One generation at a time, for as long as this one is being collected.
+        //
+        // Until the digest there was only ever one caller - a screen somebody was looking at -
+        // so turns could not overlap. A worker changes that: it can start while the app is
+        // backgrounded and still be running when the user reopens it and asks something. These
+        // are two conversations but one engine, with one set of weights behind them, and
+        // whatever that does under simultaneous generation is not something that can be checked
+        // off a device.
+        //
+        // So the second one waits. A digest is a few short facts against a schema, which is
+        // seconds; waiting seconds is a far better worst case for the user's turn than
+        // whichever error two generations at once produces.
+        generation.withLock {
+          emitAll(
+            stream(
+              live = built?.conversation ?: live,
+              prompt = prompt,
+              format = built?.format,
+              // A structured turn's conversation is closed when the turn ends - see [Built].
+              closeAfter = built?.takeIf { it.throwaway }?.conversation,
+            )
           )
-        )
+        }
       }
       .flowOn(Dispatchers.IO)
 
