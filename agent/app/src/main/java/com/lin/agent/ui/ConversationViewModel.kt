@@ -43,6 +43,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Constraints
 import androidx.work.NetworkType
+import com.lin.agent.R
 import com.lin.agent.core.memory.Digest
 import com.lin.agent.model.ConversationLog
 import com.lin.agent.model.DigestWorker
@@ -161,7 +162,21 @@ constructor(
    */
   val stagedReply = relay.staged
 
-  fun sendStagedReply(context: android.content.Context) = relay.send(context)
+  /**
+   * Sends it, or says why not.
+   *
+   * [NotificationRelay.send] can fail for reasons nobody here controls - the notification was
+   * dismissed while the card was on screen, or the app that posted it died and took its pending
+   * intent with it. Dropping that answer would leave the card sitting there after a tap, which
+   * reads as sent. On a feature whose whole point is that you know exactly what went out, a
+   * failure has to be louder than nothing.
+   */
+  fun sendStagedReply(context: android.content.Context) {
+    if (!relay.send(context)) {
+      _state.update { it.copy(error = context.getString(R.string.reply_failed)) }
+      relay.discard()
+    }
+  }
 
   fun discardStagedReply() = relay.discard()
 

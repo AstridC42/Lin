@@ -14,6 +14,7 @@
   <string name="reply_send">Send it</string>
   <string name="reply_discard">Discard</string>
   <string name="reply_warning">This sends immediately. There is no undo.</string>
+  <string name="reply_failed">That reply could not be sent - the message may have been dismissed. Nothing went out.</string>
 
   <string name="settings_memory_heading">Memory</string>
   <string name="settings_digest">Remember things from conversations</string>

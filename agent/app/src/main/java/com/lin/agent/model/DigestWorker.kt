@@ -24,6 +24,7 @@ import com.lin.agent.core.memory.Digest
 import com.lin.agent.core.memory.Memory
 import com.lin.agent.core.memory.MemorySource
 import com.lin.agent.core.memory.MemoryStore
+import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.EmbedPart
 import com.lin.agent.engine.Message
 import com.lin.agent.engine.TurnEvent
@@ -33,6 +34,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 
 /**
@@ -58,6 +60,8 @@ class DigestWorker(private val context: Context, params: WorkerParameters) :
     fun embedders(): Embedders
 
     fun backends(): ChatBackends
+
+    fun settings(): SettingsRepository
   }
 
   override suspend fun doWork(): Result =
@@ -80,6 +84,13 @@ class DigestWorker(private val context: Context, params: WorkerParameters) :
     if (conversation.isBlank()) return Result.success()
 
     val deps = EntryPointAccessors.fromApplication(context, Deps::class.java)
+
+    // Asked again here, not only where this was enqueued. The constraints mean a worker can sit
+    // for hours before running, and the switch it was queued under is the user's answer to "may
+    // you write things about me" - which they are entitled to change their mind about in the
+    // meantime. The queued work is not a promise they are held to.
+    if (!deps.settings().digestConversations.first()) return Result.success()
+
     val backend =
       (deps.backends().readiness() as? com.lin.agent.model.ChatReadiness.Ready)?.backend
         ?: return Result.success()
