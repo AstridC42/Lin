@@ -124,6 +124,20 @@
   <string name="download_waiting">Queued — waiting for a connection</string>
   <string name="settings_models_where">Models are read from, and will be downloaded to:</string>
 
+  <string name="documents_title">Documents</string>
+  <string name="documents_explain">Lin can read a document you give it, and write new ones. It
+    cannot browse your storage — each file here is one you added or shared to Lin, and removing it
+    takes that access away again.</string>
+  <string name="documents_add">Add a document</string>
+  <string name="documents_empty">Nothing yet. Add a PDF, a Word document or a text file — or share
+    one to Lin from any app.</string>
+  <string name="documents_added_at">Added %1$s</string>
+  <string name="documents_written_at">Written by Lin, %1$s</string>
+  <string name="documents_forget">Stop Lin reading this</string>
+  <string name="documents_delete">Delete this</string>
+  <string name="documents_send">Save or send a copy</string>
+  <string name="documents_dismiss">Dismiss</string>
+
   <string name="settings_reasoning_heading">Thinking</string>
   <string name="settings_reasoning_detail">Lin can work a question out before answering. Thinking
     is generated at the same speed as the answer, so it is paid for in waiting before the first

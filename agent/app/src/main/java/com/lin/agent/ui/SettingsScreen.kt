@@ -86,6 +86,7 @@ import com.lin.agent.engine.Reasoning
 fun SettingsScreen(
   onBack: () -> Unit,
   onOpenMemory: () -> Unit = {},
+  onOpenDocuments: () -> Unit = {},
   viewModel: SettingsViewModel = hiltViewModel(),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
@@ -262,6 +263,10 @@ fun SettingsScreen(
             onCheckedChange = viewModel::setDigestConversations,
           )
         }
+      }
+
+      OutlinedButton(onClick = onOpenDocuments, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.documents_title))
       }
 
       OutlinedButton(

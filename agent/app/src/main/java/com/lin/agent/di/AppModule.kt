@@ -20,6 +20,9 @@ import android.content.Context
 import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.memory.MemoryStore
 import com.lin.agent.core.models.ModelStore
+import com.lin.agent.core.documents.DocumentLibrary
+import com.lin.agent.core.documents.Documents
+import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.OllamaServer
 import com.lin.agent.model.PhoneTool
@@ -44,6 +47,16 @@ object AppModule {
 
   @Provides @Singleton
   fun provideModelStore(@ApplicationContext context: Context): ModelStore = ModelStore(context)
+
+  @Provides @Singleton
+  fun provideDocuments(@ApplicationContext context: Context): Documents = Documents(context)
+
+  @Provides @Singleton
+  fun provideDocumentLibrary(@ApplicationContext context: Context): DocumentLibrary =
+    DocumentLibrary(context)
+
+  @Provides @Singleton
+  fun providePdfPages(@ApplicationContext context: Context): PdfPages = PdfPages(context)
 
   @Provides @Singleton
   fun provideModelDownloads(@ApplicationContext context: Context): ModelDownloads =

@@ -45,12 +45,18 @@ import androidx.work.WorkManager
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import com.lin.agent.R
+import com.lin.agent.core.documents.DocumentLibrary
+import com.lin.agent.core.documents.Documents
+import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.memory.Digest
 import com.lin.agent.model.ConversationLog
 import com.lin.agent.model.DigestWorker
 import com.lin.agent.model.Embedders
 import com.lin.agent.model.FindPhotoTool
+import com.lin.agent.model.ListDocumentsTool
+import com.lin.agent.model.ReadDocumentTool
 import com.lin.agent.model.ReplyTool
+import com.lin.agent.model.WriteDocumentTool
 import com.lin.agent.model.UnreadTool
 import com.lin.agent.notifications.NotificationRelay
 import com.lin.agent.model.PhoneTool
@@ -134,6 +140,9 @@ constructor(
   private val conversationLog: ConversationLog,
   private val work: WorkManager,
   private val relay: NotificationRelay,
+  private val documentLibrary: DocumentLibrary,
+  private val documents: Documents,
+  private val pdfPages: PdfPages,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
@@ -156,6 +165,9 @@ constructor(
         FindPhotoTool(memories, embedders),
         UnreadTool(relay),
         ReplyTool(relay),
+        ListDocumentsTool(documentLibrary),
+        ReadDocumentTool(documentLibrary, documents),
+        WriteDocumentTool(documentLibrary, documents, pdfPages),
       )
     )
 
