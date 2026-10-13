@@ -457,9 +457,20 @@ distance on the trimmed tails made `+972 50 123 4567` and `050 123 4567` read
 as a one-digit slip, which would have queried every correctly-copied
 international number.
 
-**Still to do:** notification reply with its read-back, calendar and reminders,
-media control, and MobileActions-270M as the intent parser. The remaining
-orchestrator tools (`recall`, `ask`, `answer`) belong with Phase 5's memory.
+**Also done: notification replies.** `unread_messages` lists what can be
+answered and `reply_to_message` writes a reply onto the screen — it does not
+send. The confirmation is the screen's rather than the model's, deliberately:
+the obvious design is for Lin to read the wording back and send when the user
+agrees, and that puts a 2B model in charge of deciding what agreement sounds
+like, on an action with no composer and no undo. The button is ground truth;
+"yes" is an interpretation. The model cannot reach the send path at all.
+
+The listener keeps only notifications that carry a reply action, in memory,
+for as long as the notification exists. Other people's messages passing
+through a phone are not something to collect.
+
+**Still to do:** calendar and reminders, media control, and
+MobileActions-270M as the intent parser.
 
 **Measurement:** the staged-action policy holds — calls open the dialer unless
 directly authorised, messages wait for a send, and a notification reply is read

@@ -159,6 +159,33 @@ fun SettingsScreen(
       }
 
       Text(
+        stringResource(R.string.settings_messages_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_messages_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      val messagesContext = LocalContext.current
+      OutlinedButton(
+        onClick = {
+          // Notification access cannot be requested - only granted by the user in their own
+          // settings, which for this capability is right.
+          runCatching {
+            messagesContext.startActivity(
+              Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+          }
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(stringResource(R.string.settings_notification_access))
+      }
+
+      Text(
         stringResource(R.string.settings_memory_heading),
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = 12.dp),

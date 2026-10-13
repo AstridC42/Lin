@@ -6,6 +6,15 @@
   <string name="speak">Speak</string>
   <string name="stop_listening">Stop listening</string>
   <string name="listening">Listening…</string>
+  <string name="settings_messages_heading">Messages</string>
+  <string name="settings_messages_detail">Let Lin see messages that can be replied to, so it can
+    write an answer. Replies never send on their own — Lin writes, you press send.</string>
+  <string name="settings_notification_access">Allow Lin to see notifications</string>
+  <string name="reply_to">Reply to %1$s on %2$s</string>
+  <string name="reply_send">Send it</string>
+  <string name="reply_discard">Discard</string>
+  <string name="reply_warning">This sends immediately. There is no undo.</string>
+
   <string name="settings_memory_heading">Memory</string>
   <string name="settings_digest">Remember things from conversations</string>
   <string name="settings_digest_detail">Off by default. When on, Lin reads a finished

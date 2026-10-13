@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -226,6 +227,45 @@ fun ConversationScreen(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(12.dp),
               )
+            }
+          }
+        }
+      }
+
+      // The reply, in full, with the button that sends it. The model wrote these words; the
+      // person sends them - and a notification reply has no composer and no undo, so the exact
+      // text is shown rather than summarised.
+      val staged by viewModel.stagedReply.collectAsStateWithLifecycle()
+      staged?.let { reply ->
+        val replyContext = LocalContext.current
+        Card(
+          colors =
+            CardDefaults.cardColors(
+              containerColor = MaterialTheme.colorScheme.secondaryContainer
+            ),
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+          Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Text(
+              stringResource(R.string.reply_to, reply.to, reply.app),
+              style = MaterialTheme.typography.labelMedium,
+            )
+            Text(reply.text, style = MaterialTheme.typography.bodyLarge)
+            Text(
+              stringResource(R.string.reply_warning),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              Button(onClick = { viewModel.sendStagedReply(replyContext) }) {
+                Text(stringResource(R.string.reply_send))
+              }
+              OutlinedButton(onClick = viewModel::discardStagedReply) {
+                Text(stringResource(R.string.reply_discard))
+              }
             }
           }
         }

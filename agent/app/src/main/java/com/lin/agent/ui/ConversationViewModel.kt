@@ -48,6 +48,9 @@ import com.lin.agent.model.ConversationLog
 import com.lin.agent.model.DigestWorker
 import com.lin.agent.model.Embedders
 import com.lin.agent.model.FindPhotoTool
+import com.lin.agent.model.ReplyTool
+import com.lin.agent.model.UnreadTool
+import com.lin.agent.notifications.NotificationRelay
 import com.lin.agent.model.PhoneTool
 import com.lin.agent.model.RecallTool
 import com.lin.agent.model.RememberTool
@@ -120,6 +123,7 @@ constructor(
   private val dictation: Dictation,
   private val conversationLog: ConversationLog,
   private val work: WorkManager,
+  private val relay: NotificationRelay,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
@@ -140,11 +144,26 @@ constructor(
         RememberTool(memories, embedders),
         RecallTool(memories, embedders),
         FindPhotoTool(memories, embedders),
+        UnreadTool(relay),
+        ReplyTool(relay),
       )
     )
 
   private val _state = MutableStateFlow(ConversationState(messages = restored()))
   val state: StateFlow<ConversationState> = _state.asStateFlow()
+
+  /**
+   * The reply written but not sent.
+   *
+   * Exposed straight from the relay rather than copied into the screen's state, so there is
+   * exactly one answer to "is something waiting to be sent" and the Send button cannot be
+   * looking at a stale copy of it.
+   */
+  val stagedReply = relay.staged
+
+  fun sendStagedReply(context: android.content.Context) = relay.send(context)
+
+  fun discardStagedReply() = relay.discard()
 
   /** The microphone, so leaving or sending closes it. */
   private var listening: Job? = null
@@ -404,7 +423,9 @@ constructor(
         "something you were not told in this conversation. If recall finds nothing, say so " +
         "rather than filling the gap. " +
         "Use find_photo to look through the user\'s pictures; they appear on screen, and you " +
-        "cannot see them, so never describe what is in one."
+        "cannot see them, so never describe what is in one. " +
+        "reply_to_message writes a reply onto the screen for the user to send; it does " +
+        "not send, so read the wording back and never say a message has gone."
 
     const val DIGEST_WORK = "digest"
 
