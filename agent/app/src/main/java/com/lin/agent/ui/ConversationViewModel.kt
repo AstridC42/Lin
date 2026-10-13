@@ -25,6 +25,7 @@ import com.lin.agent.model.ChatReadiness
 import com.lin.agent.engine.AgentRole
 import com.lin.agent.engine.LoopEvent
 import com.lin.agent.engine.Message
+import com.lin.agent.engine.reasoningNamed
 import com.lin.agent.engine.ToolRegistry
 import com.lin.agent.engine.TurnLoop
 import com.lin.agent.core.settings.SettingsRepository
@@ -84,6 +85,14 @@ data class ConversationState(
   val notice: String = "",
   /** The tool running right now, so a long delegation reads as busy rather than stuck. */
   val runningTool: String = "",
+  /**
+   * The model's working-out for the turn in flight, empty when it is not thinking.
+   *
+   * Kept only for the current turn and dropped when the answer lands. It is not part of the
+   * conversation - what the model considered is not what it said - and keeping a transcript of
+   * deliberations that get re-sent, digested or read back aloud is all wrong.
+   */
+  val thinking: String = "",
   /**
    * Tools that failed during this turn, by name.
    *
@@ -271,6 +280,7 @@ constructor(
         messages = outgoing,
         inProgress = true,
         streaming = "",
+        thinking = "",
         error = "",
         failedTools = emptyList(),
         shows = emptyList(),
@@ -295,11 +305,15 @@ constructor(
       _state.update { it.copy(notice = (readiness as ChatReadiness.Ready).notice) }
 
       val builder = StringBuilder()
+      // Read per turn rather than held, so changing the level applies to the next question
+      // instead of the next launch.
+      val thinkingBuilder = StringBuilder()
       TurnLoop(
           backend = backend,
           registry = registry,
           role = AgentRole.ORCHESTRATOR,
           systemPrompt = ORCHESTRATOR_PROMPT,
+          reasoning = reasoningNamed(settings.reasoning.first()),
         )
         .run(outgoing)
         .collect { event ->
@@ -307,6 +321,12 @@ constructor(
             is LoopEvent.Token -> {
               builder.append(event.text)
               _state.update { it.copy(streaming = builder.toString()) }
+            }
+            // Shown as it arrives, for the same reason tool activity is: thinking is paid for
+            // in silence before the first word, and silence is indistinguishable from a hang.
+            is LoopEvent.Thought -> {
+              thinkingBuilder.append(event.text)
+              _state.update { it.copy(thinking = thinkingBuilder.toString()) }
             }
             // Shown while it runs. A delegated task can take a minute on a big model, and
             // silence for a minute is indistinguishable from the app having given up.
@@ -327,6 +347,7 @@ constructor(
                 it.copy(
                   messages = complete,
                   streaming = "",
+                  thinking = "",
                   inProgress = false,
                   runningTool = "",
                   backendId = backend.id,
@@ -345,6 +366,7 @@ constructor(
               _state.update {
                 it.copy(
                   streaming = "",
+                  thinking = "",
                   inProgress = false,
                   runningTool = "",
                   error = shown,

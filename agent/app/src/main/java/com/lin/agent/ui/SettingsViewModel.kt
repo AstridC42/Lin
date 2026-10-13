@@ -25,6 +25,8 @@ import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.engine.Reasoning
+import com.lin.agent.engine.reasoningNamed
 import com.lin.agent.engine.OllamaServer
 import com.lin.agent.engine.ServerModel
 import com.lin.agent.engine.ServerModelsResult
@@ -83,6 +85,8 @@ data class SettingsState(
   val allowDirectCalls: Boolean = false,
   val spokenReplies: Boolean = true,
   val digestConversations: Boolean = false,
+  /** The reasoning level, as the engine's own enum. */
+  val reasoning: Reasoning = Reasoning.OFF,
   val photoIndex: IndexState = IndexState.Idle,
   val photosIndexed: Int = 0,
 )
@@ -127,6 +131,7 @@ constructor(
           allowDirectCalls = settings.allowDirectCalls.first(),
           spokenReplies = settings.spokenReplies.first(),
           digestConversations = settings.digestConversations.first(),
+          reasoning = reasoningNamed(settings.reasoning.first()),
           memoryGb = memoryGb,
           socModel = com.lin.agent.core.models.currentSocModel(),
           modelsDirectory = store.directory().absolutePath,
@@ -284,6 +289,11 @@ constructor(
   fun setDigestConversations(on: Boolean) {
     _state.update { it.copy(digestConversations = on) }
     viewModelScope.launch { settings.setDigestConversations(on) }
+  }
+
+  fun setReasoning(level: Reasoning) {
+    _state.update { it.copy(reasoning = level) }
+    viewModelScope.launch { settings.setReasoning(level.name) }
   }
 
   fun setSpokenReplies(on: Boolean) {

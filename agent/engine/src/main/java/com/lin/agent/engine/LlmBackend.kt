@@ -44,6 +44,17 @@ sealed interface TurnEvent {
   /** A fragment of the reply, for streaming into the UI. */
   data class Token(val text: String) : TurnEvent
 
+  /**
+   * A fragment of the model's thinking, which is not part of its answer.
+   *
+   * A separate event rather than more [Token]s, because the two must not be mixed up. Thinking
+   * is working-out: it contradicts itself, abandons approaches and is sometimes wrong on the way
+   * to being right. Appended to the reply it would read as the reply, and a user cannot tell
+   * which half to believe. It also never goes into the conversation history that is sent back,
+   * and never into a digest - the model's deliberations are not facts about the person.
+   */
+  data class Thought(val text: String) : TurnEvent
+
   /** The turn finished normally. */
   data class Done(val fullText: String) : TurnEvent
 
@@ -98,6 +109,8 @@ data class TurnRequest(
    * schema, so the model fills slots instead of writing JSON by hand and hoping.
    */
   val responseSchema: String? = null,
+  /** How much the model may think first. See [thinkingFor] for when it is ignored. */
+  val reasoning: Reasoning = Reasoning.OFF,
 )
 
 /**

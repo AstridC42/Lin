@@ -28,6 +28,7 @@ import com.google.ai.edge.litertlm.MessageCallback
 import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.tool
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ThinkingConfig
 import com.google.ai.edge.litertlm.Message as LiteRtMessage
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -259,6 +260,7 @@ class OnDeviceBackend(
               live = built?.conversation ?: live,
               prompt = prompt,
               format = built?.format,
+            thinking = thinkingFor(request.reasoning, structured = request.responseSchema != null),
               // A structured turn's conversation is closed when the turn ends - see [Built].
               closeAfter = built?.takeIf { it.throwaway }?.conversation,
             )
@@ -368,6 +370,7 @@ class OnDeviceBackend(
     live: Conversation,
     prompt: String,
     format: ResponseFormat?,
+    thinking: ThinkingBudget?,
     closeAfter: Conversation?,
   ): Flow<TurnEvent> {
     return callbackFlow {
@@ -376,6 +379,20 @@ class OnDeviceBackend(
       val callback =
         object : MessageCallback {
           override fun onMessage(message: LiteRtMessage) {
+            // Thinking comes back on the message's channels rather than in its text, so it is
+            // read off first and reported as its own event. Every channel, not a channel named
+            // "thinking": the name is the model's chat template's business, and guessing it
+            // wrong would silently show nothing. Nothing else uses channels today, so anything
+            // arriving on one is working-out.
+            val thought =
+              runCatching { message.channels }
+                .getOrNull()
+                .orEmpty()
+                .values
+                .joinToString("")
+                .takeIf { it.isNotEmpty() }
+            if (thought != null) trySend(TurnEvent.Thought(thought))
+
             // Each emission is a delta, not a snapshot - established from the engine's own
             // callers, which append. toString() is how text comes off a Message.
             val delta = message.toString()
@@ -414,10 +431,25 @@ class OnDeviceBackend(
       try {
         // The Contents overload rather than the Message one: Message's constructor is internal
         // to the library, and Contents is the form that will carry an image or a clip later.
-        // Branched rather than passing null, so a turn with no schema makes exactly the call
-        // that is already proven against these models.
-        if (format == null) live.sendMessageAsync(Contents.of(prompt), callback)
-        else live.sendMessageAsync(Contents.of(prompt), callback, responseFormat = format)
+        // Branched rather than passing nulls, so a plain turn makes exactly the call that is
+        // already proven against these models. Only what a turn actually asked for is passed.
+        val thinkingConfig =
+          thinking?.let { ThinkingConfig(enableThinking = true, thinkingTokenBudget = it.tokens) }
+        when {
+          format == null && thinkingConfig == null ->
+            live.sendMessageAsync(Contents.of(prompt), callback)
+          format == null ->
+            live.sendMessageAsync(Contents.of(prompt), callback, thinkingConfig = thinkingConfig)
+          thinkingConfig == null ->
+            live.sendMessageAsync(Contents.of(prompt), callback, responseFormat = format)
+          else ->
+            live.sendMessageAsync(
+              Contents.of(prompt),
+              callback,
+              thinkingConfig = thinkingConfig,
+              responseFormat = format,
+            )
+        }
       } catch (e: Throwable) {
         trySend(TurnEvent.Failed(message = explain(e), detail = e.message.orEmpty()))
         channel.close()

@@ -124,6 +124,22 @@
   <string name="download_waiting">Queued — waiting for a connection</string>
   <string name="settings_models_where">Models are read from, and will be downloaded to:</string>
 
+  <string name="settings_reasoning_heading">Thinking</string>
+  <string name="settings_reasoning_detail">Lin can work a question out before answering. Thinking
+    is generated at the same speed as the answer, so it is paid for in waiting before the first
+    word — useful for a question with steps in it, wasted on the time of day.</string>
+  <string name="settings_reasoning_off">Off</string>
+  <string name="settings_reasoning_off_detail">Answers straight away</string>
+  <string name="settings_reasoning_brief">Brief</string>
+  <string name="settings_reasoning_brief_detail">A little room to work</string>
+  <string name="settings_reasoning_thorough">Thorough</string>
+  <string name="settings_reasoning_thorough_detail">A real chain, and a real wait</string>
+  <string name="settings_reasoning_unavailable">The model on the server decides for itself how
+    long to think; the level above only turns it on or off there.</string>
+
+  <string name="thinking_show">Show how it worked this out</string>
+  <string name="thinking_hide">Hide the working-out</string>
+
   <string name="recovery_title">Lin could not start</string>
   <string name="recovery_body">The last %1$d attempts closed before anything appeared, so this
     time Lin started with everything switched off. Nothing has been deleted.</string>

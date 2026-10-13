@@ -18,6 +18,8 @@ package com.lin.agent.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.selectable
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,6 +67,7 @@ import android.os.Build
 import android.provider.Settings as AndroidSettings
 import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
+import com.lin.agent.engine.Reasoning
 
 /**
  * Settings, which for now is the server address and what the phone can run.
@@ -183,6 +186,53 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text(stringResource(R.string.settings_notification_access))
+      }
+
+      Text(
+        stringResource(R.string.settings_reasoning_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_reasoning_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Column {
+          // Radio rows rather than a slider: there are three of them and each one needs a
+          // sentence saying what it costs, which a slider has nowhere to put.
+          ReasoningChoice(
+            level = Reasoning.OFF,
+            label = R.string.settings_reasoning_off,
+            detail = R.string.settings_reasoning_off_detail,
+            selected = state.reasoning,
+            onPick = viewModel::setReasoning,
+          )
+          ReasoningChoice(
+            level = Reasoning.BRIEF,
+            label = R.string.settings_reasoning_brief,
+            detail = R.string.settings_reasoning_brief_detail,
+            selected = state.reasoning,
+            onPick = viewModel::setReasoning,
+          )
+          ReasoningChoice(
+            level = Reasoning.THOROUGH,
+            label = R.string.settings_reasoning_thorough,
+            detail = R.string.settings_reasoning_thorough_detail,
+            selected = state.reasoning,
+            onPick = viewModel::setReasoning,
+          )
+        }
+      }
+      // Said plainly, because the levels mean something different depending on which model is
+      // answering and a setting that silently means two things is worse than one that explains.
+      if (state.answerOnServer) {
+        Text(
+          stringResource(R.string.settings_reasoning_unavailable),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
 
       Text(
@@ -701,3 +751,32 @@ private fun photoPermissionName(): String =
   } else {
     @Suppress("DEPRECATION") android.Manifest.permission.READ_EXTERNAL_STORAGE
   }
+
+/** One reasoning level, with what it costs underneath its name. */
+@Composable
+private fun ReasoningChoice(
+  level: Reasoning,
+  @StringRes label: Int,
+  @StringRes detail: Int,
+  selected: Reasoning,
+  onPick: (Reasoning) -> Unit,
+) {
+  Row(
+    modifier =
+      Modifier.fillMaxWidth()
+        .selectable(selected = selected == level, onClick = { onPick(level) })
+        .padding(horizontal = 12.dp, vertical = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    RadioButton(selected = selected == level, onClick = { onPick(level) })
+    Column(modifier = Modifier.weight(1f)) {
+      Text(stringResource(label), style = MaterialTheme.typography.bodyLarge)
+      Text(
+        stringResource(detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+  }
+}
