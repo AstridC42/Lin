@@ -38,6 +38,7 @@ import com.lin.agent.core.voice.Launch
 import com.lin.agent.ui.ConversationScreen
 import com.lin.agent.ui.DocumentsScreen
 import com.lin.agent.ui.MemoryScreen
+import com.lin.agent.ui.TrainingScreen
 import com.lin.agent.ui.RecoveryScreen
 import com.lin.agent.ui.SettingsScreen
 import com.lin.agent.ui.theme.LinTheme
@@ -114,10 +115,12 @@ class MainActivity : ComponentActivity() {
               onBack = { screen = CONVERSATION },
               onOpenMemory = { screen = MEMORY },
               onOpenDocuments = { screen = DOCUMENTS },
+              onOpenTraining = { screen = TRAINING },
             )
           // Back goes to settings, not the conversation: that is where it was opened from, and
           // landing somewhere else after deleting something reads as the app losing its place.
           MEMORY -> MemoryScreen(onBack = { screen = SETTINGS })
+          TRAINING -> TrainingScreen(onBack = { screen = SETTINGS })
           DOCUMENTS ->
             DocumentsScreen(
               // A share has no settings screen behind it, so back goes where the user would
@@ -155,3 +158,4 @@ private const val CONVERSATION = "conversation"
 private const val SETTINGS = "settings"
 private const val MEMORY = "memory"
 private const val DOCUMENTS = "documents"
+private const val TRAINING = "training"
