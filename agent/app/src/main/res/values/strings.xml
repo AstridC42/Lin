@@ -3,6 +3,18 @@
   <string name="app_name">Lin</string>
   <string name="ask_placeholder">Ask Lin</string>
   <string name="send">Send</string>
+  <string name="speak">Speak</string>
+  <string name="stop_listening">Stop listening</string>
+  <string name="listening">Listening…</string>
+  <string name="settings_voice_heading">Voice</string>
+  <string name="settings_voice_detail">Hold the power button, or use your phone\'s assistant
+    gesture, and Lin opens listening. Set it as your assistant below.</string>
+  <string name="settings_spoken_replies">Answer out loud when spoken to</string>
+  <string name="settings_spoken_replies_detail">Typed questions are always answered in
+    writing.</string>
+  <string name="settings_set_assistant">Choose Lin as your assistant</string>
+  <string name="settings_assistant_detail">Opens Android\'s default apps settings. Lin appears
+    under Digital assistant app.</string>
   <string name="back">Back</string>
   <string name="open_settings">Settings</string>
 

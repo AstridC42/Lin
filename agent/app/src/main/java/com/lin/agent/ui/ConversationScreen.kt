@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,12 +61,18 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.R
+import android.content.pm.PackageManager
 import com.lin.agent.core.media.PhotoLibrary
+import com.lin.agent.core.voice.Launch
 import com.lin.agent.engine.Message
 
 /**
@@ -83,12 +90,25 @@ import com.lin.agent.engine.Message
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationScreen(
+  launch: Launch = Launch.NORMAL,
   onOpenSettings: () -> Unit = {},
   onGetModel: () -> Unit = {},
   viewModel: ConversationViewModel = hiltViewModel(),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
   var draft by rememberSaveable { mutableStateOf("") }
+  val context = LocalContext.current
+
+  // Once per launch, not per recomposition - and not after a fold, which is why it is keyed on
+  // the launch rather than on Unit alone.
+  LaunchedEffect(launch) {
+    viewModel.onLaunched(
+      launch = launch,
+      microphoneGranted =
+        context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+          PackageManager.PERMISSION_GRANTED,
+    )
+  }
   val listState = rememberLazyListState()
 
   // Follow the reply as it arrives, and the new message when one is sent.
@@ -230,12 +250,48 @@ fun ConversationScreen(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         OutlinedTextField(
-          value = draft,
+          // What the microphone has heard so far takes over the field while listening, so an
+          // open microphone is never ambiguous and never silent-looking.
+          value = if (state.listening) state.heard else draft,
           onValueChange = { draft = it },
           modifier = Modifier.weight(1f),
-          placeholder = { Text(stringResource(R.string.ask_placeholder)) },
+          placeholder = {
+            Text(
+              stringResource(
+                if (state.listening) R.string.listening else R.string.ask_placeholder
+              )
+            )
+          },
+          readOnly = state.listening,
           maxLines = 5,
         )
+        // The microphone, asked for at the point of use. An assistant that requests the
+        // microphone at launch, before being asked to listen to anything, is asking on the
+        // wrong terms.
+        val micPermission =
+          rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted
+            ->
+            if (granted) viewModel.startListening()
+          }
+        if (state.listening) {
+          IconButton(onClick = viewModel::stopListening) {
+            Icon(
+              Icons.Filled.Close,
+              contentDescription = stringResource(R.string.stop_listening),
+              tint = MaterialTheme.colorScheme.error,
+            )
+          }
+        } else if (draft.isBlank()) {
+          IconButton(
+            onClick = { micPermission.launch(Manifest.permission.RECORD_AUDIO) },
+            enabled = !state.inProgress,
+          ) {
+            Icon(
+              painterResource(R.drawable.ic_mic),
+              contentDescription = stringResource(R.string.speak),
+            )
+          }
+        }
         IconButton(
           onClick = {
             viewModel.send(draft)
