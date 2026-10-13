@@ -110,6 +110,8 @@ class OllamaBackend(
                 emit(TurnEvent.Failed(serverSaid(chunk.error), chunk.error))
                 return@use
               }
+              // Before the answer, because that is the order it was produced in.
+              if (chunk.thinking.isNotEmpty()) emit(TurnEvent.Thought(chunk.thinking))
               if (chunk.text.isNotEmpty()) {
                 answer.append(chunk.text)
                 emit(TurnEvent.Token(chunk.text))
@@ -203,6 +205,8 @@ internal data class ChatChunk(
   val done: Boolean = false,
   val error: String = "",
   val toolCalls: List<ToolInvocation> = emptyList(),
+  /** The model's working-out, which Ollama reports separately from its answer. */
+  val thinking: String = "",
 )
 
 /**
@@ -225,6 +229,9 @@ internal fun readChunk(line: String): ChatChunk? {
     text = message?.optString("content").orEmpty(),
     done = json.optBoolean("done", false),
     toolCalls = message?.let(::readToolCalls).orEmpty(),
+    // Read off `thinking` rather than left in `content`, which is where Ollama puts it, so it
+    // cannot end up read as part of the answer.
+    thinking = message?.optString("thinking").orEmpty(),
   )
 }
 
@@ -299,6 +306,14 @@ internal fun chatRequestBody(model: String, request: TurnRequest): String {
 
   // Ollama takes the schema itself as `format`, which is its constrained-decoding switch.
   request.responseSchema?.let { body.put("format", JSONObject(it)) }
+
+  // Ollama's switch is a plain boolean with no budget - the server owns the model, so how long
+  // it is allowed to think is its configuration rather than this app's. Sent only when thinking
+  // was asked for: an older server that does not know the field rejects the request outright,
+  // so a turn that wants no thinking must not mention it.
+  if (thinkingFor(request.reasoning, structured = request.responseSchema != null) != null) {
+    body.put("think", true)
+  }
 
   return body.toString()
 }

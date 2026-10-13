@@ -164,6 +164,21 @@ class SettingsRepository(private val context: Context) {
   suspend fun setDigestConversations(value: Boolean) = write(DIGEST_CONVERSATIONS, value)
 
   /**
+   * How much the model may think before answering, as the name of a level.
+   *
+   * A string rather than an enum because this module does not know about the engine's types and
+   * should not start: settings are device concerns. The caller maps the name, and an unknown one
+   * - a setting written by a newer build, then downgraded - reads as the default rather than
+   * throwing on a screen somebody is just trying to open.
+   *
+   * Off by default. Thinking is generated at the same speed as the answer, so on a phone it is
+   * paid for in silence before the first word, and that is not a cost to opt somebody into.
+   */
+  val reasoning: Flow<String> = read(REASONING, "")
+
+  suspend fun setReasoning(value: String) = write(REASONING, value)
+
+  /**
    * Reads one setting, with [default] on any failure.
    *
    * `catch` rather than a bare flow: the corruption handler above covers a file that cannot be
@@ -211,5 +226,6 @@ class SettingsRepository(private val context: Context) {
     val ALLOW_DIRECT_CALLS = booleanPreferencesKey("allow_direct_calls")
     val SPOKEN_REPLIES = booleanPreferencesKey("spoken_replies")
     val DIGEST_CONVERSATIONS = booleanPreferencesKey("digest_conversations")
+    val REASONING = stringPreferencesKey("reasoning")
   }
 }

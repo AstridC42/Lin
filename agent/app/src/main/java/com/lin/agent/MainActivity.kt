@@ -32,8 +32,11 @@ import androidx.compose.runtime.setValue
 import com.lin.agent.core.diag.CrashReport
 import com.lin.agent.core.diag.LaunchHealth
 import android.content.Intent
+import android.net.Uri
+import androidx.core.content.IntentCompat
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.ui.ConversationScreen
+import com.lin.agent.ui.DocumentsScreen
 import com.lin.agent.ui.MemoryScreen
 import com.lin.agent.ui.RecoveryScreen
 import com.lin.agent.ui.SettingsScreen
@@ -97,16 +100,31 @@ class MainActivity : ComponentActivity() {
         // A saved string rather than a navigation graph. There are three screens now; a
         // navigation library for three is still ceremony, and rememberSaveable means the
         // choice survives a fold, which on this hardware happens constantly.
-        var screen by rememberSaveable { mutableStateOf(CONVERSATION) }
+        // A document shared to Lin opens the Documents screen with it already added, rather
+        // than the conversation - the share said what the user wanted to do, and landing in the
+        // chat would leave them wondering whether it arrived.
+        val shared =
+          if (intent?.action == Intent.ACTION_SEND) {
+            IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+          } else null
+        var screen by rememberSaveable { mutableStateOf(if (shared != null) DOCUMENTS else CONVERSATION) }
         when (screen) {
           SETTINGS ->
             SettingsScreen(
               onBack = { screen = CONVERSATION },
               onOpenMemory = { screen = MEMORY },
+              onOpenDocuments = { screen = DOCUMENTS },
             )
           // Back goes to settings, not the conversation: that is where it was opened from, and
           // landing somewhere else after deleting something reads as the app losing its place.
           MEMORY -> MemoryScreen(onBack = { screen = SETTINGS })
+          DOCUMENTS ->
+            DocumentsScreen(
+              // A share has no settings screen behind it, so back goes where the user would
+              // otherwise have been.
+              onBack = { screen = if (shared != null) CONVERSATION else SETTINGS },
+              incoming = shared,
+            )
           else ->
             ConversationScreen(
               // How the app was opened, which decides whether the microphone opens with it.
@@ -136,3 +154,4 @@ class MainActivity : ComponentActivity() {
 private const val CONVERSATION = "conversation"
 private const val SETTINGS = "settings"
 private const val MEMORY = "memory"
+private const val DOCUMENTS = "documents"

@@ -24,6 +24,16 @@ import kotlinx.coroutines.flow.flow
 sealed interface LoopEvent {
   data class Token(val text: String) : LoopEvent
 
+  /**
+   * A fragment of the model's thinking, kept apart from the reply all the way up.
+   *
+   * It reaches the screen because thinking you cannot see is not something you can be said to
+   * control - and because a minute of silence before the first word is indistinguishable from a
+   * hung app, which is the same reason tool activity is shown. It is never added to [messages]:
+   * what goes back to the model is what it said, not what it considered.
+   */
+  data class Thought(val text: String) : LoopEvent
+
   /** A tool is about to run. Worth showing: it is the difference between slow and stuck. */
   data class ToolStarted(val name: String) : LoopEvent
 
@@ -59,6 +69,8 @@ class TurnLoop(
   private val role: AgentRole,
   private val budget: Budget = Budget(),
   private val systemPrompt: String = "",
+  /** How much the model may think per exchange. The user's setting, passed straight through. */
+  private val reasoning: Reasoning = Reasoning.OFF,
 ) {
 
   fun run(conversation: List<Message>): Flow<LoopEvent> = flow {
@@ -68,7 +80,7 @@ class TurnLoop(
     var toolCalls = 0
 
     while (true) {
-      val outcome = oneExchange(messages, tools)
+      val outcome = oneExchange(messages, tools) { emit(it) }
 
       when (outcome) {
         is Exchange.Answered -> {
@@ -138,17 +150,31 @@ class TurnLoop(
   }
 
   /** One round trip to the model, reduced to what the loop decides on. */
-  private suspend fun oneExchange(messages: List<Message>, tools: List<ToolSpec>): Exchange {
+  private suspend fun oneExchange(
+    messages: List<Message>,
+    tools: List<ToolSpec>,
+    show: suspend (LoopEvent) -> Unit,
+  ): Exchange {
     val spoken = StringBuilder()
     val calls = mutableListOf<ToolInvocation>()
     var failure: Exchange.Failed? = null
     var done = false
 
     backend
-      .converse(TurnRequest(messages = messages, systemPrompt = systemPrompt, tools = tools))
+      .converse(
+        TurnRequest(
+          messages = messages,
+          systemPrompt = systemPrompt,
+          tools = tools,
+          reasoning = reasoning,
+        )
+      )
       .collect { event ->
         when (event) {
           is TurnEvent.Token -> spoken.append(event.text)
+          // Forwarded as it arrives rather than collected: the point of showing thinking is
+          // that something is visibly happening during the wait it causes.
+          is TurnEvent.Thought -> show(LoopEvent.Thought(event.text))
           is TurnEvent.ToolCalls -> calls.addAll(event.calls)
           is TurnEvent.Done -> {
             done = true

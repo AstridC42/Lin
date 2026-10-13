@@ -574,7 +574,65 @@ a cloud recogniser would quietly undo that for every spoken word.
 
 **Still to do:** the wake word and the resident service, which need a
 wake-word model this app does not have and a continuously open microphone it
-has not earned; and notification replies with their read-back.
+has not earned.
+
+Notification replies shipped under Phase 4, and not with the read-back this
+planned. Lin writes the reply onto the screen and the person sends it: the
+read-back design puts a 2B model in charge of deciding what agreement sounds
+like, on an action with no composer and no undo.
+
+### Phase 8 — Thinking, and documents
+
+Neither was in this plan. Both were asked for, and both turned out to be
+smaller than they looked because the pieces were already in place.
+
+**Done: controllable reasoning.** Gemma 4 can think before it answers, and on
+a phone that is a trade rather than an improvement — thinking tokens are
+generated at the same speed as answer tokens, so a budget is paid for in
+silence before the first word. So it is the user's choice, off by default,
+with the levels named by what they cost. A turn bound to a response schema
+never thinks whatever the setting says, because its decoder is constrained to
+a grammar with no room for a chain of thought. The thinking reaches the
+screen, collapsed, and is kept apart from the answer at every layer: it never
+enters the history sent back, never reaches a digest, and is dropped when the
+turn ends.
+
+Finding this one exposed a worse bug. `OnDeviceBackend` had been accepting
+`systemPrompt` and `responseSchema` and dropping both — so the orchestrator
+prompt had never reached the on-device model at all. See the commit; the
+decision is now a tested function rather than a method, because both symptoms
+look like ordinary behaviour.
+
+**Done: documents.** Lin reads PDF, Word (.docx) and plain text, and writes
+.docx, .pdf, .txt and .md. All of it local — PdfBox for PDF, and .docx read
+and written by hand, since it is a zip of XML.
+
+The access model is the point. The app holds no storage permission for
+documents: a file is readable because its owner handed over that one file
+through the picker or a share, and the persisted URI permission is the whole
+of the access. There is no browsing to be found anywhere, and the Documents
+screen is therefore a complete and truthful answer to "what can Lin open".
+
+Writing follows the staged-action rule, as calls and notification replies do.
+Lin writes only into its own private directory; the step that puts a document
+among somebody's own files is a button on the screen, which no tool can
+reach. Revising never writes over the original — it produces a new file
+beside it, because non-destructive by construction beats a confirmation
+dialog when the alternative is a 2B model replacing somebody's contract.
+
+Reading a .docx is the part with real bugs in it, and they are tested: Word
+splits one word across several runs whenever anything changes mid-word, so
+anything joining runs with a separator turns "assistant" into "assi st an t";
+field codes are instructions rather than prose; and text deleted under
+tracked changes is still in the file, so including it would have Lin answer
+from a draft its author rejected. A round-trip through this app's own writer
+caught a fourth: an empty paragraph is written self-closing, by Word as well,
+so a reader that counts only closing tags loses every blank line.
+
+**Not done, and worth saying:** editing a PDF in place. A PDF places every
+glyph at a coordinate and has no reflowing text to change, so "edit this PDF"
+means rewriting it, which loses its layout. Lin says so rather than
+pretending.
 
 ### Phase 7 — Replace
 

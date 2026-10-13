@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the one directory Lin writes documents into.
+
+  Deliberately narrow. A FileProvider with a root of "." would let anything holding a granted
+  URI read any file in the app's storage, including the memory database and the settings - so
+  what is shareable is exactly what Lin wrote to be shared.
+-->
+<paths>
+  <files-path name="documents" path="documents/" />
+</paths>
