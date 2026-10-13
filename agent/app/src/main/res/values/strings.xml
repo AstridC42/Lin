@@ -37,13 +37,16 @@
   <string name="settings_title">Settings</string>
   <string name="settings_server_heading">Model server</string>
   <string name="settings_server_detail">Where the bigger model runs. A LAN address at home, or a
-    tunnel hostname from outside — either works, as long as it is the full URL.</string>
+    tunnel hostname from outside — either works, as long as it is the full URL. Pick what is
+    actually running: the three speak different APIs, and pointing at the wrong one fails in a way
+    that looks like the server being down.</string>
   <string name="settings_server_url">Server URL</string>
   <string name="settings_server_header">Header (optional)</string>
   <string name="settings_server_header_detail">Sent with every request, as Name: value — one
-    per line, since a Cloudflare Access service token is two of them. Worth setting if the server
-    is reachable from the internet: Ollama has no password of its own, so anyone who learns the
-    address can use it.</string>
+    per line, since a Cloudflare Access service token is two of them. This is also where an API
+    key goes, as "Authorization: Bearer …". Worth setting if the server is reachable from the
+    internet: Ollama and vLLM have no password of their own, so anyone who learns the address can
+    use them.</string>
   <string name="settings_save">Save</string>
   <string name="settings_saved">Saved</string>
   <string name="memory_title">What Lin remembers</string>
@@ -123,6 +126,14 @@
   <string name="download_progress">%1$d%% · %2$s of %3$s GB</string>
   <string name="download_waiting">Queued — waiting for a connection</string>
   <string name="settings_models_where">Models are read from, and will be downloaded to:</string>
+
+  <string name="settings_server_kind_ollama">Ollama\'s own API. Listens on 11434. No key
+    unless you put a proxy in front of it.</string>
+  <string name="settings_server_kind_vllm">vLLM\'s OpenAI-compatible API. `vllm serve` listens on
+    8000, and pasting the /v1 address from its README is fine. Usually no key.</string>
+  <string name="settings_server_kind_unsloth">Unsloth\'s OpenAI-compatible API. Use the port
+    Unsloth printed, and put its sk-unsloth key in the header field below as
+    "Authorization: Bearer sk-unsloth-…".</string>
 
   <string name="documents_title">Documents</string>
   <string name="documents_explain">Lin can read a document you give it, and write new ones. It

@@ -26,8 +26,10 @@ import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.Reasoning
+import com.lin.agent.engine.ServerKind
+import com.lin.agent.engine.serverKindNamed
 import com.lin.agent.engine.reasoningNamed
-import com.lin.agent.engine.OllamaServer
+import com.lin.agent.engine.ModelServer
 import com.lin.agent.engine.ServerModel
 import com.lin.agent.engine.ServerModelsResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -87,6 +89,8 @@ data class SettingsState(
   val digestConversations: Boolean = false,
   /** The reasoning level, as the engine's own enum. */
   val reasoning: Reasoning = Reasoning.OFF,
+  /** Which kind of server the address points at, which decides the dialect spoken to it. */
+  val serverKind: ServerKind = ServerKind.OLLAMA,
   val photoIndex: IndexState = IndexState.Idle,
   val photosIndexed: Int = 0,
 )
@@ -99,7 +103,7 @@ constructor(
   private val store: ModelStore,
   private val downloads: ModelDownloads,
   private val backends: ChatBackends,
-  private val server: OllamaServer,
+  private val server: ModelServer,
   private val photos: PhotoIndex,
   private val memories: MemoryStore,
 ) : ViewModel() {
@@ -132,6 +136,7 @@ constructor(
           spokenReplies = settings.spokenReplies.first(),
           digestConversations = settings.digestConversations.first(),
           reasoning = reasoningNamed(settings.reasoning.first()),
+          serverKind = serverKindNamed(settings.serverKind.first()),
           memoryGb = memoryGb,
           socModel = com.lin.agent.core.models.currentSocModel(),
           modelsDirectory = store.directory().absolutePath,
@@ -235,7 +240,7 @@ constructor(
     _state.update { it.copy(serverModels = ServerModelsState.Checking) }
     probe =
       viewModelScope.launch {
-        val result = server.models(current.ollamaUrl, current.ollamaAuthHeader)
+        val result = server.models(current.ollamaUrl, current.ollamaAuthHeader, current.serverKind)
         _state.update {
           it.copy(
             serverModels =
@@ -289,6 +294,21 @@ constructor(
   fun setDigestConversations(on: Boolean) {
     _state.update { it.copy(digestConversations = on) }
     viewModelScope.launch { settings.setDigestConversations(on) }
+  }
+
+  /**
+   * Changes which kind of server the address points at.
+   *
+   * The model list is cleared rather than kept. It was read from a different server speaking a
+   * different dialect, and leaving a vLLM model name selected while Ollama is now configured
+   * would fail every turn with a 404 that reads like the server being broken.
+   */
+  fun setServerKind(kind: ServerKind) {
+    _state.update { it.copy(serverKind = kind, serverModels = ServerModelsState.Unknown) }
+    viewModelScope.launch {
+      settings.setServerKind(kind.name)
+      backends.refresh()
+    }
   }
 
   fun setReasoning(level: Reasoning) {

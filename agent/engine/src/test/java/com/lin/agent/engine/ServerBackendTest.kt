@@ -27,7 +27,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** A turn against the user's own server, without one. */
-class OllamaBackendTest {
+class ServerBackendTest {
 
   // ---- the request ----
 
@@ -159,13 +159,13 @@ class OllamaBackendTest {
   @Test
   fun anAnswerThatIsNotOllamaSaysSo() = runTest {
     val events = backend(stream(200, listOf("<html>", "</html>"))).converse(request()).toList()
-    assertEquals(OllamaServer.NOT_OLLAMA, (events.single() as TurnEvent.Failed).message)
+    assertEquals(ModelServer.NOT_OLLAMA, (events.single() as TurnEvent.Failed).message)
   }
 
   @Test
   fun aDeadConnectionBecomesASentence() = runTest {
     val backend =
-      OllamaBackend("host", "", "m", openStream = { _, _, _ -> throw ConnectException("refused") })
+      ServerBackend("host", "", "m", openStream = { _, _, _ -> throw ConnectException("refused") })
     val failure = backend.converse(request()).toList().single() as TurnEvent.Failed
     assertTrue(failure.message, failure.message.contains("OLLAMA_HOST"))
   }
@@ -174,9 +174,9 @@ class OllamaBackendTest {
   fun noAddressIsSaidRatherThanDialled() = runTest {
     var opened = false
     val backend =
-      OllamaBackend("", "", "m", openStream = { _, _, _ -> opened = true; stream(200, CHUNKS) })
+      ServerBackend("", "", "m", openStream = { _, _, _ -> opened = true; stream(200, CHUNKS) })
     assertEquals(
-      OllamaServer.NO_ADDRESS,
+      ModelServer.NO_ADDRESS,
       (backend.converse(request()).toList().single() as TurnEvent.Failed).message,
     )
     assertFalse(opened)
@@ -195,7 +195,7 @@ class OllamaBackendTest {
     var seenUrl: String? = null
     var seenHeaders: Map<String, String> = emptyMap()
     var seenBody: String? = null
-    OllamaBackend(
+    ServerBackend(
         baseUrl = "  192.168.1.50  ",
         authHeader = "Authorization: Bearer tok",
         modelName = "qwen3:32b",
@@ -227,13 +227,13 @@ class OllamaBackendTest {
   }
 
   private suspend fun reachableAgainst(tagsBody: String): Boolean =
-    OllamaBackend(
+    ServerBackend(
         baseUrl = "host",
         authHeader = "",
         modelName = "qwen3:32b",
         server =
-          OllamaServer { _, _ ->
-            object : OllamaServer.Response {
+          ModelServer { _, _ ->
+            object : ModelServer.Response {
               override val status = 200
               override val body = tagsBody
 
@@ -245,8 +245,8 @@ class OllamaBackendTest {
 
   // ---- helpers ----
 
-  private fun backend(stream: OllamaBackend.Stream) =
-    OllamaBackend("host", "", "qwen3:32b", openStream = { _, _, _ -> stream })
+  private fun backend(stream: ServerBackend.Stream) =
+    ServerBackend("host", "", "qwen3:32b", openStream = { _, _, _ -> stream })
 
   private fun request() = TurnRequest(messages = listOf(user("hello")))
 
@@ -260,7 +260,7 @@ class OllamaBackendTest {
     error: String = "",
     onClose: () -> Unit = {},
   ) =
-    object : OllamaBackend.Stream {
+    object : ServerBackend.Stream {
       override val status = status
       override val lines = lines.asSequence()
       override val errorBody = error

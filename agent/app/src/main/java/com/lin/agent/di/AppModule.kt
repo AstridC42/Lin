@@ -24,7 +24,7 @@ import com.lin.agent.core.documents.DocumentLibrary
 import com.lin.agent.core.documents.Documents
 import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.settings.SettingsRepository
-import com.lin.agent.engine.OllamaServer
+import com.lin.agent.engine.ModelServer
 import com.lin.agent.model.PhoneTool
 import com.lin.agent.core.media.PhotoLibrary
 import androidx.work.WorkManager
@@ -84,7 +84,7 @@ object AppModule {
   fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
     WorkManager.getInstance(context)
 
-  @Provides @Singleton fun provideOllamaServer(): OllamaServer = OllamaServer()
+  @Provides @Singleton fun provideModelServer(): ModelServer = ModelServer()
 
   @Provides @Singleton
   fun providePhoneTool(
