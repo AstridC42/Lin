@@ -66,7 +66,7 @@ sealed interface ServerModelsResult {
  *
  * [openConnection] is injectable so all of this is testable without a server.
  */
-class OllamaServer(
+class ModelServer(
   private val openConnection: (url: String, headers: Map<String, String>) -> Response =
     ::httpConnection
 ) {
@@ -85,21 +85,27 @@ class OllamaServer(
    * [typedUrl] is taken as the user typed it, not as a validated URL, because this is called from
    * a text field they are still editing - checking an address before saving it is the point.
    */
-  suspend fun models(typedUrl: String, authHeader: String = ""): ServerModelsResult =
+  suspend fun models(
+    typedUrl: String,
+    authHeader: String = "",
+    kind: ServerKind = ServerKind.OLLAMA,
+  ): ServerModelsResult =
     withContext(Dispatchers.IO) {
-      val url = tagsUrl(typedUrl) ?: return@withContext ServerModelsResult.Failed(NO_ADDRESS)
+      val url =
+        serverUrl(typedUrl, kind, Endpoint.MODELS)
+          ?: return@withContext ServerModelsResult.Failed(NO_ADDRESS)
       try {
         openConnection(url, headersFrom(authHeader)).use { response ->
           if (response.status != HTTP_OK) {
             return@withContext ServerModelsResult.Failed(describeStatus(response.status))
           }
-          ServerModelsResult.Found(parseModels(response.body))
+          ServerModelsResult.Found(parseModels(response.body, kind))
         }
       } catch (e: CancellationException) {
         throw e
       } catch (e: JSONException) {
-        Log.w(TAG, "Not an Ollama answer from $url", e)
-        ServerModelsResult.Failed(NOT_OLLAMA)
+        Log.w(TAG, "Not a $kind answer from $url", e)
+        ServerModelsResult.Failed(wrongDialect(kind))
       } catch (e: Throwable) {
         Log.w(TAG, "Could not reach $url", e)
         ServerModelsResult.Failed(describeFailure(e))
@@ -107,7 +113,7 @@ class OllamaServer(
     }
 
   companion object {
-    private const val TAG = "LinOllamaServer"
+    private const val TAG = "LinModelServer"
     private const val HTTP_OK = 200
 
     /** Interactive, unlike a model download: somebody is watching this one happen. */
@@ -118,6 +124,24 @@ class OllamaServer(
     internal const val NOT_OLLAMA =
       "Something answered at that address, but not the way Ollama does. Check the port - Ollama " +
         "listens on 11434 - and that the address does not point at another service."
+
+    /**
+     * Something answered, but not in the dialect that was chosen.
+     *
+     * Named per kind because the fix differs and the symptom does not. Pointing the Ollama
+     * setting at a vLLM server and pointing it at a router both produce "that is not Ollama",
+     * and only one of them is fixed by changing the port.
+     */
+    internal fun wrongDialect(kind: ServerKind): String =
+      when (kind) {
+        ServerKind.OLLAMA -> NOT_OLLAMA
+        ServerKind.VLLM ->
+          "Something answered there, but not the way vLLM does. vLLM listens on 8000 and serves " +
+            "/v1 - check the port, and that the kind of server above matches what is running."
+        ServerKind.UNSLOTH ->
+          "Something answered there, but not the way Unsloth does. Check the port Unsloth " +
+            "printed, and that the API key is in the header field above."
+      }
 
     private fun httpConnection(url: String, headers: Map<String, String>): Response {
       val connection =
@@ -224,7 +248,33 @@ internal fun headersFrom(field: String): Map<String, String> =
  * Throws [JSONException] when the body is not an object at all, which is the signal that whatever
  * answered is not Ollama.
  */
-internal fun parseModels(body: String): List<ServerModel> {
+internal fun parseModels(body: String, kind: ServerKind = ServerKind.OLLAMA): List<ServerModel> =
+  if (kind.speaksOpenAi) parseOpenAiModels(body) else parseOllamaModels(body)
+
+/**
+ * The models an OpenAI-compatible server lists, from `GET /v1/models`.
+ *
+ * Only the id is read, and that is the format rather than a shortcut: OpenAI's list says nothing
+ * about parameter count, quantisation or size on disk, which Ollama's does. Those fields come
+ * back empty and the screen shows a name alone - honest, and better than inventing numbers for a
+ * model served from a directory of safetensors where "size" is not a meaningful single figure.
+ *
+ * A `data` array is what makes this an OpenAI answer. Its absence throws, like the Ollama
+ * parser's, so the caller reports a wrong dialect rather than an empty server.
+ */
+internal fun parseOpenAiModels(body: String): List<ServerModel> {
+  val models = JSONObject(body).getJSONArray("data")
+  return (0 until models.length())
+    .mapNotNull { index ->
+      val entry = models.optJSONObject(index) ?: return@mapNotNull null
+      val name = entry.optString("id").ifEmpty { entry.optString("name") }
+      if (name.isEmpty()) return@mapNotNull null
+      ServerModel(name = name, sizeBytes = 0L, parameterSize = "", quantization = "")
+    }
+    .sortedBy { it.name }
+}
+
+internal fun parseOllamaModels(body: String): List<ServerModel> {
   val models = JSONObject(body).optJSONArray("models") ?: return emptyList()
   return (0 until models.length())
     .mapNotNull { index ->

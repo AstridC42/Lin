@@ -32,7 +32,7 @@ import org.junit.Test
  * where somebody discovers their phone cannot reach their server, from a phone, with no logcat and
  * no terminal. A probe that fails with the wrong explanation sends them to fix the wrong thing.
  */
-class OllamaServerTest {
+class ModelServerTest {
 
   // ---- the address ----
 
@@ -215,7 +215,7 @@ class OllamaServerTest {
 
   @Test
   fun aGoodAnswerBecomesAList() = runTest {
-    val result = OllamaServer { _, _ -> response(200, TAGS_BODY) }.models("host")
+    val result = ModelServer { _, _ -> response(200, TAGS_BODY) }.models("host")
     assertEquals(
       listOf("gemma3:12b", "qwen3:32b"),
       (result as ServerModelsResult.Found).models.map { it.name },
@@ -227,7 +227,7 @@ class OllamaServerTest {
     var seenUrl: String? = null
     var seenHeaders: Map<String, String> = emptyMap()
     val server =
-      OllamaServer { url, headers ->
+      ModelServer { url, headers ->
         seenUrl = url
         seenHeaders = headers
         response(200, """{"models":[]}""")
@@ -242,22 +242,22 @@ class OllamaServerTest {
   /** Something answered, but not Ollama - a router's admin page, most likely. */
   @Test
   fun anHtmlAnswerIsReportedAsNotOllama() = runTest {
-    val result = OllamaServer { _, _ -> response(200, "<html><body>Router</body></html>") }
+    val result = ModelServer { _, _ -> response(200, "<html><body>Router</body></html>") }
       .models("host")
-    assertEquals(OllamaServer.NOT_OLLAMA, (result as ServerModelsResult.Failed).message)
+    assertEquals(ModelServer.NOT_OLLAMA, (result as ServerModelsResult.Failed).message)
   }
 
   @Test
   fun aThrownConnectionBecomesASentence() = runTest {
-    val result = OllamaServer { _, _ -> throw ConnectException("Connection refused") }.models("host")
+    val result = ModelServer { _, _ -> throw ConnectException("Connection refused") }.models("host")
     assertTrue((result as ServerModelsResult.Failed).message.contains("OLLAMA_HOST"))
   }
 
   @Test
   fun noAddressIsItsOwnMessageRatherThanAConnectionAttempt() = runTest {
     var opened = false
-    val result = OllamaServer { _, _ -> opened = true; response(200, "{}") }.models("")
-    assertEquals(OllamaServer.NO_ADDRESS, (result as ServerModelsResult.Failed).message)
+    val result = ModelServer { _, _ -> opened = true; response(200, "{}") }.models("")
+    assertEquals(ModelServer.NO_ADDRESS, (result as ServerModelsResult.Failed).message)
     assertTrue("nothing should be dialled with no address", !opened)
   }
 
@@ -265,12 +265,12 @@ class OllamaServerTest {
   @Test
   fun theResponseIsAlwaysClosed() = runTest {
     var closed = false
-    OllamaServer { _, _ -> response(200, "not json", onClose = { closed = true }) }.models("host")
+    ModelServer { _, _ -> response(200, "not json", onClose = { closed = true }) }.models("host")
     assertTrue(closed)
   }
 
   private fun response(status: Int, body: String, onClose: () -> Unit = {}) =
-    object : OllamaServer.Response {
+    object : ModelServer.Response {
       override val status = status
       override val body = body
 

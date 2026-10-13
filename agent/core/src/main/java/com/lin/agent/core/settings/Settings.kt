@@ -179,6 +179,17 @@ class SettingsRepository(private val context: Context) {
   suspend fun setReasoning(value: String) = write(REASONING, value)
 
   /**
+   * Which kind of server is at [serverUrl], as the name of a kind.
+   *
+   * A string for the same reason as [reasoning]: this module does not know the engine's types.
+   * Empty reads as Ollama, which is what this app shipped with - somebody upgrading has a
+   * working server and no stored kind, and should find it still working.
+   */
+  val serverKind: Flow<String> = read(SERVER_KIND, "")
+
+  suspend fun setServerKind(value: String) = write(SERVER_KIND, value)
+
+  /**
    * Reads one setting, with [default] on any failure.
    *
    * `catch` rather than a bare flow: the corruption handler above covers a file that cannot be
@@ -227,5 +238,6 @@ class SettingsRepository(private val context: Context) {
     val SPOKEN_REPLIES = booleanPreferencesKey("spoken_replies")
     val DIGEST_CONVERSATIONS = booleanPreferencesKey("digest_conversations")
     val REASONING = stringPreferencesKey("reasoning")
+    val SERVER_KIND = stringPreferencesKey("server_kind")
   }
 }
