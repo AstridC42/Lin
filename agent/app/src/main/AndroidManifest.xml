@@ -103,7 +103,39 @@
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!--
+              Sharing a document to Lin, which is the natural way to hand one over - from a
+              mail attachment, a browser download, a file manager.
+
+              Narrow on purpose. Only the three kinds this app can actually read are listed, so
+              Lin does not appear in the share sheet for a photo or a video and then say it
+              cannot read it. A share grants access to that one file and nothing around it.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
         </activity>
+
+        <!--
+          How a document Lin wrote gets out of Lin's own storage.
+
+          Scoped to the single directory it writes into - see documents_paths.xml. A provider
+          rooted at "." would let anything holding a granted URI read the memory database and
+          the settings as well, which is not a trade worth making to save a line of XML.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/documents_paths" />
+        </provider>
 
         <!--
           The one line that stops a download killing the app.

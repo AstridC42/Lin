@@ -52,6 +52,20 @@ kotlin {
 }
 
 dependencies {
+  // PdfBox reads and writes PDF locally, which is the whole reason for it: nothing about a
+  // document leaves the phone.
+  //
+  // Without BouncyCastle, which it pulls in and which costs 4 MB of the APK. Only two PdfBox
+  // classes reference it, both in the encryption package: SecurityProvider and
+  // PublicKeySecurityHandler. PDDocument, StandardSecurityHandler and PDFTextStripper reference
+  // neither - checked against the AAR's bytecode, not assumed - so reading an ordinary PDF, and
+  // even a password-protected one, never reaches it.
+  //
+  // What is given up is certificate-encrypted PDFs, which are rare and which this app rejects
+  // anyway: Documents.textFromPdf refuses an encrypted document rather than asking for a
+  // password. Such a file now fails as a missing class instead, which Documents.read catches
+  // and reports as "damaged or password-protected" - the same thing it would have said.
+  implementation(libs.pdfbox.android) { exclude(group = "org.bouncycastle") }
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.datastore.preferences)
   // Downloads that survive the app being backgrounded, and process death.

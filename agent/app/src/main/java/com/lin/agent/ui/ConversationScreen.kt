@@ -20,6 +20,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -68,6 +70,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -177,6 +180,13 @@ fun ConversationScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         itemsIndexed(state.messages) { _, message -> Bubble(message) }
+        // Before the answer, collapsed, and visibly not the answer. Thinking contradicts itself
+        // and abandons approaches on the way to being right, so it is offered rather than shown:
+        // somebody who wants to know why an answer took thirty seconds can open it, and nobody
+        // has to read working-out to find the reply.
+        if (state.thinking.isNotEmpty()) {
+          item { Thinking(state.thinking, inProgress = state.inProgress) }
+        }
         if (state.streaming.isNotEmpty()) {
           item { Bubble(Message(Message.Role.ASSISTANT, state.streaming)) }
         }
@@ -417,6 +427,36 @@ private fun Thumbnail(uri: String) {
         contentDescription = stringResource(R.string.found_photo),
         contentScale = ContentScale.Crop,
         modifier = Modifier.fillMaxSize(),
+      )
+    }
+  }
+}
+
+/**
+ * The model's working-out, folded away.
+ *
+ * Starts open while the turn is running and closes once the answer is in, which matches what it
+ * is for: during the wait it is the only sign anything is happening, and afterwards the answer
+ * is what matters. Monospaced and dimmed so it does not read as prose Lin is addressing to
+ * anybody.
+ */
+@Composable
+private fun Thinking(text: String, inProgress: Boolean) {
+  var open by remember(inProgress) { mutableStateOf(inProgress) }
+  Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    TextButton(onClick = { open = !open }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+      Text(
+        stringResource(if (open) R.string.thinking_hide else R.string.thinking_show),
+        style = MaterialTheme.typography.bodySmall,
+      )
+    }
+    if (open) {
+      Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        fontFamily = FontFamily.Monospace,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 4.dp),
       )
     }
   }
