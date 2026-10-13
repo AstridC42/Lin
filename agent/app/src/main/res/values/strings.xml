@@ -34,6 +34,20 @@
   <string name="memory_source_photo">From a photo · %1$s</string>
   <string name="settings_open_memory">See what Lin remembers</string>
 
+  <string name="settings_photos_heading">Your photos</string>
+  <string name="settings_photos_detail">Index your photo library so Lin can find pictures by
+    what is in them. It runs on this phone — nothing is uploaded, and no picture is copied.
+    Thousands of photos take a while.</string>
+  <string name="settings_photos_start">Index my photos</string>
+  <string name="settings_photos_continue">Continue indexing</string>
+  <string name="settings_photos_stop">Stop</string>
+  <string name="settings_photos_progress">%1$d of %2$d</string>
+  <string name="settings_photos_preparing">Reading the library…</string>
+  <string name="settings_photos_indexed">%1$d photos indexed</string>
+  <string name="settings_photos_none">No photos indexed yet.</string>
+  <string name="settings_photos_clear">Remove the photo index</string>
+  <string name="found_photo">A photo Lin found</string>
+
   <string name="settings_phone_heading">The phone</string>
   <string name="settings_direct_calls">Let Lin place calls itself</string>
   <string name="settings_direct_calls_off">Off: a call opens the dialer with the number in it
@@ -68,6 +82,8 @@
   <string name="settings_device">This phone: %1$d GB of memory, %2$s</string>
   <string name="no_model">no model</string>
   <string name="running_tool">Working on the server — this can take a minute…</string>
+  <string name="tool_failed">%1$s did not work. Whatever Lin says above, that part did not
+    happen.</string>
   <string name="no_model_title">No model yet</string>
   <string name="no_model_body">Lin answers with a model running on this phone, and there is not
     one here yet. %1$s is about %2$s GB — worth starting on Wi-Fi.</string>

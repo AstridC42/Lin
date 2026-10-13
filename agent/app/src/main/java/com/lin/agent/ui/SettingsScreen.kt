@@ -59,6 +59,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.core.models.DownloadState
 import com.lin.agent.engine.ServerModel
+import com.lin.agent.model.IndexState
+import android.os.Build
 import com.lin.agent.R
 
 /**
@@ -159,6 +161,84 @@ fun SettingsScreen(
       ) {
         Text(stringResource(R.string.settings_open_memory))
       }
+
+      Text(
+        stringResource(R.string.settings_photos_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_photos_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      val photoPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+          viewModel.indexPhotos(granted)
+        }
+      when (val indexing = state.photoIndex) {
+        is IndexState.Running ->
+          Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (indexing.total > 0) {
+              LinearProgressIndicator(
+                progress = { indexing.done.toFloat() / indexing.total },
+                modifier = Modifier.fillMaxWidth(),
+              )
+            } else {
+              LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Text(
+                if (indexing.total > 0) {
+                  stringResource(
+                    R.string.settings_photos_progress,
+                    indexing.done,
+                    indexing.total,
+                  )
+                } else stringResource(R.string.settings_photos_preparing),
+                style = MaterialTheme.typography.bodySmall,
+              )
+              TextButton(onClick = viewModel::stopIndexing) {
+                Text(stringResource(R.string.settings_photos_stop))
+              }
+            }
+          }
+        is IndexState.Failed ->
+          Text(
+            indexing.message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+          )
+        else -> Unit
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(
+          onClick = { photoPermission.launch(photoPermissionName()) },
+          enabled = state.photoIndex !is IndexState.Running,
+        ) {
+          Text(
+            stringResource(
+              if (state.photosIndexed > 0) R.string.settings_photos_continue
+              else R.string.settings_photos_start
+            )
+          )
+        }
+        if (state.photosIndexed > 0) {
+          TextButton(onClick = viewModel::clearPhotoIndex) {
+            Text(stringResource(R.string.settings_photos_clear))
+          }
+        }
+      }
+      Text(
+        if (state.photosIndexed > 0) {
+          stringResource(R.string.settings_photos_indexed, state.photosIndexed)
+        } else stringResource(R.string.settings_photos_none),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
 
       Text(
         stringResource(R.string.settings_phone_heading),
@@ -497,3 +577,16 @@ private fun describe(model: ServerModel): String =
     )
     .filter { it.isNotEmpty() }
     .joinToString(" · ")
+
+/**
+ * The photo permission this Android version actually uses.
+ *
+ * Three of them across the versions this app supports, and asking for the wrong one is denied
+ * silently rather than with an error - which looks exactly like the user refusing.
+ */
+private fun photoPermissionName(): String =
+  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    android.Manifest.permission.READ_MEDIA_IMAGES
+  } else {
+    @Suppress("DEPRECATION") android.Manifest.permission.READ_EXTERNAL_STORAGE
+  }

@@ -20,7 +20,14 @@ package com.lin.agent.engine
 sealed interface EmbedPart {
   data class Text(val text: String) : EmbedPart
 
-  data class Image(val path: String) : EmbedPart
+  /**
+   * Already-decoded image bytes rather than a path.
+   *
+   * The photo library hands out `content://` URIs, which only a ContentResolver can open - and
+   * the caller is also the only place that knows to downscale first, since embedding a twelve
+   * megapixel JPEG costs many times what the model needs. Both belong above this module.
+   */
+  class Image(val bytes: ByteArray) : EmbedPart
 
   data class Audio(val path: String) : EmbedPart
 }

@@ -34,6 +34,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.lin.agent.model.ChatBackends
+import com.lin.agent.model.IndexState
+import com.lin.agent.model.PhotoIndex
+import com.lin.agent.core.memory.MemorySource
+import com.lin.agent.core.memory.MemoryStore
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -77,6 +81,8 @@ data class SettingsState(
   val serverModel: String = "",
   val answerOnServer: Boolean = false,
   val allowDirectCalls: Boolean = false,
+  val photoIndex: IndexState = IndexState.Idle,
+  val photosIndexed: Int = 0,
 )
 
 @HiltViewModel
@@ -88,6 +94,8 @@ constructor(
   private val downloads: ModelDownloads,
   private val backends: ChatBackends,
   private val server: OllamaServer,
+  private val photos: PhotoIndex,
+  private val memories: MemoryStore,
 ) : ViewModel() {
 
   private val _state = MutableStateFlow(SettingsState())
@@ -142,6 +150,19 @@ constructor(
       // screen is whether the phone can reach the server at all - and from outside the house that
       // answer changes without anything in the app changing.
       if (_state.value.ollamaUrl.isNotBlank()) checkServer()
+    }
+  }
+
+  init {
+    viewModelScope.launch {
+      photos.watch().collect { indexing ->
+        _state.update { it.copy(photoIndex = indexing) }
+        // Re-counted when a run ends rather than polled: the count only moves while indexing,
+        // and a query per progress tick would compete with the indexing for the same database.
+        if (indexing is IndexState.Finished || indexing is IndexState.Idle) {
+          _state.update { it.copy(photosIndexed = memories.countFrom(MemorySource.PHOTO)) }
+        }
+      }
     }
   }
 
@@ -236,6 +257,26 @@ constructor(
    * cannot be acted on. The policy needs both anyway; storing a true that the permission does
    * not back would only make the setting lie about what Lin can do.
    */
+  /**
+   * Starts or continues indexing. [granted] is whether photo access was actually given.
+   *
+   * Nothing is enqueued without it: a run that starts and immediately finds no photos reads as
+   * the feature being broken rather than as a permission the user declined.
+   */
+  fun indexPhotos(granted: Boolean) {
+    if (!granted) return
+    photos.start()
+  }
+
+  fun stopIndexing() = photos.stop()
+
+  fun clearPhotoIndex() {
+    viewModelScope.launch {
+      memories.forgetAllFrom(MemorySource.PHOTO)
+      _state.update { it.copy(photosIndexed = 0) }
+    }
+  }
+
   fun setAllowDirectCalls(allow: Boolean, granted: Boolean) {
     val effective = allow && granted
     _state.update { it.copy(allowDirectCalls = effective) }

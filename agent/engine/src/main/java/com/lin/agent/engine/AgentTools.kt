@@ -47,7 +47,15 @@ data class ToolParameter(
 
 /** How a tool call ended. [Failed] is a message for the model, not an exception for the app. */
 sealed interface ToolResult {
-  data class Ok(val text: String) : ToolResult
+  /**
+   * [text] is what the model is told. [shows] is what the user is shown.
+   *
+   * Two channels because a photo search has nothing useful to say in words - "I found three
+   * photos" is not an answer to "find the one from the beach" - and describing an image back to
+   * a model that cannot see it only invites it to embellish. The pictures go to the screen; the
+   * model gets told how many and that they are already visible.
+   */
+  data class Ok(val text: String, val shows: List<String> = emptyList()) : ToolResult
 
   data class Failed(val message: String) : ToolResult
 }

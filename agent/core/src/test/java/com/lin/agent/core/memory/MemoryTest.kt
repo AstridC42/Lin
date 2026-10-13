@@ -95,6 +95,27 @@ class MemoryTest {
     )
   }
 
+  /**
+   * A memory saved before the embedder arrived is held but not searchable.
+   *
+   * Load-bearing now that `remember` keeps a fact whether or not an embedding model is
+   * downloaded. It has to be inert in search rather than matching everything at score zero -
+   * the floor already excludes it, and this pins that rather than leaving it to follow from
+   * two other rules.
+   */
+  @Test
+  fun aMemoryWithNoVectorNeverMatches() {
+    val results =
+      rank(
+        floatArrayOf(1f, 0f, 0f),
+        listOf(
+          memory("saved before the embedder") to FloatArray(0),
+          memory("searchable") to floatArrayOf(1f, 0f, 0f),
+        ),
+      )
+    assertEquals(listOf("searchable"), results.map { it.memory.text })
+  }
+
   @Test
   fun anEmptyOrZeroVectorScoresNothingRatherThanThrowing() {
     assertEquals(0f, cosine(FloatArray(0), FloatArray(0)), 0f)

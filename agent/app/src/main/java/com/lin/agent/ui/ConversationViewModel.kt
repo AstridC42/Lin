@@ -29,6 +29,7 @@ import com.lin.agent.engine.ToolRegistry
 import com.lin.agent.engine.TurnLoop
 import com.lin.agent.model.DelegateTool
 import com.lin.agent.model.Embedders
+import com.lin.agent.model.FindPhotoTool
 import com.lin.agent.model.PhoneTool
 import com.lin.agent.model.RecallTool
 import com.lin.agent.model.RememberTool
@@ -61,6 +62,17 @@ data class ConversationState(
   val notice: String = "",
   /** The tool running right now, so a long delegation reads as busy rather than stuck. */
   val runningTool: String = "",
+  /**
+   * Tools that failed during this turn, by name.
+   *
+   * Shown to the user, not only fed back to the model. A failed tool used to be invisible: the
+   * message went into the conversation the model sees, and a 2B model handed "that did not
+   * work" will still often say it did - which is how Lin reported remembering a name it had
+   * not saved. The model's account of what it did is not evidence that it did it.
+   */
+  val failedTools: List<String> = emptyList(),
+  /** Pictures a tool found, shown directly rather than described by a model that cannot see. */
+  val shows: List<String> = emptyList(),
 )
 
 /**
@@ -100,6 +112,7 @@ constructor(
         phoneTool,
         RememberTool(memories, embedders),
         RecallTool(memories, embedders),
+        FindPhotoTool(memories, embedders),
       )
     )
 
@@ -145,7 +158,16 @@ constructor(
     // can mean asking the server whether it is there, and a message that only appears once that
     // round trip finishes reads as a Send button that did nothing.
     val outgoing = _state.value.messages + Message(Message.Role.USER, trimmed)
-    _state.update { it.copy(messages = outgoing, inProgress = true, streaming = "", error = "") }
+    _state.update {
+      it.copy(
+        messages = outgoing,
+        inProgress = true,
+        streaming = "",
+        error = "",
+        failedTools = emptyList(),
+        shows = emptyList(),
+      )
+    }
     persist(outgoing)
 
     viewModelScope.launch {
@@ -181,7 +203,14 @@ constructor(
             // Shown while it runs. A delegated task can take a minute on a big model, and
             // silence for a minute is indistinguishable from the app having given up.
             is LoopEvent.ToolStarted -> _state.update { it.copy(runningTool = event.name) }
-            is LoopEvent.ToolFinished -> _state.update { it.copy(runningTool = "") }
+            is LoopEvent.ToolFinished ->
+              _state.update {
+                it.copy(
+                  runningTool = "",
+                  failedTools = if (event.ok) it.failedTools else it.failedTools + event.name,
+                  shows = it.shows + event.shows,
+                )
+              }
             is LoopEvent.Done -> {
               val complete = outgoing + Message(Message.Role.ASSISTANT, event.text)
               _state.update {
@@ -257,7 +286,9 @@ constructor(
         "is done. Never invent a phone number - pass the name instead. " +
         "Call remember when the user says to keep something, and recall when they refer to " +
         "something you were not told in this conversation. If recall finds nothing, say so " +
-        "rather than filling the gap."
+        "rather than filling the gap. " +
+        "Use find_photo to look through the user\'s pictures; they appear on screen, and you " +
+        "cannot see them, so never describe what is in one."
 
     const val KEY_ROLES = "conversation_roles"
     const val KEY_TEXTS = "conversation_texts"
