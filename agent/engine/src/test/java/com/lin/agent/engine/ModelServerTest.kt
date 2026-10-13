@@ -21,6 +21,7 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -200,9 +201,18 @@ class ModelServerTest {
     }
   }
 
+  /**
+   * A 404 names the two things it can be, and neither of them is "Ollama".
+   *
+   * It said "no Ollama API there" when Ollama was the only kind of server this spoke to. Now
+   * it is one of three, and the likelier cause on the other two is a server that simply does
+   * not list its models.
+   */
   @Test
-  fun aNotFoundSaysItReachedSomething() {
-    assertTrue(describeStatus(404).contains("no Ollama API"))
+  fun aNotFoundSaysItReachedSomethingWithoutBlamingOllama() {
+    val message = describeStatus(404)
+    assertTrue(message, message.contains("404"))
+    assertFalse(message, message.contains("Ollama"))
   }
 
   /** A 502 through a tunnel means the tunnel is up and the thing behind it is not. */
@@ -239,12 +249,19 @@ class ModelServerTest {
     assertEquals(mapOf("Authorization" to "Bearer tok"), seenHeaders)
   }
 
-  /** Something answered, but not Ollama - a router's admin page, most likely. */
+  /**
+   * Something answered, but not Ollama - a router's admin page, most likely.
+   *
+   * The message now quotes what came back as well as saying it was not understood, because
+   * the sentence alone left nobody any way to find out what had actually answered.
+   */
   @Test
-  fun anHtmlAnswerIsReportedAsNotOllama() = runTest {
+  fun anHtmlAnswerIsReportedAsNotOllamaAndQuotedBack() = runTest {
     val result = ModelServer { _, _ -> response(200, "<html><body>Router</body></html>") }
       .models("host")
-    assertEquals(ModelServer.NOT_OLLAMA, (result as ServerModelsResult.Failed).message)
+    val message = (result as ServerModelsResult.Failed).message
+    assertTrue(message, message.startsWith(ModelServer.NOT_OLLAMA))
+    assertTrue(message, message.contains("Router"))
   }
 
   @Test

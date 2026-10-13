@@ -50,6 +50,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
@@ -517,8 +520,10 @@ fun SettingsScreen(
       ServerModels(
         state = state.serverModels,
         picked = state.serverModel,
+        typed = state.serverModelTyped,
         onCheck = viewModel::checkServer,
         onPick = viewModel::pickServerModel,
+        onType = viewModel::typeServerModel,
       )
 
       Text(
@@ -644,8 +649,10 @@ fun SettingsScreen(
 private fun ServerModels(
   state: ServerModelsState,
   picked: String,
+  typed: Boolean,
   onCheck: () -> Unit,
   onPick: (String) -> Unit,
+  onType: (String) -> Unit,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Row(
@@ -688,12 +695,18 @@ private fun ServerModels(
             style = MaterialTheme.typography.bodySmall,
           )
         }
-      is ServerModelsState.Failed ->
+      is ServerModelsState.Failed -> {
         Text(
           state.message,
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.error,
         )
+        // Not every server lists its models, and that is a configuration rather than a fault -
+        // Unsloth's own documentation says to type the id in when a server does not expose
+        // /models. Without this the whole feature is a dead end behind a list that was only
+        // ever a convenience.
+        TypedModel(picked = picked, typed = typed, onType = onType)
+      }
       is ServerModelsState.Found ->
         if (state.models.isEmpty()) {
           Text(
@@ -836,3 +849,44 @@ private fun serverKindPlaceholder(kind: ServerKind): String =
     ServerKind.VLLM -> "http://192.168.1.50:8000"
     ServerKind.UNSLOTH -> "http://192.168.1.50:8080"
   }
+
+/**
+ * Typing the model's name instead of picking it.
+ *
+ * Shown when the list could not be had. The name is taken on trust, which is the point: the
+ * server has said nothing about what it holds, so the only authority left is the person who set
+ * it up. It is remembered as typed, which is what stops the app falling back to the phone every
+ * time the list fails again.
+ */
+@Composable
+private fun TypedModel(picked: String, typed: Boolean, onType: (String) -> Unit) {
+  var draft by rememberSaveable(picked) { mutableStateOf(picked) }
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(
+      stringResource(R.string.settings_server_type_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedTextField(
+      value = draft,
+      onValueChange = { draft = it },
+      label = { Text(stringResource(R.string.settings_server_type_label)) },
+      placeholder = { Text("unsloth/gemma-4-27b") },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      OutlinedButton(onClick = { onType(draft) }, enabled = draft.isNotBlank()) {
+        Text(stringResource(R.string.settings_server_type_use))
+      }
+      if (typed && picked.isNotBlank()) {
+        Text(
+          stringResource(R.string.settings_server_type_using, picked),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.align(Alignment.CenterVertically),
+        )
+      }
+    }
+  }
+}

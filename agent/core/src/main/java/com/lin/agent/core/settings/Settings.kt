@@ -202,6 +202,17 @@ class SettingsRepository(private val context: Context) {
    * whatever the tool returned - which can include other people's messages and the contents of
    * documents.
    */
+  /**
+   * Whether the server model's name was typed rather than picked from the server's list.
+   *
+   * Worth storing, because it changes what an unanswered model list means. Picked from a list
+   * that has since stopped working, the server is suspect; typed in, the user has said the
+   * model is there and the list was never the authority.
+   */
+  val serverModelTyped: Flow<Boolean> = read(SERVER_MODEL_TYPED, false)
+
+  suspend fun setServerModelTyped(value: Boolean) = write(SERVER_MODEL_TYPED, value)
+
   val keepTranscripts: Flow<Boolean> = read(KEEP_TRANSCRIPTS, true)
 
   suspend fun setKeepTranscripts(value: Boolean) = write(KEEP_TRANSCRIPTS, value)
@@ -257,5 +268,6 @@ class SettingsRepository(private val context: Context) {
     val REASONING = stringPreferencesKey("reasoning")
     val SERVER_KIND = stringPreferencesKey("server_kind")
     val KEEP_TRANSCRIPTS = booleanPreferencesKey("keep_transcripts")
+    val SERVER_MODEL_TYPED = booleanPreferencesKey("server_model_typed")
   }
 }
