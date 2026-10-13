@@ -24,6 +24,8 @@ import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.OllamaServer
 import com.lin.agent.model.PhoneTool
 import com.lin.agent.core.media.PhotoLibrary
+import androidx.work.WorkManager
+import com.lin.agent.model.ConversationLog
 import com.lin.agent.voice.Dictation
 import dagger.Module
 import dagger.Provides
@@ -60,6 +62,14 @@ object AppModule {
   @Provides @Singleton
   fun provideDictation(@ApplicationContext context: Context): Dictation =
     Dictation(context)
+
+  @Provides @Singleton
+  fun provideConversationLog(@ApplicationContext context: Context): ConversationLog =
+    ConversationLog(context)
+
+  @Provides @Singleton
+  fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
+    WorkManager.getInstance(context)
 
   @Provides @Singleton fun provideOllamaServer(): OllamaServer = OllamaServer()
 

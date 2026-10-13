@@ -507,7 +507,21 @@ memory with the evidence sitting unexamined next to it. The photo threshold is
 looser than memory's on purpose — a wrong picture costs a glance, a wrong
 memory gets stated as fact.
 
-**Still to do:** the background digest.
+**Also done: the background digest**, last because it writes things about
+somebody without being asked each time and that needed a screen to see it on
+first. Off by default — the one default here chosen against convenience, since
+the other switches decide what Lin may *do* and this decides what it *keeps*.
+
+The quality risk is the whole of it. Ask a 2B model what is worth remembering
+and it answers "the user said hello": a fact about the conversation, not about
+the person, and a store full of those is worse than an empty one because they
+crowd out the real entries in every search. So the schema is narrow, the
+prompt says what not to produce, and everything that comes back is filtered
+again — a prompt is a request and a filter is a rule. New facts are also
+checked against what is already stored, because a digest after every
+conversation rediscovers the same few things forever.
+
+Phase 5 is complete.
 
 Port `memory/`. Replace word-overlap search with embedding retrieval using
 **EmbeddingGemma 2 Text 270M**, 164 MB and co-resident with the chat model,

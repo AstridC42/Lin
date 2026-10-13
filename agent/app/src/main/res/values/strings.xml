@@ -6,6 +6,12 @@
   <string name="speak">Speak</string>
   <string name="stop_listening">Stop listening</string>
   <string name="listening">Listening…</string>
+  <string name="settings_memory_heading">Memory</string>
+  <string name="settings_digest">Remember things from conversations</string>
+  <string name="settings_digest_detail">Off by default. When on, Lin reads a finished
+    conversation for lasting facts about you and writes them down without asking each time.
+    Everything it keeps is listed under what Lin remembers, and you can delete any of it.</string>
+
   <string name="settings_voice_heading">Voice</string>
   <string name="settings_voice_detail">Hold the power button, or use your phone\'s assistant
     gesture, and Lin opens listening. Set it as your assistant below.</string>

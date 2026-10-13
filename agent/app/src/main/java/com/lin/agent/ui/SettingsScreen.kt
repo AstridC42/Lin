@@ -158,6 +158,35 @@ fun SettingsScreen(
         }
       }
 
+      Text(
+        stringResource(R.string.settings_memory_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              stringResource(R.string.settings_digest),
+              style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+              stringResource(R.string.settings_digest_detail),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(
+            checked = state.digestConversations,
+            onCheckedChange = viewModel::setDigestConversations,
+          )
+        }
+      }
+
       OutlinedButton(
         onClick = onOpenMemory,
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),

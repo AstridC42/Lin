@@ -38,6 +38,14 @@ import com.lin.agent.voice.Heard
 import com.lin.agent.voice.Speaker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import com.lin.agent.core.memory.Digest
+import com.lin.agent.model.ConversationLog
+import com.lin.agent.model.DigestWorker
 import com.lin.agent.model.Embedders
 import com.lin.agent.model.FindPhotoTool
 import com.lin.agent.model.PhoneTool
@@ -110,6 +118,8 @@ constructor(
   private val memories: MemoryStore,
   private val embedders: Embedders,
   private val dictation: Dictation,
+  private val conversationLog: ConversationLog,
+  private val work: WorkManager,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
@@ -333,6 +343,39 @@ constructor(
     }
   }
 
+  /**
+   * Called when the screen goes away, so a finished conversation can be read for memories.
+   *
+   * Here rather than in `onCleared`, which does not run when the app is merely backgrounded -
+   * and backgrounded is what "the conversation is over" usually looks like. Enqueued rather
+   * than run: the model takes long enough that doing it on the way out would hold the app
+   * open, and nothing is waiting for the result.
+   */
+  fun onStopped() {
+    val messages = _state.value.messages
+    if (messages.size < Digest.MIN_MESSAGES) return
+    viewModelScope.launch {
+      if (!settings.digestConversations.first()) return@launch
+      conversationLog.write(messages)
+      work.enqueueUniqueWork(
+        DIGEST_WORK,
+        // Replace: a newer conversation supersedes an older one that has not been read yet,
+        // and the log holds one at a time anyway.
+        ExistingWorkPolicy.REPLACE,
+        OneTimeWorkRequestBuilder<DigestWorker>()
+          .setConstraints(
+            // Nothing waits on this, so it can wait for the phone to be idle-ish. No network
+            // constraint: the model it uses is on the phone.
+            Constraints.Builder()
+              .setRequiresBatteryNotLow(true)
+              .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+              .build()
+          )
+          .build(),
+      )
+    }
+  }
+
   override fun onCleared() {
     // The microphone and the voice both stop with the screen. Neither is something to leave
     // running because a view model was discarded.
@@ -362,6 +405,8 @@ constructor(
         "rather than filling the gap. " +
         "Use find_photo to look through the user\'s pictures; they appear on screen, and you " +
         "cannot see them, so never describe what is in one."
+
+    const val DIGEST_WORK = "digest"
 
     const val KEY_ROLES = "conversation_roles"
     const val KEY_TEXTS = "conversation_texts"

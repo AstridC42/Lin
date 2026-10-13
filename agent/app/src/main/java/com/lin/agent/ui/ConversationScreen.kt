@@ -48,6 +48,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +69,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.R
 import android.content.pm.PackageManager
@@ -98,6 +102,17 @@ fun ConversationScreen(
   val state by viewModel.state.collectAsStateWithLifecycle()
   var draft by rememberSaveable { mutableStateOf("") }
   val context = LocalContext.current
+
+  // "The conversation is over" is what being backgrounded looks like, and onCleared does not
+  // run for that - so the digest is triggered from the lifecycle rather than from teardown.
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_STOP) viewModel.onStopped()
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  }
 
   // Once per launch, not per recomposition - and not after a fold, which is why it is keyed on
   // the launch rather than on Unit alone.
