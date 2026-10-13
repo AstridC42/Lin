@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -143,6 +144,16 @@ fun ConversationScreen(
               modifier = Modifier.padding(vertical = 4.dp),
             )
           }
+        }
+        // Said plainly and kept on screen, because the model's own account of a failed tool is
+        // not evidence: it will often claim the thing happened anyway.
+        items(state.failedTools) { failed ->
+          Text(
+            stringResource(R.string.tool_failed, failed),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(vertical = 2.dp),
+          )
         }
         if (state.error.isNotEmpty()) {
           item {
