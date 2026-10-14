@@ -858,6 +858,45 @@ memories, is worse than saying it cannot be read. And a zip entry called
 archive handling, and the one worth a test even when the current reader
 never writes to a path from the file.
 
+### Phase 10 — Staying inside the window
+
+Not planned; found by looking for what would break next.
+
+**`contextWindow` was declared, carried around and never read.** A
+conversation grew until the engine refused it, which is the failure this
+plan's own table blames for the fork becoming unworkable
+(`Input token ids are too long: 4230 >= 4000`). Attachments brought it
+closer: a picture is worth a few hundred tokens and the history keeps them.
+
+Three rules, in order of what they cost. The newest message is always kept,
+whatever its size — it is the question being asked, and a turn without it is
+not a shorter conversation but a different one. Then pictures go from older
+messages, because a picture is expensive and almost never what a later
+question is about, so dropping one buys back the most history per token.
+Then whole messages, oldest first. A tool result left stranded at the front
+is dropped as well: an answer with no visible question reads as something
+the user said.
+
+Trimming happens in the loop rather than where the conversation is held,
+because that is where it grows fastest — a turn with four tool calls adds
+four results to the same request, so the overflow arrives mid-turn rather
+than mid-conversation.
+
+An unknown window (zero, which is what a server reports) trims nothing.
+Guessing one would cut conversations that were fine on a machine with far
+more room than a phone.
+
+**Honest limit:** this governs what is *sent*. On-device, LiteRT holds the
+conversation's history itself and only the new message is sent, so trimming
+here cannot shrink what the engine is already carrying. Starting a new
+conversation is what does that — which is also why there is now a button
+for it.
+
+**Also done: starting a new conversation.** The half-hour boundary left
+nobody any way to say "that is finished"; the only way to begin again was to
+put the phone down and wait. The conversation being left is recorded for the
+corpus first, so starting a new one never loses the last.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
