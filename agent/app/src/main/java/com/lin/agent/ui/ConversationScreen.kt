@@ -101,7 +101,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
-import androidx.compose.ui.unit.Dp
 
 /**
  * The conversation, full screen.
@@ -174,7 +173,7 @@ fun ConversationScreen(
         spoken = spoken,
         token = token,
         // Fills what the screen has, which is the difference between this frame and the panel.
-        listMaxHeight = null,
+        fillHeight = true,
         onGetModel = onGetModel,
         viewModel = viewModel,
       )
@@ -217,11 +216,12 @@ fun AssistPanel(
   val state by viewModel.state.collectAsStateWithLifecycle()
 
   BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-    // Just under half the window for the conversation itself. The composer, the header and
-    // anything in flight sit outside this, so the panel as a whole settles around two thirds
-    // of the screen at its tallest - enough to read an answer, little enough to still be over
-    // something rather than instead of it.
-    val listMaxHeight = maxHeight * 0.45f
+    // The cap is on the panel rather than on the conversation inside it, which is the right way
+    // round: the conversation then shrinks to make room for whatever else has to be shown - an
+    // attachment, a notice, a reply waiting to be sent - instead of pushing the composer off the
+    // bottom of the screen. Three fifths of the window at its tallest: enough to read an answer,
+    // little enough to still be over something rather than instead of it.
+    val panelMaxHeight = maxHeight * 0.6f
 
     Column(modifier = Modifier.fillMaxSize()) {
       Box(
@@ -241,7 +241,7 @@ fun AssistPanel(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         tonalElevation = 3.dp,
         shadowElevation = 12.dp,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(max = panelMaxHeight),
       ) {
         // One bottom inset rather than two. The keyboard's inset and the navigation bar's
         // overlap - the keyboard is drawn over where the bar was - so padding for both in turn
@@ -279,7 +279,9 @@ fun AssistPanel(
             launch = launch,
             spoken = spoken,
             token = token,
-            listMaxHeight = listMaxHeight,
+            // Takes what is left of the panel rather than all of it, so a one-line answer is a
+            // one-line panel.
+            fillHeight = false,
             onGetModel = onGetModel,
             viewModel = viewModel,
           )
@@ -292,22 +294,22 @@ fun AssistPanel(
 /**
  * The conversation itself, and the composer: everything that is the same in both frames.
  *
- * [listMaxHeight] is the one difference, and it is a height rather than a flag because the two
- * frames want genuinely different layouts. Full screen, the conversation takes the space that is
- * left and the composer stays at the bottom. In the panel it has to be the other way round: the
- * list is as tall as its contents up to the cap, so that the panel can be short when the answer
- * is short. A weight would have made it fill the cap always.
+ * [fillHeight] is the one difference between them, and it is all of it. Full screen, the
+ * conversation takes the space that is left so that the composer sits at the bottom of the
+ * screen. In the panel it takes only as much as it needs, up to what is left of the panel's
+ * cap - so a one-line answer is a one-line panel, and anything else that has to be shown
+ * squeezes the conversation rather than pushing the composer off the bottom.
  *
- * Why a ColumnScope extension rather than a Composable taking a Modifier: the full-screen frame
- * needs `weight`, which only exists in this scope, and handing a pre-built modifier in from
- * outside would put the layout decision in both callers instead of here.
+ * Why a ColumnScope extension rather than a Composable taking a Modifier: both frames need
+ * `weight`, which only exists in this scope, and handing a pre-built modifier in from outside
+ * would put the layout decision in both callers instead of here.
  */
 @Composable
 private fun ColumnScope.ConversationBody(
   launch: Launch,
   spoken: String,
   token: String,
-  listMaxHeight: Dp?,
+  fillHeight: Boolean,
   onGetModel: () -> Unit,
   viewModel: ConversationViewModel,
 ) {
@@ -363,7 +365,7 @@ private fun ColumnScope.ConversationBody(
   LazyColumn(
     state = listState,
     modifier =
-      (if (listMaxHeight == null) Modifier.weight(1f) else Modifier.heightIn(max = listMaxHeight))
+      Modifier.weight(1f, fill = fillHeight)
         .fillMaxWidth()
         .padding(horizontal = 16.dp),
     verticalArrangement = Arrangement.spacedBy(8.dp),
