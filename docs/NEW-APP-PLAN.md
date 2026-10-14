@@ -703,6 +703,16 @@ also a button that opens the panel directly, which is half a feature and half
 a diagnosis: if it appears from there but not from the power button, the
 problem is the role or the phone's own side-button and gesture settings.
 
+**The summons kept opening the old screen.** Moving the ASSIST filter to the
+panel was not enough, and the reason is worth keeping: Android stores the
+chosen assistant as a *component* - `com.lin.agent/.MainActivity` - rather
+than as a package. A phone told "Lin" before the panel existed goes on
+starting the activity it was told about, by name and explicitly, so no
+manifest change reaches it and the whole app opens over whatever somebody was
+doing. The main activity now hands any summons straight to the panel, so it
+works whatever the phone remembers; settings says when a phone is pointing at
+the old door, because re-picking Lin there skips the hop.
+
 **A summon happens once.** A screen's start-up effect runs again whenever the
 screen is recreated, and on a foldable that is every fold — so unfolding the
 phone after "Hey Lin, what's the time" asked it a second time. Keying the

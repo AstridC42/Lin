@@ -90,3 +90,27 @@ fun openAppearOverOtherApps(context: Context) {
       runCatching { context.startActivity(Intent(screen).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 }
+
+/**
+ * Whether the phone will summon the panel, or something else of ours.
+ *
+ * Android stores the assistant as a component name, so a phone told "Lin" before the panel
+ * existed still points at the whole app by name - which is why the power button kept opening
+ * the old screen after the update. [com.lin.agent.MainActivity] hands that summons on, so it
+ * works either way; this is for saying why it goes the long way round, and that re-picking Lin
+ * fixes it.
+ *
+ * Null when the phone will not say what it stored. Unknown is not "wrong", and a warning shown
+ * on a guess is worse than no warning.
+ */
+fun assistantSummonsThePanel(context: Context): Boolean? {
+  val stored =
+    runCatching { Settings.Secure.getString(context.contentResolver, "assistant") }
+      .getOrNull() ?: return null
+  if (stored.isBlank()) return null
+  return AssistantRole.pointsAt(
+    stored = stored,
+    packageName = context.packageName,
+    className = "com.lin.agent.AssistActivity",
+  )
+}

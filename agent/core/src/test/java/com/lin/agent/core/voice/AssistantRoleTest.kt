@@ -17,6 +17,7 @@
 package com.lin.agent.core.voice
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -63,4 +64,59 @@ class AssistantRoleTest {
     assertEquals("android.settings.SETTINGS", AssistantRole.settingsScreens.last())
     assertTrue(AssistantRole.settingsScreens.size >= 2)
   }
+  @Test
+  fun `the short form of a component name is the same component`() {
+    // How Android actually stores it. A plain string comparison says no to this one, which is
+    // how "Lin is the assistant" and "the summons opens the wrong screen" were both true.
+    assertTrue(
+      AssistantRole.pointsAt(
+        "com.lin.agent/.AssistActivity",
+        "com.lin.agent",
+        "com.lin.agent.AssistActivity",
+      )
+    )
+  }
+
+  @Test
+  fun `the long form too`() {
+    assertTrue(
+      AssistantRole.pointsAt(
+        "com.lin.agent/com.lin.agent.AssistActivity",
+        "com.lin.agent",
+        "com.lin.agent.AssistActivity",
+      )
+    )
+  }
+
+  @Test
+  fun `another activity of ours is not this one`() {
+    // The case this exists for: the phone was told about Lin before the panel existed, and
+    // still points at the whole app.
+    assertFalse(
+      AssistantRole.pointsAt(
+        "com.lin.agent/.MainActivity",
+        "com.lin.agent",
+        "com.lin.agent.AssistActivity",
+      )
+    )
+  }
+
+  @Test
+  fun `another app entirely is not us`() {
+    assertFalse(
+      AssistantRole.pointsAt(
+        "com.google.android.googlequicksearchbox/.VoiceSearchActivity",
+        "com.lin.agent",
+        "com.lin.agent.AssistActivity",
+      )
+    )
+  }
+
+  @Test
+  fun `nothing stored is not a match`() {
+    assertFalse(AssistantRole.pointsAt(null, "com.lin.agent", "com.lin.agent.AssistActivity"))
+    assertFalse(AssistantRole.pointsAt("", "com.lin.agent", "com.lin.agent.AssistActivity"))
+    assertFalse(AssistantRole.pointsAt("com.lin.agent", "com.lin.agent", "com.lin.agent.AssistActivity"))
+  }
+
 }
