@@ -91,6 +91,29 @@ class MainActivity : ComponentActivity() {
       return
     }
 
+    // Summoned, but at the wrong door.
+    //
+    // Android stores the chosen assistant as a component name rather than as a package - a
+    // phone told "Lin" before the panel existed still points at this activity by name, and an
+    // update that moved the ASSIST filter elsewhere does not change what was stored. The
+    // system then starts this activity explicitly, no filter needed, and the whole app opens
+    // over whatever somebody was doing: the thing the panel was built to stop.
+    //
+    // So a summons that lands here is handed straight on. Re-picking Lin in the phone's
+    // assistant settings makes the system point at the panel directly and skips this hop,
+    // but nobody should have to know that.
+    if (intent?.action in SUMMONS) {
+      startActivity(
+        Intent(this, AssistActivity::class.java).apply {
+          action = intent?.action
+          intent?.extras?.let { putExtras(it) }
+          addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        }
+      )
+      finish()
+      return
+    }
+
     // Asked once, at launch, rather than at the moment a download starts: being interrupted by a
     // permission dialog in the middle of tapping Download is worse, and refusing it only hides
     // the progress - the download itself still runs.
@@ -196,6 +219,20 @@ class MainActivity : ComponentActivity() {
     }
   }
 }
+
+/**
+ * Every way of being summoned rather than opened.
+ *
+ * Listed here because this activity should never answer any of them - see the hand-off in
+ * onCreate. They are the panel's, and the panel's filters are the ones in the manifest.
+ */
+private val SUMMONS =
+  setOf(
+    Intent.ACTION_ASSIST,
+    "android.intent.action.VOICE_COMMAND",
+    "android.speech.action.VOICE_SEARCH_HANDS_FREE",
+    WakeService.ACTION_WOKEN,
+  )
 
 /** The screens, as saveable strings. See the note where they are switched on. */
 private const val CONVERSATION = "conversation"

@@ -61,4 +61,28 @@ object AssistantRole {
     candidates: List<String> = settingsScreens,
     canResolve: (String) -> Boolean,
   ): String? = candidates.firstOrNull(canResolve)
+
+  /**
+   * Whether what the phone stored as its assistant is this exact activity.
+   *
+   * Android stores the assistant as a flattened component - "com.lin.agent/.AssistActivity" -
+   * and not as a package, which is why an update that moves the ASSIST filter to another
+   * activity does not move the summons with it: the phone goes on starting the one it was
+   * told about, by name.
+   *
+   * The short form is the part worth a function. A flattened name writes the class relative to
+   * the package when it starts with a dot, so the same activity appears two ways and a plain
+   * string comparison says no to one of them.
+   */
+  fun pointsAt(stored: String?, packageName: String, className: String): Boolean {
+    val said = stored?.trim().orEmpty()
+    if (said.isEmpty()) return false
+    val slash = said.indexOf('/')
+    if (slash <= 0) return false
+    val storedPackage = said.substring(0, slash)
+    if (storedPackage != packageName) return false
+    val storedClass = said.substring(slash + 1)
+    val full = if (storedClass.startsWith(".")) storedPackage + storedClass else storedClass
+    return full == className
+  }
 }
