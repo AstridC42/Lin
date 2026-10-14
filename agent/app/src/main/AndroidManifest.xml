@@ -50,6 +50,19 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
+    <!--
+      Reading the calendar, to answer "what is on today".
+
+      Read only. There is deliberately no WRITE_CALENDAR: an event Lin creates goes through the
+      calendar app's own editor with the fields filled in, so a model that misreads a date
+      cannot put anything in somebody's week - the worst it can do is open an editor showing
+      the wrong day, which is visible before it is saved.
+    -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
+    <!-- Setting a timer outright. An alarm still opens the clock app to be confirmed. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
 
@@ -65,6 +78,22 @@
         <intent>
             <action android:name="android.intent.action.SENDTO" />
             <data android:scheme="smsto" />
+        </intent>
+        <!--
+          Without these, startActivity for a calendar event or a timer throws
+          ActivityNotFoundException on API 30 and up even when a calendar and a clock are
+          installed - package visibility hides them, and the failure reads as "there is no
+          calendar app on this phone".
+        -->
+        <intent>
+            <action android:name="android.intent.action.INSERT" />
+            <data android:mimeType="vnd.android.cursor.dir/event" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_TIMER" />
         </intent>
     </queries>
 

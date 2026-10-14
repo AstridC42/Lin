@@ -469,8 +469,42 @@ The listener keeps only notifications that carry a reply action, in memory,
 for as long as the notification exists. Other people's messages passing
 through a phone are not something to collect.
 
-**Still to do:** calendar and reminders, media control, and
-MobileActions-270M as the intent parser.
+**Also done: the calendar, timers and alarms.** `whats_on` reads what is
+coming up, `add_to_calendar` opens the calendar app with an event filled in,
+and `set_timer_or_alarm` does the obvious thing.
+
+The staged-action rule again, and here it costs nothing to honour: the app
+holds **no** calendar write permission at all. An event goes through
+`ACTION_INSERT`, so the calendar app's own editor opens populated and the
+user saves — a model that misreads a date can open an editor on the wrong
+day and nothing else.
+
+A timer is set outright and an alarm is not, which looks inconsistent and is
+not. The test is what the mistake costs: a timer runs for minutes, is visible
+the moment it is set and is cancelled with a tap, while an alarm fires hours
+later — often in the night — and a misheard "seven" for "eleven" is found out
+by being woken by it. That decision is a tested function rather than care
+taken in the Android plumbing.
+
+**The model did not know what day it was**, which made "put it in the calendar
+tomorrow" impossible to get right; it was guessing, and a 2B model's guess at
+the date is a year out as often as not. Today's date is now in front of the
+orchestrator prompt — at *day* resolution, which is load-bearing: the prompt
+is part of what keys an on-device conversation, so a prompt carrying the time
+of day would rebuild the conversation every minute and throw the history away
+with it.
+
+Almost every bug here was a time zone. An all-day event is stored at midnight
+**UTC**, so reading it locally puts somebody's birthday on the wrong day
+everywhere west of Greenwich; "the start of today" written as
+`now - now % DAY_MS` is UTC midnight, which answers for yesterday in New York
+before dawn; a lookahead window added in milliseconds loses an hour across a
+clock change and drops the last event of the final evening; and a lenient
+`Calendar` turns the 31st of February — which is what a model produces when
+asked for the end of the month — into the 3rd of March. All four fail tests
+when reintroduced.
+
+**Still to do:** media control, and MobileActions-270M as the intent parser.
 
 **Measurement:** the staged-action policy holds — calls open the dialer unless
 directly authorised, messages wait for a send, and a notification reply is read

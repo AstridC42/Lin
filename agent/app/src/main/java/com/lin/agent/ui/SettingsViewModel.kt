@@ -25,6 +25,7 @@ import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
 import com.lin.agent.engine.serverKindNamed
@@ -93,6 +94,8 @@ data class SettingsState(
   val reasoning: Reasoning = Reasoning.OFF,
   /** Which kind of server the address points at, which decides the dialect spoken to it. */
   val serverKind: ServerKind = ServerKind.OLLAMA,
+  /** Whether Lin may read the calendar. Asked for here; there is no write permission at all. */
+  val calendarPermitted: Boolean = false,
   val photoIndex: IndexState = IndexState.Idle,
   val photosIndexed: Int = 0,
 )
@@ -106,6 +109,7 @@ constructor(
   private val downloads: ModelDownloads,
   private val backends: ChatBackends,
   private val server: ModelServer,
+  private val calendars: Calendars,
   private val photos: PhotoIndex,
   private val memories: MemoryStore,
 ) : ViewModel() {
@@ -140,6 +144,7 @@ constructor(
           digestConversations = settings.digestConversations.first(),
           reasoning = reasoningNamed(settings.reasoning.first()),
           serverKind = serverKindNamed(settings.serverKind.first()),
+          calendarPermitted = calendars.permitted(),
           memoryGb = memoryGb,
           socModel = com.lin.agent.core.models.currentSocModel(),
           modelsDirectory = store.directory().absolutePath,
@@ -325,6 +330,16 @@ constructor(
       settings.setServerKind(kind.name)
       backends.refresh()
     }
+  }
+
+  /**
+   * Re-reads calendar access after the system dialog closes.
+   *
+   * Read from the system rather than stored. A remembered "yes" that the permission no longer
+   * backs would have this screen say Lin can see the calendar while every lookup fails.
+   */
+  fun refreshCalendarAccess(@Suppress("UNUSED_PARAMETER") granted: Boolean) {
+    _state.update { it.copy(calendarPermitted = calendars.permitted()) }
   }
 
   fun setReasoning(level: Reasoning) {
