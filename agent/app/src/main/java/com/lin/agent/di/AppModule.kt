@@ -22,6 +22,7 @@ import com.lin.agent.core.memory.MemoryStore
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.core.documents.DocumentLibrary
+import com.lin.agent.core.tools.LaunchGuard
 import com.lin.agent.core.documents.Documents
 import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.settings.SettingsRepository
@@ -66,6 +67,12 @@ object AppModule {
 
   @Provides @Singleton
   fun provideCalendars(@ApplicationContext context: Context): Calendars = Calendars(context)
+
+  /**
+   * Shared, because the point is for one tool's launch to be remembered across the turns of a
+   * conversation - a per-tool instance would forget between them and the loop would come back.
+   */
+  @Provides @Singleton fun provideLaunchGuard(): LaunchGuard = LaunchGuard()
 
   @Provides @Singleton
   fun provideModelDownloads(@ApplicationContext context: Context): ModelDownloads =

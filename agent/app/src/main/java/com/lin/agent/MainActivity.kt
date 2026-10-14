@@ -21,6 +21,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
@@ -110,6 +111,24 @@ class MainActivity : ComponentActivity() {
             IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
           } else null
         var screen by rememberSaveable { mutableStateOf(if (shared != null) DOCUMENTS else CONVERSATION) }
+
+        // Where the back arrow goes, and - the part that was missing - where the phone's own
+        // back button goes. Without a BackHandler the system back finishes the activity, so
+        // pressing it anywhere but the conversation closed the whole app instead of going up
+        // one screen. One value for both, so they cannot drift apart.
+        val backTo: String? =
+          when (screen) {
+            SETTINGS -> CONVERSATION
+            MEMORY, TRAINING, BACKUP -> SETTINGS
+            // A share has no settings screen behind it, so back goes where the user would
+            // otherwise have been.
+            DOCUMENTS -> if (shared != null) CONVERSATION else SETTINGS
+            // The conversation is the bottom of the stack: back there means leaving, which is
+            // what the system does on its own.
+            else -> null
+          }
+        BackHandler(enabled = backTo != null) { backTo?.let { screen = it } }
+
         when (screen) {
           SETTINGS ->
             SettingsScreen(

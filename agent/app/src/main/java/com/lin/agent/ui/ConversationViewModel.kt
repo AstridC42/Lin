@@ -51,6 +51,7 @@ import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.core.calendar.todayLine
 import com.lin.agent.core.memory.Digest
+import com.lin.agent.core.tools.LaunchGuard
 import com.lin.agent.core.training.TrainingArchive
 import com.lin.agent.core.training.TrainingData
 import com.lin.agent.core.training.TrainingTurn
@@ -154,6 +155,7 @@ constructor(
   private val pdfPages: PdfPages,
   private val archive: TrainingArchive,
   private val calendars: Calendars,
+  private val launchGuard: LaunchGuard,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
@@ -179,8 +181,8 @@ constructor(
         ReplyTool(relay),
         CalendarTool(calendars),
         MediaTool(appContext),
-        AddToCalendarTool(appContext),
-        AlarmTool(appContext),
+        AddToCalendarTool(appContext, launchGuard),
+        AlarmTool(appContext, launchGuard),
         ListDocumentsTool(documentLibrary),
         ReadDocumentTool(documentLibrary, documents),
         WriteDocumentTool(documentLibrary, documents, pdfPages),
@@ -491,7 +493,9 @@ constructor(
    * it. The date changes once a day, which costs one rebuild.
    */
   private fun promptForToday(): String =
-    todayLine(System.currentTimeMillis()) + " " + ORCHESTRATOR_PROMPT
+    todayLine(System.currentTimeMillis()) +
+      " This is the real date; use it and never a date you remember from elsewhere. " +
+      ORCHESTRATOR_PROMPT
 
   private fun persist(messages: List<Message>) {
     saved[KEY_ROLES] = ArrayList(messages.map { it.role.name })
