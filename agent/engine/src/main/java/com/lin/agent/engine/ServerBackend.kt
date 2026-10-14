@@ -299,6 +299,13 @@ internal fun chatRequestBody(model: String, request: TurnRequest): String {
     messages.put(
       JSONObject().put("role", wireRole(message.role)).put("content", message.text).apply {
         if (message.toolName.isNotEmpty()) put("tool_name", message.toolName)
+        // Ollama takes pictures as bare base64 alongside the text, not as content parts.
+        val pictures = message.attachments.filterIsInstance<Attachment.Picture>()
+        if (pictures.isNotEmpty()) {
+          val images = JSONArray()
+          pictures.forEach { images.put(base64(it.bytes)) }
+          put("images", images)
+        }
       }
     )
   }
@@ -365,11 +372,35 @@ internal fun openAiRequestBody(model: String, request: TurnRequest): String {
     messages.put(JSONObject().put("role", "system").put("content", request.systemPrompt))
   }
   for (message in request.messages) {
+    val pictures = message.attachments.filterIsInstance<Attachment.Picture>()
     messages.put(
-      JSONObject().put("role", wireRole(message.role)).put("content", message.text).apply {
-        // A tool result has to say which tool, and OpenAI's field for that is `name`.
-        if (message.toolName.isNotEmpty()) put("name", message.toolName)
-      }
+      JSONObject()
+        .put("role", wireRole(message.role))
+        .put(
+          "content",
+          // A string when there is only text, which is what every server takes. The list form
+          // is used only when there is a picture to put beside it - some servers reject a
+          // content list on a plain message, and there is nothing to gain by risking it.
+          if (pictures.isEmpty()) message.text
+          else
+            JSONArray().apply {
+              pictures.forEach { picture ->
+                put(
+                  JSONObject()
+                    .put("type", "image_url")
+                    .put(
+                      "image_url",
+                      JSONObject().put("url", "data:image/jpeg;base64," + base64(picture.bytes)),
+                    )
+                )
+              }
+              put(JSONObject().put("type", "text").put("text", message.text))
+            },
+        )
+        .apply {
+          // A tool result has to say which tool, and OpenAI's field for that is `name`.
+          if (message.toolName.isNotEmpty()) put("name", message.toolName)
+        }
     )
   }
 
@@ -522,3 +553,17 @@ internal fun readOpenAiToolCalls(delta: JSONObject): List<ToolInvocation> {
 private const val SSE_DATA = "data:"
 
 private const val SSE_DONE = "[DONE]"
+
+/**
+ * Bytes as base64, on one line.
+ *
+ * The JDK's encoder rather than `android.util.Base64`. That one arrived at API 26 and this
+ * app's minimum is 31, so there is nothing to work around - and the Android class is a stub
+ * in unit tests that returns null, which would leave the one part of this that most needs
+ * checking untestable.
+ *
+ * The basic encoder, not the MIME one: MIME inserts a newline every seventy-six characters,
+ * which is valid base64 and invalid JSON.
+ */
+private fun base64(bytes: ByteArray): String =
+  java.util.Base64.getEncoder().encodeToString(bytes)

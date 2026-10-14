@@ -19,7 +19,13 @@ package com.lin.agent.engine
 import kotlinx.coroutines.flow.Flow
 
 /** One message in a conversation. */
-data class Message(val role: Role, val text: String, val toolName: String = "") {
+data class Message(
+  val role: Role,
+  val text: String,
+  val toolName: String = "",
+  /** Files and pictures the user sent with this message. See [Attachment]. */
+  val attachments: List<Attachment> = emptyList(),
+) {
   enum class Role {
     USER,
     ASSISTANT,

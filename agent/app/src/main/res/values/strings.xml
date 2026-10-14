@@ -142,6 +142,11 @@
   <string name="settings_server_type_use">Use this name</string>
   <string name="settings_server_type_using">Using %1$s</string>
 
+  <string name="attach">Attach something</string>
+  <string name="attach_photo">A photo</string>
+  <string name="attach_file">A file</string>
+  <string name="attach_remove">Remove</string>
+
   <string name="backup_title">Backup</string>
   <string name="backup_explain">A copy of what cannot be got back if this phone is lost: what Lin
     remembers, your training files, and your settings. Keep it somewhere other than this

@@ -690,6 +690,27 @@ from a draft its author rejected. A round-trip through this app's own writer
 caught a fourth: an empty paragraph is written self-closing, by Word as well,
 so a reader that counts only closing tags loses every blank line.
 
+**Corrected later: attachments in the chat.** "Add documents" was read as a
+library managed in settings, and what was wanted was attaching a photo or a
+file to a message and asking about *that*. The library stays — it is what
+`read_document` searches — but the composer now has an attach button, and
+that is the thing somebody reaches for.
+
+The two kinds are handled completely differently, on purpose. A document is
+turned into text before it reaches any backend, so it needs nothing from any
+of them and works identically whichever model answers; it is fenced and
+named, so a file containing "ignore your instructions" cannot read as the
+user typing it. A picture cannot be turned into anything — it travels as a
+picture, which means three wire formats (LiteRT `Content.ImageBytes`,
+Ollama's bare base64, OpenAI's data URI) and a model that can actually see.
+When the model cannot, Lin says the picture was not sent, because a model
+with no vision answers about the question alone and sounds entirely
+confident.
+
+Photos are sampled down on the way in. A phone camera makes twelve
+megapixels; a vision encoder sees a few hundred pixels a side whatever it is
+handed, and the rest is a base64 string big enough to make the request fail.
+
 **Not done, and worth saying:** editing a PDF in place. A PDF places every
 glyph at a coordinate and has no reflowing text to change, so "edit this PDF"
 means rewriting it, which loses its layout. Lin says so rather than

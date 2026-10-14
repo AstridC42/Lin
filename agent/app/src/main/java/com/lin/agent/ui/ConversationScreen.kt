@@ -20,6 +20,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,10 +37,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -67,6 +72,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -309,11 +315,72 @@ fun ConversationScreen(
         return@Column
       }
 
+      // What is going with the next message, and a way to change your mind before it goes.
+      if (state.attached.isNotEmpty()) {
+        LazyRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        ) {
+          items(state.attached) { item ->
+            AssistChip(
+              onClick = { viewModel.detach(item) },
+              label = { Text(item.name, maxLines = 1) },
+              trailingIcon = {
+                Icon(Icons.Filled.Close, stringResource(R.string.attach_remove))
+              },
+            )
+          }
+        }
+      }
+
       Row(
         modifier = Modifier.fillMaxWidth().padding(12.dp),
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
+        val attachContext = LocalContext.current
+        val photoPicker =
+          rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let { viewModel.attach(it, asPicture = true, context = attachContext) }
+          }
+        val filePicker =
+          rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let { viewModel.attach(it, asPicture = false, context = attachContext) }
+          }
+        var choosing by remember { mutableStateOf(false) }
+
+        Box {
+          IconButton(onClick = { choosing = true }, enabled = !state.inProgress) {
+            Icon(Icons.Filled.Add, stringResource(R.string.attach))
+          }
+          DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
+            DropdownMenuItem(
+              text = { Text(stringResource(R.string.attach_photo)) },
+              onClick = {
+                choosing = false
+                // The photo picker, not a storage permission: it hands over the one picture
+                // that was chosen and needs nothing granted.
+                photoPicker.launch(
+                  PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+              },
+            )
+            DropdownMenuItem(
+              text = { Text(stringResource(R.string.attach_file)) },
+              onClick = {
+                choosing = false
+                filePicker.launch(
+                  arrayOf(
+                    "application/pdf",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "text/*",
+                  )
+                )
+              },
+            )
+          }
+        }
+
         OutlinedTextField(
           // What the microphone has heard so far takes over the field while listening, so an
           // open microphone is never ambiguous and never silent-looking.
@@ -362,7 +429,8 @@ fun ConversationScreen(
             viewModel.send(draft)
             draft = ""
           },
-          enabled = draft.isNotBlank() && !state.inProgress,
+          // Attaching something and saying nothing is a question in itself - see withDocuments.
+          enabled = (draft.isNotBlank() || state.attached.isNotEmpty()) && !state.inProgress,
         ) {
           Icon(
             Icons.AutoMirrored.Filled.Send,
