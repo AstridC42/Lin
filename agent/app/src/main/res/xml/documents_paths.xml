@@ -10,4 +10,6 @@
   <files-path name="documents" path="documents/" />
   <!-- Training packs, which leave the phone the same way a written document does. -->
   <files-path name="training-packs" path="training-packs/" />
+  <!-- The backup, which leaves the phone the same way. -->
+  <files-path name="backups" path="backups/" />
 </paths>

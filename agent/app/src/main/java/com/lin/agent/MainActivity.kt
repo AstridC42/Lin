@@ -37,6 +37,7 @@ import androidx.core.content.IntentCompat
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.ui.ConversationScreen
 import com.lin.agent.ui.DocumentsScreen
+import com.lin.agent.ui.BackupScreen
 import com.lin.agent.ui.MemoryScreen
 import com.lin.agent.ui.TrainingScreen
 import com.lin.agent.ui.RecoveryScreen
@@ -116,11 +117,13 @@ class MainActivity : ComponentActivity() {
               onOpenMemory = { screen = MEMORY },
               onOpenDocuments = { screen = DOCUMENTS },
               onOpenTraining = { screen = TRAINING },
+              onOpenBackup = { screen = BACKUP },
             )
           // Back goes to settings, not the conversation: that is where it was opened from, and
           // landing somewhere else after deleting something reads as the app losing its place.
           MEMORY -> MemoryScreen(onBack = { screen = SETTINGS })
           TRAINING -> TrainingScreen(onBack = { screen = SETTINGS })
+          BACKUP -> BackupScreen(onBack = { screen = SETTINGS })
           DOCUMENTS ->
             DocumentsScreen(
               // A share has no settings screen behind it, so back goes where the user would
@@ -159,3 +162,4 @@ private const val SETTINGS = "settings"
 private const val MEMORY = "memory"
 private const val DOCUMENTS = "documents"
 private const val TRAINING = "training"
+private const val BACKUP = "backup"
