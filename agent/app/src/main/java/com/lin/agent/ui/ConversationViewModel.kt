@@ -24,7 +24,10 @@ import com.lin.agent.model.ChatBackends
 import com.lin.agent.model.ChatReadiness
 import com.lin.agent.engine.AgentRole
 import com.lin.agent.engine.LoopEvent
+import com.lin.agent.engine.Attachment
 import com.lin.agent.engine.Message
+import com.lin.agent.engine.picturesNotSeen
+import com.lin.agent.engine.withDocuments
 import com.lin.agent.engine.reasoningNamed
 import com.lin.agent.engine.ToolRegistry
 import com.lin.agent.engine.TurnLoop
@@ -99,6 +102,8 @@ data class ConversationState(
   val missingModel: CatalogModel? = null,
   /** Set when what answered is not what was asked for - see [ChatReadiness.Ready.notice]. */
   val notice: String = "",
+  /** Files and pictures waiting to go with the next message. */
+  val attached: List<Attachment> = emptyList(),
   /** The tool running right now, so a long delegation reads as busy rather than stuck. */
   val runningTool: String = "",
   /**
@@ -156,6 +161,7 @@ constructor(
   private val archive: TrainingArchive,
   private val calendars: Calendars,
   private val launchGuard: LaunchGuard,
+  private val attachments: com.lin.agent.model.Attachments,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
@@ -218,6 +224,27 @@ constructor(
   }
 
   fun discardStagedReply() = relay.discard()
+
+  /**
+   * Takes on a file or a picture for the next message.
+   *
+   * Read here rather than when the message is sent, so a file that cannot be read says so
+   * while the person is still looking at the composer - not after they have pressed send and
+   * are waiting for an answer about it.
+   */
+  fun attach(uri: android.net.Uri, asPicture: Boolean, context: android.content.Context) {
+    viewModelScope.launch {
+      val result =
+        if (asPicture) attachments.picture(uri, context) else attachments.document(uri, context)
+      result
+        .onSuccess { item -> _state.update { it.copy(attached = it.attached + item, error = "") } }
+        .onFailure { failure ->
+          _state.update { it.copy(error = failure.message ?: "That could not be attached.") }
+        }
+    }
+  }
+
+  fun detach(item: Attachment) = _state.update { it.copy(attached = it.attached - item) }
 
   /** The microphone, so leaving or sending closes it. */
   private var listening: Job? = null
@@ -308,10 +335,20 @@ constructor(
     // The user's message goes up immediately, before anything is resolved. Choosing a backend
     // can mean asking the server whether it is there, and a message that only appears once that
     // round trip finishes reads as a Send button that did nothing.
-    val outgoing = _state.value.messages + Message(Message.Role.USER, trimmed)
+    // Documents are folded into the words; pictures ride along as attachments, because only
+    // one of those is something a backend needs to know about. See withDocuments.
+    val carried = _state.value.attached
+    val outgoing =
+      _state.value.messages +
+        Message(
+          role = Message.Role.USER,
+          text = withDocuments(trimmed, carried),
+          attachments = carried.filterIsInstance<Attachment.Picture>(),
+        )
     _state.update {
       it.copy(
         messages = outgoing,
+        attached = emptyList(),
         inProgress = true,
         streaming = "",
         thinking = "",
@@ -336,7 +373,13 @@ constructor(
             }
             return@launch
           }
-      _state.update { it.copy(notice = (readiness as ChatReadiness.Ready).notice) }
+      // A model with no vision, handed a picture, answers about the question alone and sounds
+      // entirely confident. Nothing on screen would suggest it never saw the thing.
+      val unseen = picturesNotSeen(carried, backend.capabilities.supportsImages)
+      _state.update {
+        val notice = (readiness as ChatReadiness.Ready).notice
+        it.copy(notice = listOf(notice, unseen).filter { line -> line.isNotBlank() }.joinToString(" "))
+      }
 
       val builder = StringBuilder()
       // Read per turn rather than held, so changing the level applies to the next question
