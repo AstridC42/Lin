@@ -142,6 +142,7 @@
   <string name="settings_server_type_use">Use this name</string>
   <string name="settings_server_type_using">Using %1$s</string>
 
+  <string name="new_conversation">Start a new conversation</string>
   <string name="attach">Attach something</string>
   <string name="attach_photo">A photo</string>
   <string name="attach_file">A file</string>

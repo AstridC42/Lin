@@ -246,6 +246,36 @@ constructor(
 
   fun detach(item: Attachment) = _state.update { it.copy(attached = it.attached - item) }
 
+  /**
+   * Ends this conversation and begins another.
+   *
+   * Added because the half-hour boundary left nobody any way to say "that is finished" - the
+   * only way to start again was to put the phone down and wait, which is not a thing to make
+   * somebody do. It also ends a conversation that has grown long, which is the cheapest way
+   * to get the model's full attention back.
+   *
+   * The one being left is recorded first, so starting a new one never loses the last.
+   */
+  fun startNewConversation() {
+    saved.get<String>(KEY_CONVERSATION_ID)?.let { captureNow(it) }
+    saved[KEY_CONVERSATION_ID] = java.util.UUID.randomUUID().toString()
+    saved[KEY_LAST_ACTIVE] = System.currentTimeMillis()
+    speaker.stop()
+    stopListening()
+    _state.update {
+      it.copy(
+        messages = emptyList(),
+        attached = emptyList(),
+        streaming = "",
+        thinking = "",
+        error = "",
+        shows = emptyList(),
+        failedTools = emptyList(),
+      )
+    }
+    persist(emptyList())
+  }
+
   /** The microphone, so leaving or sending closes it. */
   private var listening: Job? = null
 
