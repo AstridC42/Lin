@@ -89,6 +89,7 @@ import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
 import com.lin.agent.AssistActivity
 import com.lin.agent.voice.WakeService
+import com.lin.agent.voice.assistantSummonsThePanel
 import com.lin.agent.voice.canAppearOverOtherApps
 import com.lin.agent.voice.linIsTheAssistant
 import com.lin.agent.voice.openAppearOverOtherApps
@@ -518,12 +519,16 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
   // return to the front rather than once.
   val systemContext = LocalContext.current
   var isAssistant by remember { mutableStateOf(linIsTheAssistant(systemContext)) }
+  // Not the same question as whether Lin holds the role: a phone told "Lin" before the panel
+  // existed points at the whole app by name, and the summons then goes the long way round.
+  var summonsThePanel by remember { mutableStateOf(assistantSummonsThePanel(systemContext)) }
   var mayAppearOverOtherApps by remember { mutableStateOf(canAppearOverOtherApps(systemContext)) }
   val systemLifecycle = LocalLifecycleOwner.current
   DisposableEffect(systemLifecycle) {
     val observer = LifecycleEventObserver { _, event ->
       if (event == Lifecycle.Event.ON_RESUME) {
         isAssistant = linIsTheAssistant(systemContext)
+        summonsThePanel = assistantSummonsThePanel(systemContext)
         mayAppearOverOtherApps = canAppearOverOtherApps(systemContext)
       }
     }
@@ -585,6 +590,13 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
       if (isAssistant == true) MaterialTheme.colorScheme.onSurface
       else MaterialTheme.colorScheme.error,
   )
+  if (isAssistant == true && summonsThePanel == false) {
+    Text(
+      stringResource(R.string.settings_assistant_old_door),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
   OutlinedButton(
     // Android gives no way to request the assistant role directly - it is the user's
     // choice to make in their own settings, which is correct. This only takes them there,

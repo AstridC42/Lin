@@ -36,6 +36,10 @@
     Digital assistant app. Android only lets you choose this yourself — and it goes back to
     whichever app came with the phone if Lin is uninstalled, so if summoning stopped working after
     a reinstall, this is why.</string>
+  <string name="settings_assistant_old_door">Your phone points at an older part of Lin, from
+    before the panel existed — Android remembers the exact screen you picked, not just the app.
+    Summoning still works, but it goes through the full app on the way. Pick Lin again below to
+    have the panel open straight away.</string>
   <string name="settings_assistant_is_lin">Lin is the assistant on this phone.</string>
   <string name="settings_assistant_is_other">Something else is the assistant, so the power button
     and the assistant gesture will not reach Lin.</string>
