@@ -1168,6 +1168,43 @@ nobody any way to say "that is finished"; the only way to begin again was to
 put the phone down and wait. The conversation being left is recorded for the
 corpus first, so starting a new one never loses the last.
 
+### Phase 11 — A design pass, not yet taken
+
+Asked for in October 2026 and written down rather than started, because a
+redesign begun between two feature requests is a repaint.
+
+**What the interface is now, honestly.** It grew a feature at a time and it
+shows. The conversation screen is Material defaults with bubbles; settings
+was one scrolling page until it had fourteen sections and is now five tabs;
+the panel is new and is the only part designed as a shape rather than
+assembled from controls. Nothing has had a pass where someone asked what this
+app should feel like to use rather than what it needs to contain. Four
+screens behind buttons on a settings page — memory, documents, training,
+backup — are there because they had to live somewhere.
+
+**What a pass would have to decide**, rather than what it should produce:
+
+- What Lin looks like when it has nothing to say yet. The empty conversation
+  is the first thing anybody sees and it is currently a title bar and a text
+  box.
+- Whether the panel and the full screen are two views of one conversation or
+  two conversations. They are two today, and that is a layout decision
+  standing in for a product one — see the note in Phase 6.
+- What a tool doing something looks like. Running, staged, failed and
+  "opened, you finish it" are four different states and three of them are
+  currently a line of small grey text.
+- What the big screen is for. On a Fold's inner screen the conversation is
+  width-capped and the rest is empty; the plan has always said a two-pane
+  layout arrives when there is tool activity worth showing beside the
+  conversation, and there now is.
+- Whether settings is five tabs or something else once the screens behind it
+  are part of the design rather than appended to it.
+
+**The constraint worth keeping through any of it:** every screen in this app
+says what is actually true - which model answered, whether a thing was done or
+only opened, whether Lin can see a picture it is being asked about. A prettier
+interface that smooths those over would be a worse one.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
