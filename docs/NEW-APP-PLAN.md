@@ -14,8 +14,10 @@ help it can reach for without the user asking:
   written brief for a task the 2B cannot do well, running as a sub-agent with
   its own tools and its own budget, returning a result the orchestrator folds
   into its reply.
-- **The phone itself**, through a tool layer, with MobileActions-270M as an
-  intent parser where that helps.
+- **The phone itself**, through a tool layer. MobileActions-270M was planned
+  as an intent parser in front of it; see Phase 4 for why that is deferred
+  rather than built — the validation it was meant to justify now exists on
+  its own.
 
 Everything is local in the sense that matters: the phone, or hardware the user
 owns. Nothing goes to anybody's cloud.
@@ -441,6 +443,9 @@ intent parser with its output validated before it reaches anything — a 270M
 model is a translator, not a decider, and the fork's `garbledNumberRefusal`
 exists because small-model output cannot be trusted with a phone call.
 
+*As built, the validation arrived without the second model, which is what
+left the 270M with nothing to justify it — see the deferral below.*
+
 Deliberately after Phase 3, so tools arrive into a system that already routes.
 
 **Done:** `phone_action` — calling and messaging — with the staged-action
@@ -531,7 +536,51 @@ Reaching the sessions needs notification access — the same grant that lets
 Lin answer messages. The alternative, `MEDIA_CONTENT_CONTROL`, is for system
 apps.
 
-**Still to do:** MobileActions-270M as the intent parser.
+**Deferred, not dropped: MobileActions-270M.** Looked at properly in October
+2026 and parked, with the reasoning kept here so it is not re-derived.
+
+*What it actually is.* Not an intent parser in the sense this plan assumed:
+it is **FunctionGemma-270M fine-tuned for mobile actions**, a ~271 MB
+`.litertlm` function-calling model. In the archived fork, "MobileActions" is
+not a model at all — it is a per-model capability flag that unlocks a
+Gallery demo task. The plan conflated the two.
+
+*Why not now.* Four reasons, in order of weight:
+
+- **The premise expired.** The rationale was "output validated before it
+  reaches anything — a 270M is a translator, not a decider". That validation
+  now exists unconditionally: `clockTime`, `timerMinutes`, `startOfEvent`,
+  `dayFromWords`, `decideCall`, `looksLikeAGarbledCopy`, `fileNameFor`,
+  `volumeAfterStep`, all tested in `core`. Gemma's output already goes
+  through every one. A 270M would remove no check.
+- **The repertoire barely overlaps.** It covers about seven functions —
+  flashlight, alarms, contacts, calendar creation, maps, email, Wi-Fi. Lin
+  has fourteen tools and only two overlap. Its own card says it "may not
+  generalize well to other function calling tasks", so `delegate`,
+  `find_photo`, `remember`, `read_document` and `media` would stay with
+  Gemma regardless.
+- **Accuracy.** An arXiv benchmark puts Google's Mobile Actions variant at
+  17.2% end-to-end, against 29.3% for base FunctionGemma. That is the
+  paper's own extended benchmark rather than the vendor's metric — harder
+  cases than the model was tuned for — but it is the only end-to-end figure
+  found.
+- **Cost.** +271 MB on top of 2.6 GB and 0.5 GB, a second resident model,
+  and a routing layer that is itself a new failure mode.
+
+*What it knows that Lin does not* — flashlight, Wi-Fi, maps — are plain
+intents. They are worth adding as ordinary tools, with validation and no
+download, if they are wanted.
+
+*What would change the answer.* Any one of: Gemma observably picking the
+wrong tool or mangling arguments in daily use; tool latency being the thing
+that annoys, where a 270M is several times quicker; or wanting those seven
+actions specifically as a fast path, accepting the accuracy. None of those
+is measured yet, and the measurement is what should decide it.
+
+Sources: the litert-community model cards for
+`FunctionGemma_270M_Mobile_Actions` and
+`functiongemma-270m-ft-mobile-actions`, arXiv 2609.25373, and Google's
+on-device function calling post.
 
 **Measurement:** the staged-action policy holds — calls open the dialer unless
 directly authorised, messages wait for a send, and a notification reply is read
@@ -633,9 +682,48 @@ a privacy choice rather than a performance one — the rest of this app keeps
 what is said on the phone unless the user pointed it at their own server, and
 a cloud recogniser would quietly undo that for every spoken word.
 
-**Still to do:** the wake word and the resident service, which need a
-wake-word model this app does not have and a continuously open microphone it
-has not earned.
+**Done, with a caveat worth reading: "Hey Lin".** Off by default, and of all
+the defaults here that is the one least open to argument — it holds the
+microphone open indefinitely.
+
+It is **not a wake-word engine**. A real one listens to audio at almost no
+cost; there is no pre-trained model for "Hey Lin" (the open ones ship "Hey
+Jarvis" and "Okay Nabu", and a custom one means an account with somebody's
+cloud), so this runs the phone's recogniser continuously and reads the
+words. The battery cost is real and the setting says so. The matcher is kept
+apart in `WakeWord` so a proper model can replace the listening half without
+touching anything else.
+
+Where the care went is the matching. A recogniser returns "hey Lynn", "hey
+line", "hey len" and "heylin" for the same two syllables, so insisting on
+the spelling means it never fires; being loose means it fires in a pocket,
+which opens a microphone nobody asked to open. Both halves must be present
+and adjacent, each allowed one *substitution or insertion* — never a
+deletion, because that is what lets "he li" through, and two ordinary
+syllables must not wake it. A test caught exactly that.
+
+"Hey Lin, what's the time" asks the question rather than only opening the
+microphone, or the feature would be slower than picking the phone up.
+
+Listening restarts when the app is opened rather than at boot, which is a
+platform constraint: from Android 14 a microphone foreground service cannot
+be started from the background, so a `BOOT_COMPLETED` receiver would throw
+rather than listen. After a restart, Lin has to be opened once.
+
+**Lin in the car, and the honest limits.** Android Auto's microphone button
+goes to Assistant, and from 2026 to Gemini; it is not open to other apps and
+no amount of code changes that. What *is* open is the older path: a
+Bluetooth car kit or headset's voice button sends `VOICE_COMMAND` to the
+phone, and Lin now answers it — summoned, so the microphone opens, exactly
+as the power button does. Whether a given car sends it is a property of the
+head unit rather than of this app.
+
+Android Automotive — the Android built into a car rather than projected to
+it — does allow a third-party `VoiceInteractionService` to take the wheel
+button. That is a different product surface and a different build; it is
+noted here rather than attempted.
+
+**Decided: no rename.** `com.lin.agent` stays. See Phase 7.
 
 Notification replies shipped under Phase 4, and not with the read-back this
 planned. Lin writes the reply onto the screen and the person sends it: the

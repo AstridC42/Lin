@@ -218,6 +218,17 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setServerModelTyped(value: Boolean) = write(SERVER_MODEL_TYPED, value)
 
+  /**
+   * Whether to listen for "Hey Lin" when the app is not open.
+   *
+   * Off, and of all the defaults in this file this is the one least open to argument: it
+   * holds the microphone open indefinitely. It is also the most expensive, because there is
+   * no wake-word model for this phrase and the recogniser runs continuously instead.
+   */
+  val wakeWord: Flow<Boolean> = read(WAKE_WORD, false)
+
+  suspend fun setWakeWord(value: Boolean) = write(WAKE_WORD, value)
+
   val keepTranscripts: Flow<Boolean> = read(KEEP_TRANSCRIPTS, true)
 
   suspend fun setKeepTranscripts(value: Boolean) = write(KEEP_TRANSCRIPTS, value)
@@ -333,6 +344,7 @@ class SettingsRepository(private val context: Context) {
     val REASONING = stringPreferencesKey("reasoning")
     val SERVER_KIND = stringPreferencesKey("server_kind")
     val KEEP_TRANSCRIPTS = booleanPreferencesKey("keep_transcripts")
+    val WAKE_WORD = booleanPreferencesKey("wake_word")
     val SERVER_MODEL_TYPED = booleanPreferencesKey("server_model_typed")
   }
 }

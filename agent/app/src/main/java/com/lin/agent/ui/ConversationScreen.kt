@@ -105,6 +105,8 @@ import com.lin.agent.engine.Message
 @Composable
 fun ConversationScreen(
   launch: Launch = Launch.NORMAL,
+  /** Words already said - what followed "Hey Lin". Asked instead of opening the microphone. */
+  spoken: String = "",
   onOpenSettings: () -> Unit = {},
   onGetModel: () -> Unit = {},
   viewModel: ConversationViewModel = hiltViewModel(),
@@ -126,13 +128,18 @@ fun ConversationScreen(
 
   // Once per launch, not per recomposition - and not after a fold, which is why it is keyed on
   // the launch rather than on Unit alone.
-  LaunchedEffect(launch) {
-    viewModel.onLaunched(
-      launch = launch,
-      microphoneGranted =
-        context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
-          PackageManager.PERMISSION_GRANTED,
-    )
+  LaunchedEffect(launch, spoken) {
+    if (spoken.isNotBlank()) {
+      // Already said, so asking again would be rude and slower than not having a wake word.
+      viewModel.send(spoken, spoken = true)
+    } else {
+      viewModel.onLaunched(
+        launch = launch,
+        microphoneGranted =
+          context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED,
+      )
+    }
   }
   val listState = rememberLazyListState()
 

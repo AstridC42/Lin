@@ -73,6 +73,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
 import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
+import com.lin.agent.voice.WakeService
 
 /**
  * Settings, which for now is the server address and what the phone can run.
@@ -214,6 +215,47 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text(stringResource(R.string.settings_notification_access))
+      }
+
+      Text(
+        stringResource(R.string.settings_wake_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_wake_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      val wakeContext = LocalContext.current
+      val wakePermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+          viewModel.setWakeWord(on = true, granted = granted)
+          if (granted) WakeService.start(wakeContext)
+        }
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+            stringResource(R.string.settings_wake),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+          )
+          Switch(
+            checked = state.wakeWord,
+            onCheckedChange = { wanted ->
+              if (wanted) {
+                wakePermission.launch(Manifest.permission.RECORD_AUDIO)
+              } else {
+                viewModel.setWakeWord(on = false, granted = false)
+                WakeService.stop(wakeContext)
+              }
+            },
+          )
+        }
       }
 
       Text(
