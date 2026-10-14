@@ -81,7 +81,9 @@ import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
 import com.lin.agent.AssistActivity
 import com.lin.agent.voice.WakeService
+import com.lin.agent.voice.canAppearOverOtherApps
 import com.lin.agent.voice.linIsTheAssistant
+import com.lin.agent.voice.openAppearOverOtherApps
 import com.lin.agent.voice.openAssistantSettings
 
 /**
@@ -107,6 +109,26 @@ fun SettingsScreen(
   viewModel: SettingsViewModel = hiltViewModel(),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
+
+  // Two things the phone grants and this screen only reports: whether Lin is the assistant, and
+  // whether it may open a window from the background. Both are set in the phone's own settings,
+  // so both are stale the moment somebody goes there and comes back - hence read again on every
+  // return to the front rather than once. They are declared here, above every section that uses
+  // them, because the wake word reads the second one and comes first on screen.
+  val systemContext = LocalContext.current
+  var isAssistant by remember { mutableStateOf(linIsTheAssistant(systemContext)) }
+  var mayAppearOverOtherApps by remember { mutableStateOf(canAppearOverOtherApps(systemContext)) }
+  val systemLifecycle = LocalLifecycleOwner.current
+  DisposableEffect(systemLifecycle) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) {
+        isAssistant = linIsTheAssistant(systemContext)
+        mayAppearOverOtherApps = canAppearOverOtherApps(systemContext)
+      }
+    }
+    systemLifecycle.lifecycle.addObserver(observer)
+    onDispose { systemLifecycle.lifecycle.removeObserver(observer) }
+  }
 
   Scaffold(
     topBar = {
@@ -264,6 +286,29 @@ fun SettingsScreen(
               }
             },
           )
+        }
+      }
+
+      // The second half of a working wake word, and the half nobody would guess at. Shown only
+      // while the wake word is on: it is not a permission to ask for otherwise.
+      if (state.wakeWord) {
+        Text(
+          stringResource(
+            if (mayAppearOverOtherApps) R.string.settings_overlay_granted
+            else R.string.settings_overlay_missing
+          ),
+          style = MaterialTheme.typography.bodySmall,
+          color =
+            if (mayAppearOverOtherApps) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.error,
+        )
+        if (!mayAppearOverOtherApps) {
+          OutlinedButton(
+            onClick = { openAppearOverOtherApps(wakeContext) },
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(stringResource(R.string.settings_overlay_button))
+          }
         }
       }
 
@@ -426,15 +471,6 @@ fun SettingsScreen(
       // Whether Lin is actually the assistant, read again every time this screen comes back to
       // the front - because the only way to change it is to leave for the system's settings and
       // come back, so a value read once is stale exactly when somebody is looking at it.
-      var isAssistant by remember { mutableStateOf(linIsTheAssistant(context)) }
-      val assistantLifecycle = LocalLifecycleOwner.current
-      DisposableEffect(assistantLifecycle) {
-        val observer = LifecycleEventObserver { _, event ->
-          if (event == Lifecycle.Event.ON_RESUME) isAssistant = linIsTheAssistant(context)
-        }
-        assistantLifecycle.lifecycle.addObserver(observer)
-        onDispose { assistantLifecycle.lifecycle.removeObserver(observer) }
-      }
 
       // Said before the button rather than after it, because this is the answer to the question
       // somebody opens this section with: the power button does nothing, is Lin even set? Three

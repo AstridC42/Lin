@@ -165,6 +165,9 @@
   <string name="wake_listening_detail">Tap to open. Turn this off in settings to stop
     listening.</string>
   <string name="wake_channel">Listening</string>
+  <string name="wake_heard_channel">Heard</string>
+  <string name="wake_heard_title">Lin heard you</string>
+  <string name="wake_heard_detail">Tap to answer.</string>
   <string name="settings_wake_heading">“Hey Lin”</string>
   <string name="settings_wake_detail">Lin listens for its name and opens when it hears it, even
     with the screen off. Off by default, and worth knowing why: this is not a wake-word chip —
@@ -172,6 +175,13 @@
     continuously and reads the words. It costs battery, and a notification stays up the whole
     time it is listening.</string>
   <string name="settings_wake">Listen for “Hey Lin”</string>
+  <string name="settings_overlay_granted">Lin can appear over other apps, so “Hey Lin” answers
+    straight away.</string>
+  <string name="settings_overlay_missing">Lin cannot appear over other apps — and Android will not
+    let an app in the background open a window without that, whatever else it is doing. So
+    “Hey Lin” will put what it heard in a notification to tap instead of answering
+    hands-free.</string>
+  <string name="settings_overlay_button">Let Lin appear over other apps</string>
 
   <string name="new_conversation">Start a new conversation</string>
   <string name="attach">Attach something</string>

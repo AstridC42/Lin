@@ -51,6 +51,19 @@
     -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
+    <!--
+      Appearing over whatever is on screen when the wake word hears its name.
+
+      This is not about drawing an overlay: Lin never does. It is the only exemption that lets
+      an app in the background open a window at all. A foreground service is not one - the
+      system drops the launch silently rather than refusing it - so without this, "Hey Lin"
+      would hear the question, have nowhere to put it, and look broken. Granted by hand in the
+      phone's own settings, like notification access, and optional: without it the wake word
+      puts the question in a notification to tap instead, which is the one background start
+      that is always allowed.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
         android:minSdkVersion="33" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"

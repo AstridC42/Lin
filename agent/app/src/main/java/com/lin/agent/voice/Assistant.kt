@@ -19,6 +19,8 @@ package com.lin.agent.voice
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import com.lin.agent.core.voice.AssistantRole
 
 /**
@@ -58,4 +60,33 @@ fun openAssistantSettings(context: Context): Boolean {
       true
     }
     .getOrDefault(false)
+}
+
+/**
+ * Whether Lin may open a window while it is in the background.
+ *
+ * Named for what it is for rather than for the permission behind it. Lin draws no overlays;
+ * this is the only exemption that lets a background app start an activity at all, and without
+ * it the wake word has heard a question it cannot answer - see
+ * [com.lin.agent.core.voice.wakeRoute].
+ */
+fun canAppearOverOtherApps(context: Context): Boolean =
+  runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false)
+
+/**
+ * Opens the screen where that permission is granted.
+ *
+ * With the package in the URI, so it lands on Lin's own row rather than a list to find it in.
+ * Falling back to the list if the phone will not take the URI, which is better than a button
+ * that throws.
+ */
+fun openAppearOverOtherApps(context: Context) {
+  val screen = Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+  val mine =
+    Intent(screen, Uri.fromParts("package", context.packageName, null))
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+  runCatching { context.startActivity(mine) }
+    .onFailure {
+      runCatching { context.startActivity(Intent(screen).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
 }

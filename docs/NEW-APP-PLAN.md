@@ -751,6 +751,21 @@ platform constraint: from Android 14 a microphone foreground service cannot
 be started from the background, so a `BOOT_COMPLETED` receiver would throw
 rather than listen. After a restart, Lin has to be opened once.
 
+**A second platform rule, worse because it is silent.** An app in the
+background may not start an activity, and a foreground service is *not* an
+exception — the microphone notification does not buy a window. A blocked
+launch is dropped rather than refused, so "Hey Lin" heard the question, had
+nowhere to put it, and looked deaf with nothing in the logs anybody reads.
+
+Two of the documented exceptions apply. "Appear over other apps", granted by
+hand, lets the launch through, which is what makes the wake word hands-free;
+and an app with a window already on screen may start another, so it works
+with Lin open and nothing granted. With neither, the question goes into a
+heads-up notification that opens the panel when tapped — a tap rather than
+hands-free, which is the honest cost of not having the permission. Lin draws
+no overlays; the permission is asked for only for this, and only once the wake
+word is on.
+
 **Lin in the car, and the honest limits.** Android Auto's microphone button
 goes to Assistant, and from 2026 to Gemini; it is not open to other apps and
 no amount of code changes that. What *is* open is the older path: a
