@@ -178,6 +178,13 @@
   <string name="documents_send">Save or send a copy</string>
   <string name="documents_dismiss">Dismiss</string>
 
+  <string name="settings_calendar_heading">Calendar</string>
+  <string name="settings_calendar_detail">Lets Lin answer what you have on. Reading only — an
+    event Lin creates opens in your calendar app with the fields filled in, and you save it, so
+    Lin can never put anything in your week on its own.</string>
+  <string name="settings_calendar_allow">Let Lin read the calendar</string>
+  <string name="settings_calendar_granted">Lin can read your calendar.</string>
+
   <string name="settings_reasoning_heading">Thinking</string>
   <string name="settings_reasoning_detail">Lin can work a question out before answering. Thinking
     is generated at the same speed as the answer, so it is paid for in waiting before the first

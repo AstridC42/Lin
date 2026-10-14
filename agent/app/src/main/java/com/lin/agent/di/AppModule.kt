@@ -20,6 +20,7 @@ import android.content.Context
 import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.memory.MemoryStore
 import com.lin.agent.core.models.ModelStore
+import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.core.documents.DocumentLibrary
 import com.lin.agent.core.documents.Documents
 import com.lin.agent.core.documents.PdfPages
@@ -62,6 +63,9 @@ object AppModule {
   @Provides @Singleton
   fun provideTrainingArchive(@ApplicationContext context: Context): TrainingArchive =
     TrainingArchive(context.filesDir)
+
+  @Provides @Singleton
+  fun provideCalendars(@ApplicationContext context: Context): Calendars = Calendars(context)
 
   @Provides @Singleton
   fun provideModelDownloads(@ApplicationContext context: Context): ModelDownloads =

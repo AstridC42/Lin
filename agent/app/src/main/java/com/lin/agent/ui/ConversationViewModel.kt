@@ -48,6 +48,8 @@ import com.lin.agent.R
 import com.lin.agent.core.documents.DocumentLibrary
 import com.lin.agent.core.documents.Documents
 import com.lin.agent.core.documents.PdfPages
+import com.lin.agent.core.calendar.Calendars
+import com.lin.agent.core.calendar.todayLine
 import com.lin.agent.core.memory.Digest
 import com.lin.agent.core.training.TrainingArchive
 import com.lin.agent.core.training.TrainingData
@@ -56,6 +58,9 @@ import com.lin.agent.model.ConversationLog
 import com.lin.agent.model.DigestWorker
 import com.lin.agent.model.Embedders
 import com.lin.agent.model.FindPhotoTool
+import com.lin.agent.model.AddToCalendarTool
+import com.lin.agent.model.AlarmTool
+import com.lin.agent.model.CalendarTool
 import com.lin.agent.model.ListDocumentsTool
 import com.lin.agent.model.ReadDocumentTool
 import com.lin.agent.model.ReplyTool
@@ -147,6 +152,8 @@ constructor(
   private val documents: Documents,
   private val pdfPages: PdfPages,
   private val archive: TrainingArchive,
+  private val calendars: Calendars,
+  @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
@@ -169,6 +176,9 @@ constructor(
         FindPhotoTool(memories, embedders),
         UnreadTool(relay),
         ReplyTool(relay),
+        CalendarTool(calendars),
+        AddToCalendarTool(appContext),
+        AlarmTool(appContext),
         ListDocumentsTool(documentLibrary),
         ReadDocumentTool(documentLibrary, documents),
         WriteDocumentTool(documentLibrary, documents, pdfPages),
@@ -332,7 +342,7 @@ constructor(
           backend = backend,
           registry = registry,
           role = AgentRole.ORCHESTRATOR,
-          systemPrompt = ORCHESTRATOR_PROMPT,
+          systemPrompt = promptForToday(),
           reasoning = reasoningNamed(settings.reasoning.first()),
         )
         .run(outgoing)
@@ -466,6 +476,21 @@ constructor(
       toolName = message.toolName,
     )
 
+  /**
+   * The orchestrator prompt with today's date in front of it.
+   *
+   * Without this the model has no idea what day it is, which makes "put it in the calendar
+   * tomorrow" impossible to get right - it was guessing, and a 2B model's guess at the date is
+   * a year out as often as not.
+   *
+   * Day resolution, and that is load-bearing rather than lazy. The system prompt is part of
+   * what decides which conversation a turn can be sent to on-device, so a prompt carrying the
+   * time of day would build a fresh conversation every minute and throw the history away with
+   * it. The date changes once a day, which costs one rebuild.
+   */
+  private fun promptForToday(): String =
+    todayLine(System.currentTimeMillis()) + " " + ORCHESTRATOR_PROMPT
+
   private fun persist(messages: List<Message>) {
     saved[KEY_ROLES] = ArrayList(messages.map { it.role.name })
     saved[KEY_TEXTS] = ArrayList(messages.map { it.text })
@@ -551,7 +576,12 @@ constructor(
         "Use find_photo to look through the user\'s pictures; they appear on screen, and you " +
         "cannot see them, so never describe what is in one. " +
         "reply_to_message writes a reply onto the screen for the user to send; it does " +
-        "not send, so read the wording back and never say a message has gone."
+        "not send, so read the wording back and never say a message has gone. " +
+        "Use whats_on to look at the calendar rather than guessing what the user has on. " +
+        "add_to_calendar opens the calendar filled in and the user saves it, so say it is " +
+        "ready rather than saying it is in their calendar; work the date out from today's " +
+        "date above and pass it as numbers. A timer is set straight away, but an alarm opens " +
+        "the clock to be confirmed - do not say an alarm is set."
 
     const val DIGEST_WORK = "digest"
 

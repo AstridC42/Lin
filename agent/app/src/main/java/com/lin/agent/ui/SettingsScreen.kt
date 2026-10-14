@@ -216,6 +216,35 @@ fun SettingsScreen(
       }
 
       Text(
+        stringResource(R.string.settings_calendar_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_calendar_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      val calendarPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+          viewModel.refreshCalendarAccess(granted)
+        }
+      if (state.calendarPermitted) {
+        Text(
+          stringResource(R.string.settings_calendar_granted),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      } else {
+        OutlinedButton(
+          onClick = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Text(stringResource(R.string.settings_calendar_allow))
+        }
+      }
+
+      Text(
         stringResource(R.string.settings_reasoning_heading),
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = 12.dp),
