@@ -14,8 +14,10 @@ help it can reach for without the user asking:
   written brief for a task the 2B cannot do well, running as a sub-agent with
   its own tools and its own budget, returning a result the orchestrator folds
   into its reply.
-- **The phone itself**, through a tool layer, with MobileActions-270M as an
-  intent parser where that helps.
+- **The phone itself**, through a tool layer. MobileActions-270M was planned
+  as an intent parser in front of it; see Phase 4 for why that is deferred
+  rather than built — the validation it was meant to justify now exists on
+  its own.
 
 Everything is local in the sense that matters: the phone, or hardware the user
 owns. Nothing goes to anybody's cloud.
@@ -441,6 +443,9 @@ intent parser with its output validated before it reaches anything — a 270M
 model is a translator, not a decider, and the fork's `garbledNumberRefusal`
 exists because small-model output cannot be trusted with a phone call.
 
+*As built, the validation arrived without the second model, which is what
+left the 270M with nothing to justify it — see the deferral below.*
+
 Deliberately after Phase 3, so tools arrive into a system that already routes.
 
 **Done:** `phone_action` — calling and messaging — with the staged-action
@@ -531,7 +536,51 @@ Reaching the sessions needs notification access — the same grant that lets
 Lin answer messages. The alternative, `MEDIA_CONTENT_CONTROL`, is for system
 apps.
 
-**Still to do:** MobileActions-270M as the intent parser.
+**Deferred, not dropped: MobileActions-270M.** Looked at properly in October
+2026 and parked, with the reasoning kept here so it is not re-derived.
+
+*What it actually is.* Not an intent parser in the sense this plan assumed:
+it is **FunctionGemma-270M fine-tuned for mobile actions**, a ~271 MB
+`.litertlm` function-calling model. In the archived fork, "MobileActions" is
+not a model at all — it is a per-model capability flag that unlocks a
+Gallery demo task. The plan conflated the two.
+
+*Why not now.* Four reasons, in order of weight:
+
+- **The premise expired.** The rationale was "output validated before it
+  reaches anything — a 270M is a translator, not a decider". That validation
+  now exists unconditionally: `clockTime`, `timerMinutes`, `startOfEvent`,
+  `dayFromWords`, `decideCall`, `looksLikeAGarbledCopy`, `fileNameFor`,
+  `volumeAfterStep`, all tested in `core`. Gemma's output already goes
+  through every one. A 270M would remove no check.
+- **The repertoire barely overlaps.** It covers about seven functions —
+  flashlight, alarms, contacts, calendar creation, maps, email, Wi-Fi. Lin
+  has fourteen tools and only two overlap. Its own card says it "may not
+  generalize well to other function calling tasks", so `delegate`,
+  `find_photo`, `remember`, `read_document` and `media` would stay with
+  Gemma regardless.
+- **Accuracy.** An arXiv benchmark puts Google's Mobile Actions variant at
+  17.2% end-to-end, against 29.3% for base FunctionGemma. That is the
+  paper's own extended benchmark rather than the vendor's metric — harder
+  cases than the model was tuned for — but it is the only end-to-end figure
+  found.
+- **Cost.** +271 MB on top of 2.6 GB and 0.5 GB, a second resident model,
+  and a routing layer that is itself a new failure mode.
+
+*What it knows that Lin does not* — flashlight, Wi-Fi, maps — are plain
+intents. They are worth adding as ordinary tools, with validation and no
+download, if they are wanted.
+
+*What would change the answer.* Any one of: Gemma observably picking the
+wrong tool or mangling arguments in daily use; tool latency being the thing
+that annoys, where a 270M is several times quicker; or wanting those seven
+actions specifically as a fast path, accepting the accuracy. None of those
+is measured yet, and the measurement is what should decide it.
+
+Sources: the litert-community model cards for
+`FunctionGemma_270M_Mobile_Actions` and
+`functiongemma-270m-ft-mobile-actions`, arXiv 2609.25373, and Google's
+on-device function calling post.
 
 **Measurement:** the staged-action policy holds — calls open the dialer unless
 directly authorised, messages wait for a send, and a notification reply is read
