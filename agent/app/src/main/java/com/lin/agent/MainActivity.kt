@@ -38,6 +38,9 @@ import androidx.core.content.IntentCompat
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.ui.ConversationScreen
 import com.lin.agent.ui.DocumentsScreen
+import com.lin.agent.voice.WakeService
+import kotlinx.coroutines.flow.first
+import dagger.hilt.android.EntryPointAccessors
 import com.lin.agent.ui.BackupScreen
 import com.lin.agent.ui.MemoryScreen
 import com.lin.agent.ui.TrainingScreen
@@ -155,8 +158,22 @@ class MainActivity : ComponentActivity() {
               // How the app was opened, which decides whether the microphone opens with it.
               // Read from the intent rather than remembered, so returning to a summoned
               // session later does not start listening again.
+              // Three ways of being summoned rather than opened, and they mean the same
+              // thing: the power button, a car kit's voice button over Bluetooth, and the
+              // wake word. None of them involves a keyboard, so all three open the
+              // microphone - see shouldListenOnLaunch.
               launch =
-                if (intent?.action == Intent.ACTION_ASSIST) Launch.ASSIST else Launch.NORMAL,
+                if (
+                  intent?.action == Intent.ACTION_ASSIST ||
+                    intent?.action == ACTION_VOICE_COMMAND ||
+                    intent?.action == WakeService.ACTION_WOKEN
+                ) {
+                  Launch.ASSIST
+                } else Launch.NORMAL,
+              // "Hey Lin, what's the time" asks the question. Without this the wake word only
+              // opens the microphone and the whole thing has to be said again, which makes it
+              // slower than picking the phone up.
+              spoken = intent?.getStringExtra(WakeService.EXTRA_SAID).orEmpty(),
               onOpenSettings = { screen = SETTINGS },
               // The empty state's button goes to the same screen the gear does, which is where
               // the downloads live. One place to manage models, not two.
@@ -169,6 +186,19 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(Unit) {
           LaunchHealth.mark(this@MainActivity, "first frame")
           LaunchHealth.noteLaunchSucceeded(this@MainActivity)
+
+          // Listening restarts here rather than at boot, and that is a platform constraint
+          // rather than a choice: from Android 14 a microphone foreground service cannot be
+          // started from the background, so a BOOT_COMPLETED receiver would throw rather than
+          // listen. An activity on screen is the one place it is allowed. The cost is that
+          // after a restart, Lin has to be opened once.
+          val settings =
+            EntryPointAccessors.fromApplication(
+                this@MainActivity.applicationContext,
+                SettingsEntryPoint::class.java,
+              )
+              .settings()
+          if (settings.wakeWord.first()) WakeService.start(this@MainActivity)
         }
       }
     }
@@ -182,3 +212,13 @@ private const val MEMORY = "memory"
 private const val DOCUMENTS = "documents"
 private const val TRAINING = "training"
 private const val BACKUP = "backup"
+
+/** A Bluetooth car kit or headset voice button. Not Android Auto's, which is not open. */
+private const val ACTION_VOICE_COMMAND = "android.intent.action.VOICE_COMMAND"
+
+/** Reading one setting from an activity, without making the activity a view model's owner. */
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface SettingsEntryPoint {
+  fun settings(): com.lin.agent.core.settings.SettingsRepository
+}

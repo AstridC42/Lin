@@ -43,6 +43,14 @@
     <!-- Dictation. Asked for at the microphone button, never at launch. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!--
+      Holding the microphone open for the wake word.
+
+      Its own foreground-service type, because that is what the system shows somebody when it
+      tells them an app has the microphone. The service runs only while the setting is on.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
         android:minSdkVersion="33" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
@@ -133,6 +141,19 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <!--
+              The voice button on a car kit or a headset, over Bluetooth.
+
+              Not Android Auto's microphone button: that one goes to Assistant or Gemini and
+              is not open to other apps. This is the older, simpler path - a Bluetooth
+              hands-free unit's voice-dial button sends VOICE_COMMAND to the phone, and
+              whichever app answers it handles the request. Which cars send it is a property
+              of the head unit rather than of this app, so it is offered and not promised.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!--
               Sharing a document to Lin, which is the natural way to hand one over - from a
               mail attachment, a browser download, a file manager.
 
@@ -200,6 +221,12 @@
           Notification access is granted by the user in system settings and cannot be
           requested; the settings screen links there.
         -->
+        <!-- Listens for "Hey Lin". Started by the setting, and stopped with it. -->
+        <service
+            android:name=".voice.WakeService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
         <service
             android:name=".notifications.LinNotificationListener"
             android:exported="false"

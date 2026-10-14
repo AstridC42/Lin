@@ -89,6 +89,8 @@ data class SettingsState(
   val answerOnServer: Boolean = false,
   val allowDirectCalls: Boolean = false,
   val spokenReplies: Boolean = true,
+  /** Whether Lin is listening for its name. Off by default; it holds the microphone. */
+  val wakeWord: Boolean = false,
   val digestConversations: Boolean = false,
   /** The reasoning level, as the engine's own enum. */
   val reasoning: Reasoning = Reasoning.OFF,
@@ -141,6 +143,7 @@ constructor(
           answerOnServer = settings.answerOnServer.first(),
           allowDirectCalls = settings.allowDirectCalls.first(),
           spokenReplies = settings.spokenReplies.first(),
+          wakeWord = settings.wakeWord.first(),
           digestConversations = settings.digestConversations.first(),
           reasoning = reasoningNamed(settings.reasoning.first()),
           serverKind = serverKindNamed(settings.serverKind.first()),
@@ -345,6 +348,19 @@ constructor(
   fun setReasoning(level: Reasoning) {
     _state.update { it.copy(reasoning = level) }
     viewModelScope.launch { settings.setReasoning(level.name) }
+  }
+
+  /**
+   * Turns listening on or off, and starts or stops the service with it.
+   *
+   * A refusal of the microphone leaves it off rather than stored as a yes the permission does
+   * not back - the same rule as direct calling. A switch that says Lin is listening while it
+   * cannot is worse than one that is plainly off.
+   */
+  fun setWakeWord(on: Boolean, granted: Boolean) {
+    val effective = on && granted
+    _state.update { it.copy(wakeWord = effective) }
+    viewModelScope.launch { settings.setWakeWord(effective) }
   }
 
   fun setSpokenReplies(on: Boolean) {
