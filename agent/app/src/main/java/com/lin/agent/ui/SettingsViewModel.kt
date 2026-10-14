@@ -25,6 +25,7 @@ import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.model.installedMusicApps
 import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
@@ -73,6 +74,9 @@ sealed interface ServerModelsState {
   data class Failed(val message: String) : ServerModelsState
 }
 
+/** One app that could play music. */
+data class MusicAppLine(val label: String, val packageName: String)
+
 data class SettingsState(
   val ollamaUrl: String = "",
   val ollamaAuthHeader: String = "",
@@ -100,6 +104,10 @@ data class SettingsState(
   val serverKind: ServerKind = ServerKind.OLLAMA,
   /** Whether Lin may read the calendar. Asked for here; there is no write permission at all. */
   val calendarPermitted: Boolean = false,
+  /** Apps on this phone that can play music, for the one the user picks. */
+  val musicApps: List<MusicAppLine> = emptyList(),
+  /** The chosen music app's package, or empty: Lin will not guess which service to open. */
+  val musicApp: String = "",
   val photoIndex: IndexState = IndexState.Idle,
   val photosIndexed: Int = 0,
 )
@@ -116,6 +124,7 @@ constructor(
   private val calendars: Calendars,
   private val photos: PhotoIndex,
   private val memories: MemoryStore,
+  @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
 
   private val _state = MutableStateFlow(SettingsState())
@@ -147,6 +156,9 @@ constructor(
           spokenReplies = settings.spokenReplies.first(),
           wakeWord = settings.wakeWord.first(),
           chatModel = settings.chatModelName.first(),
+          musicApp = settings.musicApp.first(),
+          musicApps =
+            installedMusicApps(appContext).map { MusicAppLine(it.label, it.packageName) },
           digestConversations = settings.digestConversations.first(),
           reasoning = reasoningNamed(settings.reasoning.first()),
           serverKind = serverKindNamed(settings.serverKind.first()),
@@ -375,6 +387,19 @@ constructor(
       // the app is restarted.
       backends.refresh()
     }
+  }
+
+  /**
+   * Which app plays music, or none.
+   *
+   * Tapping the chosen one again clears it, like the model picker above - and clearing is a
+   * real choice here rather than a reset to a default: with no app chosen, Lin says it has
+   * not been told which service to use instead of opening whichever it finds first.
+   */
+  fun useMusicApp(packageName: String) {
+    val chosen = if (packageName == _state.value.musicApp) "" else packageName
+    _state.update { it.copy(musicApp = chosen) }
+    viewModelScope.launch { settings.setMusicApp(chosen) }
   }
 
   fun setWakeWord(on: Boolean, granted: Boolean) {

@@ -109,6 +109,18 @@ class SettingsRepository(private val context: Context) {
   suspend fun setChatModelName(value: String) = write(CHAT_MODEL_NAME, value)
 
   /**
+   * Which app plays music, by package name. Empty until the user picks one.
+   *
+   * No default and no guessing. Somebody with Tidal, Spotify and YouTube Music installed has a
+   * service they pay for and two they do not, and an assistant that opens the wrong one - or
+   * worse, starts a free tier playing an advert - is not saving them anything. Lin says it
+   * needs to be told rather than choosing.
+   */
+  val musicApp: Flow<String> = read(MUSIC_APP, "")
+
+  suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
+
+  /**
    * Which of the server's models to send work to, by the name the server uses: `qwen3:32b`.
    *
    * Stored by name rather than by anything structural on purpose. The server's list is the
@@ -341,6 +353,7 @@ class SettingsRepository(private val context: Context) {
     val SERVER_URL = stringPreferencesKey("ollama_url")
     val SERVER_AUTH_HEADER = stringPreferencesKey("ollama_auth_header")
     val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
+    val MUSIC_APP = stringPreferencesKey("music_app")
     val SERVER_MODEL_NAME = stringPreferencesKey("server_model_name")
     val ANSWER_ON_SERVER = booleanPreferencesKey("answer_on_server")
     val ALLOW_DIRECT_CALLS = booleanPreferencesKey("allow_direct_calls")

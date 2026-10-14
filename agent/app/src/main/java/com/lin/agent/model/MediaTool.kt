@@ -16,16 +16,11 @@
 
 package com.lin.agent.model
 
-import android.content.ComponentName
 import android.content.Context
 import android.media.AudioManager
-import android.media.MediaMetadata
 import android.media.session.MediaController
-import android.media.session.MediaSessionManager
-import android.media.session.PlaybackState
 import android.util.Log
 import com.lin.agent.core.media.MediaCommand
-import com.lin.agent.core.media.Session
 import com.lin.agent.core.media.canDo
 import com.lin.agent.core.media.chooseSession
 import com.lin.agent.core.media.describeNowPlaying
@@ -35,7 +30,6 @@ import com.lin.agent.engine.AgentTool
 import com.lin.agent.engine.ParamType
 import com.lin.agent.engine.ToolParameter
 import com.lin.agent.engine.ToolResult
-import com.lin.agent.notifications.LinNotificationListener
 
 /**
  * Whatever is playing on the phone.
@@ -78,13 +72,13 @@ class MediaTool(private val context: Context) : AgentTool {
     if (action == "louder" || action == "quieter") return volume(up = action == "louder")
 
     val controllers =
-      activeControllers()
+      activeControllers(context)
         ?: return ToolResult.Failed(
           "Lin cannot see what is playing: that needs notification access, which the user turns " +
             "on in settings. Tell them rather than guessing."
         )
 
-    val sessions = controllers.map { it.asSession() }
+    val sessions = controllers.map { it.asSession(context) }
     if (action == "what") return ToolResult.Ok(describeNowPlaying(sessions))
 
     val command =
@@ -104,7 +98,7 @@ class MediaTool(private val context: Context) : AgentTool {
       chooseSession(sessions)
         ?: return ToolResult.Failed("Nothing is playing, and nothing is paused to start again.")
     val controller =
-      controllers.firstOrNull { it.asSession() == chosen }
+      controllers.firstOrNull { it.asSession(context) == chosen }
         ?: return ToolResult.Failed("Whatever was playing has gone.")
 
     // Asked rather than attempted: a transport control that goes nowhere is silent, and the
@@ -148,49 +142,6 @@ class MediaTool(private val context: Context) : AgentTool {
       ToolResult.Failed("The phone would not allow a volume change just now.")
     }
   }
-
-  /** Null when notification access is off, which is the only way to reach these at all. */
-  private fun activeControllers(): List<MediaController>? =
-    runCatching {
-        val manager =
-          context.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
-            ?: return null
-        manager.getActiveSessions(ComponentName(context, LinNotificationListener::class.java))
-      }
-      .onFailure { Log.i(TAG, "No access to media sessions", it) }
-      .getOrNull()
-
-  private fun MediaController.asSession(): Session {
-    val state = playbackState
-    val actions = state?.actions ?: 0L
-    return Session(
-      app = appLabel(packageName),
-      title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE).orEmpty(),
-      artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST).orEmpty(),
-      playing = state?.state == PlaybackState.STATE_PLAYING,
-      // Ordering only. The last position update is the best "when was this last touched" the
-      // platform offers without holding state of our own.
-      activeAt = state?.lastPositionUpdateTime ?: 0L,
-      can =
-        buildSet {
-          if (actions and PlaybackState.ACTION_PLAY != 0L) add(MediaCommand.PLAY)
-          if (actions and PlaybackState.ACTION_PLAY_PAUSE != 0L) {
-            add(MediaCommand.PLAY)
-            add(MediaCommand.PAUSE)
-          }
-          if (actions and PlaybackState.ACTION_PAUSE != 0L) add(MediaCommand.PAUSE)
-          if (actions and PlaybackState.ACTION_SKIP_TO_NEXT != 0L) add(MediaCommand.NEXT)
-          if (actions and PlaybackState.ACTION_SKIP_TO_PREVIOUS != 0L) add(MediaCommand.PREVIOUS)
-        },
-    )
-  }
-
-  private fun appLabel(packageName: String): String =
-    runCatching {
-        val info = context.packageManager.getApplicationInfo(packageName, 0)
-        context.packageManager.getApplicationLabel(info).toString()
-      }
-      .getOrDefault(packageName)
 
   private companion object {
     const val TAG = "LinMediaTool"

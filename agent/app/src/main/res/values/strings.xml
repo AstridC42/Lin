@@ -25,7 +25,9 @@
 
   <string name="settings_voice_heading">Voice</string>
   <string name="settings_voice_detail">Hold the power button, or use your phone\'s assistant
-    gesture, and Lin opens listening. Set it as your assistant below.</string>
+    gesture, and Lin opens listening. Set it as your assistant below. In a car this reaches Lin
+    over plain Bluetooth, where the voice-dial button summons the phone\'s assistant — but not
+    through Android Auto, whose microphone button only ever calls Google\'s own assistant.</string>
   <string name="settings_spoken_replies">Answer out loud when spoken to</string>
   <string name="settings_spoken_replies_detail">Typed questions are always answered in
     writing.</string>
@@ -123,6 +125,12 @@
     more. Choose one from the list.</string>
   <string name="settings_server_found">%1$d on the server</string>
 
+  <string name="settings_music_heading">Music</string>
+  <string name="settings_music_detail">Which app “play Stan by Eminem” should use. Lin will not
+    guess: with nothing chosen it says so rather than opening whichever service it finds first.
+    Whether the song starts playing or the app just opens on the search is up to the app — Lin
+    checks what is actually playing afterwards and tells you which of the two happened.</string>
+  <string name="settings_music_none">No app on this phone says it can play music.</string>
   <string name="settings_models_heading">Models on this phone</string>
   <string name="settings_device">This phone: %1$d GB of memory, %2$s</string>
   <string name="no_model">no model</string>

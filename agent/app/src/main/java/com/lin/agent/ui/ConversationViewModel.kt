@@ -68,6 +68,9 @@ import com.lin.agent.model.AlarmTool
 import com.lin.agent.model.CalendarTool
 import com.lin.agent.model.ListDocumentsTool
 import com.lin.agent.model.MediaTool
+import com.lin.agent.model.OpenAppTool
+import com.lin.agent.model.PhoneSettingTool
+import com.lin.agent.model.PlayMusicTool
 import com.lin.agent.model.ReadDocumentTool
 import com.lin.agent.model.ReplyTool
 import com.lin.agent.model.WriteDocumentTool
@@ -188,6 +191,9 @@ constructor(
         ReplyTool(relay),
         CalendarTool(calendars),
         MediaTool(appContext),
+        PlayMusicTool(appContext, settings, launchGuard),
+        PhoneSettingTool(appContext, launchGuard),
+        OpenAppTool(appContext, launchGuard),
         AddToCalendarTool(appContext, launchGuard),
         AlarmTool(appContext, launchGuard),
         ListDocumentsTool(documentLibrary),
@@ -680,7 +686,15 @@ constructor(
         "date above and pass it as numbers. A timer is set straight away, but an alarm opens " +
         "the clock to be confirmed - do not say an alarm is set. " +
         "Use media to see or change what is playing; check with action \"what\" before " +
-        "saying what is on."
+        "saying what is on. play_music starts something new in the user\'s own music app - " +
+        "pass what they said, such as \"Stan by Eminem\"; read its result before answering, " +
+        "because it says whether the music actually started or only a search opened. " +
+        "open_app opens an app by name. " +
+        "phone_setting does the flashlight and Do Not Disturb outright; for wi-fi, bluetooth, " +
+        "NFC and airplane mode Android allows no app to switch them, so it opens the phone\'s " +
+        "own panel - say it is ready to tap and never say the setting was changed. " +
+        "These tools are everything Lin can do to the phone: if something is not on this " +
+        "list, say you cannot do it rather than describing how the user could."
 
     const val DIGEST_WORK = "digest"
 

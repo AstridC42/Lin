@@ -700,6 +700,32 @@ fun SettingsScreen(
       )
 
       Text(
+        stringResource(R.string.settings_music_heading),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 12.dp),
+      )
+      Text(
+        stringResource(R.string.settings_music_detail),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      if (state.musicApps.isEmpty()) {
+        Text(
+          stringResource(R.string.settings_music_none),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      for (app in state.musicApps) {
+        ChoiceRow(
+          title = app.label,
+          detail = app.packageName,
+          selected = state.musicApp == app.packageName,
+          onPick = { viewModel.useMusicApp(app.packageName) },
+        )
+      }
+
+      Text(
         stringResource(R.string.settings_models_heading),
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = 12.dp),
