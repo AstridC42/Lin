@@ -2,4 +2,26 @@
 <resources>
   <!-- Compose draws everything; this exists so the window has sane defaults before it does. -->
   <style name="Theme.Lin" parent="android:Theme.Material.Light.NoActionBar" />
+
+  <!--
+    The window Lin wears when it is summoned rather than opened.
+
+    An assistant answering a question should sit over whatever somebody was doing, not replace
+    it: a full-screen app launch loses their place and makes a ten-second question feel like
+    leaving. Translucent with the background dimmed, so what is underneath stays visible and
+    plainly still there.
+
+    Not windowIsFloating: that sizes the window to its content and fights a panel that grows as
+    a reply streams into it. Full-size and transparent, with the panel laid out at the bottom
+    where a thumb is, does the same job without the fighting. windowCloseOnTouchOutside goes
+    with floating and does nothing without it, so dismissing by tapping away is the panel's own
+    job - see AssistPanel.
+  -->
+  <style name="Theme.Lin.Assist" parent="Theme.Lin">
+    <item name="android:windowIsTranslucent">true</item>
+    <item name="android:windowBackground">@android:color/transparent</item>
+    <item name="android:backgroundDimEnabled">true</item>
+    <item name="android:backgroundDimAmount">0.45</item>
+    <item name="android:windowContentOverlay">@null</item>
+  </style>
 </resources>

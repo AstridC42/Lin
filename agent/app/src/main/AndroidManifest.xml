@@ -126,34 +126,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <!--
-              What makes Lin selectable as the phone's digital assistant, and so what the power
-              button and the assistant gesture summon. This is the whole point of the project
-              stated in one intent filter.
-
-              The simple ASSIST filter rather than a VoiceInteractionService: the full form
-              brings an overlay session and "Hey Google"-style always-listening, which needs a
-              wake-word model this app does not have and a microphone open continuously, which
-              it has not earned. This gets the role and the summon; the rest is Phase 6's
-              remaining half.
-            -->
-            <intent-filter>
-                <action android:name="android.intent.action.ASSIST" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-            <!--
-              The voice button on a car kit or a headset, over Bluetooth.
-
-              Not Android Auto's microphone button: that one goes to Assistant or Gemini and
-              is not open to other apps. This is the older, simpler path - a Bluetooth
-              hands-free unit's voice-dial button sends VOICE_COMMAND to the phone, and
-              whichever app answers it handles the request. Which cars send it is a property
-              of the head unit rather than of this app, so it is offered and not promised.
-            -->
-            <intent-filter>
-                <action android:name="android.intent.action.VOICE_COMMAND" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-            <!--
               Sharing a document to Lin, which is the natural way to hand one over - from a
               mail attachment, a browser download, a file manager.
 
@@ -221,6 +193,56 @@
           Notification access is granted by the user in system settings and cannot be
           requested; the settings screen links there.
         -->
+        <!--
+          Lin as a panel over whatever you were doing, which is what being summoned should
+          look like. A full-screen launch loses somebody's place and makes a ten-second
+          question feel like leaving the app they were in.
+
+          Its own activity rather than a mode of the main one, because the window's theme is
+          fixed when it is created: a single activity reused for both would keep whichever
+          window it was born with. singleTask so a second summon reuses this one rather than
+          stacking panels, and excludeFromRecents so a finished question does not sit in the
+          task switcher pretending to be an open app.
+        -->
+        <activity
+            android:name=".AssistActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Lin.Assist"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden">
+            <!--
+              What makes Lin selectable as the phone's digital assistant, and so what the power
+              button and the assistant gesture summon. This is the whole point of the project
+              stated in one intent filter.
+
+              The simple ASSIST filter rather than a VoiceInteractionService: the full form
+              brings an overlay session and "Hey Google"-style always-listening, which needs a
+              wake-word model this app does not have and a microphone open continuously, which
+              it has not earned. This gets the role and the summon; the rest is Phase 6's
+              remaining half.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!--
+              The voice button on a car kit or a headset, over Bluetooth.
+
+              Not Android Auto's microphone button: that one goes to Assistant or Gemini and
+              is not open to other apps. This is the older, simpler path - a Bluetooth
+              hands-free unit's voice-dial button sends VOICE_COMMAND to the phone, and
+              whichever app answers it handles the request. Which cars send it is a property
+              of the head unit rather than of this app, so it is offered and not promised.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- Listens for "Hey Lin". Started by the setting, and stopped with it. -->
         <service
             android:name=".voice.WakeService"

@@ -31,6 +31,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import com.lin.agent.AssistActivity
 import com.lin.agent.MainActivity
 import com.lin.agent.R
 import com.lin.agent.core.voice.WakeWord
@@ -150,13 +151,23 @@ class WakeService : Service() {
       }
   }
 
-  /** Opens the app, listening, with whatever was said after the phrase. */
+  /**
+   * Brings up the panel, listening, with whatever was said after the phrase.
+   *
+   * The panel rather than the whole app: "Hey Lin, what's the time" should not take over the
+   * screen of whatever somebody was doing when they said it. See [com.lin.agent.AssistActivity].
+   *
+   * A token per wake, so that two wakes are two summons even when the same words were said
+   * both times - and so that the panel being recreated mid-answer does not ask again. See
+   * [com.lin.agent.core.voice.Summon].
+   */
   private fun wake(heard: String) {
     val question = WakeWord.afterWake(heard)
     startActivity(
-      Intent(this, MainActivity::class.java).apply {
+      Intent(this, AssistActivity::class.java).apply {
         action = ACTION_WOKEN
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        putExtra(EXTRA_TOKEN, java.util.UUID.randomUUID().toString())
         if (question.isNotBlank()) putExtra(EXTRA_SAID, question)
       }
     )
@@ -218,6 +229,9 @@ class WakeService : Service() {
 
     /** Whatever was said after "Hey Lin", so it does not have to be said twice. */
     const val EXTRA_SAID = "com.lin.agent.extra.SAID"
+
+    /** Which wake this is, so the question goes exactly once. See Summon. */
+    const val EXTRA_TOKEN = "com.lin.agent.extra.TOKEN"
 
     fun start(context: Context) {
       runCatching {

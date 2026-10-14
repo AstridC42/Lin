@@ -62,6 +62,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.core.models.DownloadState
 import com.lin.agent.core.models.ModelRole
@@ -75,6 +80,8 @@ import com.lin.agent.R
 import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
 import com.lin.agent.voice.WakeService
+import com.lin.agent.voice.linIsTheAssistant
+import com.lin.agent.voice.openAssistantSettings
 
 /**
  * Settings, which for now is the server address and what the phone can run.
@@ -414,23 +421,53 @@ fun SettingsScreen(
         }
       }
       val context = LocalContext.current
-      OutlinedButton(
-        onClick = {
-          // Android gives no way to request the assistant role directly - it is the user's
-          // choice to make in their own settings, which is correct. This only takes them there.
-          runCatching {
-            context.startActivity(
-              Intent(AndroidSettings.ACTION_VOICE_INPUT_SETTINGS)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
+
+      // Whether Lin is actually the assistant, read again every time this screen comes back to
+      // the front - because the only way to change it is to leave for the system's settings and
+      // come back, so a value read once is stale exactly when somebody is looking at it.
+      var isAssistant by remember { mutableStateOf(linIsTheAssistant(context)) }
+      val assistantLifecycle = LocalLifecycleOwner.current
+      DisposableEffect(assistantLifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+          if (event == Lifecycle.Event.ON_RESUME) isAssistant = linIsTheAssistant(context)
+        }
+        assistantLifecycle.lifecycle.addObserver(observer)
+        onDispose { assistantLifecycle.lifecycle.removeObserver(observer) }
+      }
+
+      // Said before the button rather than after it, because this is the answer to the question
+      // somebody opens this section with: the power button does nothing, is Lin even set? Three
+      // states and not two - null is the phone declining to say, and guessing "no" there would
+      // be a made-up fact on the one screen meant to clear this up.
+      var noAssistantScreen by remember { mutableStateOf(false) }
+      Text(
+        stringResource(
+          when (isAssistant) {
+            true -> R.string.settings_assistant_is_lin
+            false -> R.string.settings_assistant_is_other
+            null -> R.string.settings_assistant_unknown
           }
-        },
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        color =
+          if (isAssistant == true) MaterialTheme.colorScheme.onSurface
+          else MaterialTheme.colorScheme.error,
+      )
+      OutlinedButton(
+        // Android gives no way to request the assistant role directly - it is the user's
+        // choice to make in their own settings, which is correct. This only takes them there,
+        // to whichever of those screens the phone actually has: starting one it does not
+        // throws, and this button used to swallow that and look broken.
+        onClick = { noAssistantScreen = !openAssistantSettings(context) },
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text(stringResource(R.string.settings_set_assistant))
       }
       Text(
-        stringResource(R.string.settings_assistant_detail),
+        stringResource(
+          if (noAssistantScreen) R.string.settings_assistant_no_screen
+          else R.string.settings_assistant_detail
+        ),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
