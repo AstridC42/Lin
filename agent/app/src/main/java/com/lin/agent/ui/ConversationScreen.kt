@@ -157,6 +157,16 @@ fun ConversationScreen(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
+          // Only once there is something to end. On an empty conversation it would do nothing
+          // visible, which reads as a broken button.
+          if (state.messages.isNotEmpty()) {
+            IconButton(onClick = viewModel::startNewConversation) {
+              Icon(
+                Icons.Filled.Add,
+                contentDescription = stringResource(R.string.new_conversation),
+              )
+            }
+          }
           IconButton(onClick = onOpenSettings) {
             Icon(
               Icons.Filled.Settings,

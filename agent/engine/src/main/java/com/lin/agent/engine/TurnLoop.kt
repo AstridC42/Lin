@@ -186,7 +186,10 @@ class TurnLoop(
     backend
       .converse(
         TurnRequest(
-          messages = messages,
+          // Trimmed here rather than where the conversation is held, because this is where it
+          // grows fastest: a turn with four tool calls adds four results to the same request,
+          // and the overflow arrives mid-turn rather than mid-conversation.
+          messages = fitToContext(messages, backend.capabilities.contextWindow),
           systemPrompt = systemPrompt,
           tools = tools,
           reasoning = reasoning,
