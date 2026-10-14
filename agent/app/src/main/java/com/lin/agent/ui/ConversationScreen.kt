@@ -94,7 +94,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.ui.unit.Dp
@@ -239,7 +243,15 @@ fun AssistPanel(
         shadowElevation = 12.dp,
         modifier = Modifier.fillMaxWidth(),
       ) {
-        Column(modifier = Modifier.navigationBarsPadding().imePadding()) {
+        // One bottom inset rather than two. The keyboard's inset and the navigation bar's
+        // overlap - the keyboard is drawn over where the bar was - so padding for both in turn
+        // leaves a bar-sized gap above an open keyboard. safeDrawing takes the larger of them,
+        // which is also right when the window is resized for the keyboard instead and the
+        // keyboard inset is zero.
+        Column(
+          modifier =
+            Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+        ) {
           Row(
             modifier =
               Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 10.dp),

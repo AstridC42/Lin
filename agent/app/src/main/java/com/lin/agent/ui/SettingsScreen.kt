@@ -79,6 +79,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
 import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
+import com.lin.agent.AssistActivity
 import com.lin.agent.voice.WakeService
 import com.lin.agent.voice.linIsTheAssistant
 import com.lin.agent.voice.openAssistantSettings
@@ -468,6 +469,28 @@ fun SettingsScreen(
           if (noAssistantScreen) R.string.settings_assistant_no_screen
           else R.string.settings_assistant_detail
         ),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+
+      // The panel, from inside the app. Half a feature and half a diagnosis: it is the only way
+      // to see the thing without a working summon, and whether it appears from here says which
+      // half is broken - Lin, or the phone's idea of which app it should be asking.
+      OutlinedButton(
+        onClick = {
+          runCatching {
+            context.startActivity(
+              Intent(context, AssistActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+          }
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(stringResource(R.string.settings_try_panel))
+      }
+      Text(
+        stringResource(R.string.settings_try_panel_detail),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )

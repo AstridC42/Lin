@@ -41,6 +41,10 @@
     If summoning Lin does nothing, this is the thing to set.</string>
   <string name="settings_assistant_no_screen">This phone has no assistant screen Lin can open. It
     is usually under Apps, then Default apps.</string>
+  <string name="settings_try_panel">Show me the panel</string>
+  <string name="settings_try_panel_detail">The same panel the power button summons. Worth trying if
+    summoning does nothing: if it appears from here but not from the button, it is the setting above
+    or the phone\'s own side-button and gesture settings, not Lin.</string>
   <string name="back">Back</string>
   <string name="open_settings">Settings</string>
 
