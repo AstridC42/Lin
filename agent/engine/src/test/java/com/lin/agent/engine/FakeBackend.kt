@@ -40,12 +40,16 @@ class FakeBackend(
   /** Non-zero in the app so streaming looks like streaming; zero in tests so they do not wait. */
   private val perTokenDelayMillis: Long = 0,
   private val failWith: String? = null,
+  /** Whether this stands in for a model with vision. */
+  private val seesPictures: Boolean = false,
+  /** Every request made, so a test can look at what the loop actually sent. */
+  val sent: MutableList<TurnRequest> = mutableListOf(),
 ) : LlmBackend {
 
   override val capabilities =
     BackendCapabilities(
       supportsTools = true,
-      supportsImages = false,
+      supportsImages = seesPictures,
       supportsAudio = false,
       contextWindow = 8192,
     )
@@ -53,6 +57,7 @@ class FakeBackend(
   override suspend fun reachable(): Boolean = true
 
   override fun converse(request: TurnRequest): Flow<TurnEvent> = flow {
+    sent.add(request)
     failWith?.let {
       emit(TurnEvent.Failed(message = it))
       return@flow

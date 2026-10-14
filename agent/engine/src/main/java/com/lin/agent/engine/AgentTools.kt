@@ -54,8 +54,18 @@ sealed interface ToolResult {
    * photos" is not an answer to "find the one from the beach" - and describing an image back to
    * a model that cannot see it only invites it to embellish. The pictures go to the screen; the
    * model gets told how many and that they are already visible.
+   *
+   * [looksAt] is the third: pictures for the model itself, now that it can be given one. It is
+   * separate from [shows] because they answer different questions. Everything found goes on
+   * screen, because the person can take in six thumbnails at a glance; at most one goes to the
+   * model, because each is a slice of a context window that has to hold the conversation too.
+   * The loop drops these when the model cannot see - see [LoopEvent].
    */
-  data class Ok(val text: String, val shows: List<String> = emptyList()) : ToolResult
+  data class Ok(
+    val text: String,
+    val shows: List<String> = emptyList(),
+    val looksAt: List<Attachment.Picture> = emptyList(),
+  ) : ToolResult
 
   data class Failed(val message: String) : ToolResult
 }

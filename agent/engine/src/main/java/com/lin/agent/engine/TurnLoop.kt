@@ -133,16 +133,39 @@ class TurnLoop(
                 shows = (result as? ToolResult.Ok)?.shows.orEmpty(),
               )
             )
+            val pictures = (result as? ToolResult.Ok)?.looksAt.orEmpty()
+            val canSee = backend.capabilities.supportsImages
             messages.add(
               Message(
                 Message.Role.TOOL,
                 when (result) {
-                  is ToolResult.Ok -> result.text
+                  is ToolResult.Ok ->
+                    // Said in the tool's own result rather than left for the model to work
+                    // out. A model that is handed nothing and told nothing describes the
+                    // picture anyway, from the search words that found it.
+                    if (pictures.isNotEmpty() && !canSee) {
+                      result.text + " This model cannot see pictures, so you have not been " +
+                        "shown it - do not describe what is in it."
+                    } else result.text
                   is ToolResult.Failed -> "That did not work: ${result.message}"
                 },
                 toolName = call.name,
               )
             )
+
+            // As a user-role message rather than on the tool result, because that is the role
+            // every backend accepts a picture on: an OpenAI tool message takes a plain string.
+            // Labelled, so the model does not read it as the person having said something.
+            if (pictures.isNotEmpty() && canSee) {
+              messages.add(
+                Message(
+                  Message.Role.USER,
+                  "This is the picture ${call.name} found, for you to look at. The user did " +
+                    "not say this.",
+                  attachments = pictures,
+                )
+              )
+            }
           }
         }
       }

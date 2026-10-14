@@ -182,7 +182,7 @@ constructor(
         phoneTool,
         RememberTool(memories, embedders),
         RecallTool(memories, embedders),
-        FindPhotoTool(memories, embedders),
+        FindPhotoTool(memories, embedders, attachments, appContext),
         UnreadTool(relay),
         ReplyTool(relay),
         CalendarTool(calendars),
@@ -622,8 +622,10 @@ constructor(
         "Call remember when the user says to keep something, and recall when they refer to " +
         "something you were not told in this conversation. If recall finds nothing, say so " +
         "rather than filling the gap. " +
-        "Use find_photo to look through the user\'s pictures; they appear on screen, and you " +
-        "cannot see them, so never describe what is in one. " +
+        "Use find_photo to look through the user\'s pictures; they appear on screen. Set its " +
+        "look argument when the question is about what is IN a photo - the best match is then " +
+        "shown to you and you may describe it. Without it you have not seen them, so never " +
+        "describe what is in one. " +
         "reply_to_message writes a reply onto the screen for the user to send; it does " +
         "not send, so read the wording back and never say a message has gone. " +
         "Use whats_on to look at the calendar rather than guessing what the user has on. " +
