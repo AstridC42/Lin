@@ -116,6 +116,28 @@
         <intent>
             <action android:name="android.intent.action.SET_TIMER" />
         </intent>
+        <!--
+          Every app with an icon, which is what "open Instagram" needs and all it needs.
+
+          Deliberately not QUERY_ALL_PACKAGES. That permission exists for app stores and
+          antivirus; this one asks exactly the question Lin has - which apps could the user
+          have opened themselves - and answers nothing else.
+        -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!--
+          Apps that can play music, for the setting that picks one. Two ways of declaring it,
+          because an app may answer either: a media browser service is what a car and a watch
+          look for, and the play-from-search intent is what Lin asks with.
+        -->
+        <intent>
+            <action android:name="android.media.browse.MediaBrowserService" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+        </intent>
     </queries>
 
     <application
