@@ -29,6 +29,8 @@ import com.lin.agent.ui.AssistPanel
 import com.lin.agent.ui.theme.LinTheme
 import com.lin.agent.voice.WakeService
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.flow.first
 import java.util.UUID
 
 /**
@@ -56,6 +58,26 @@ class AssistActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
+    // Over the lock screen, if that was asked for. A car locks the phone by definition -
+    // Android Auto locks it while projecting - so without this, being summoned while driving
+    // opens a panel nobody can see. Off by default, because a panel over a locked phone shows
+    // the conversation to whoever is holding it. Read blocking, and it has to be: the window
+    // flags are set before the first frame or not at all.
+    val overLockScreen =
+      runCatching {
+          kotlinx.coroutines.runBlocking {
+            EntryPointAccessors.fromApplication(applicationContext, SettingsEntryPoint::class.java)
+              .settings()
+              .answerWhenLocked
+              .first()
+          }
+        }
+        .getOrDefault(false)
+    if (overLockScreen) {
+      setShowWhenLocked(true)
+      setTurnScreenOn(true)
+    }
     // The saved token wins over the intent's, which is the whole reason it is saved: this
     // activity is recreated when the device is folded, with the same intent redelivered, and
     // without it the question would be asked a second time by the act of unfolding.

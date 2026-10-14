@@ -130,4 +130,24 @@ class VoicePolicyTest {
     assertEquals("", forSpeaking(""))
     assertEquals("", forSpeaking("\n\n"))
   }
+  @Test
+  fun `a spoken question in a car is answered out loud whatever the setting says`() {
+    // An answer only on screen is no answer to somebody driving, and they asked out loud.
+    assertTrue(shouldSpeak(spokenRepliesOn = false, asked = Asked.SPOKEN, inCar = true))
+  }
+
+  @Test
+  fun `a typed question in a car is still answered in writing`() {
+    // Either the car is stationary or somebody else is holding the phone. Neither wants it
+    // talking, and "in a car" is not on its own a reason to speak.
+    assertFalse(shouldSpeak(spokenRepliesOn = false, asked = Asked.TYPED, inCar = true))
+    assertFalse(shouldSpeak(spokenRepliesOn = true, asked = Asked.TYPED, inCar = true))
+  }
+
+  @Test
+  fun `out of a car nothing changes`() {
+    assertTrue(shouldSpeak(spokenRepliesOn = true, asked = Asked.SPOKEN, inCar = false))
+    assertFalse(shouldSpeak(spokenRepliesOn = false, asked = Asked.SPOKEN, inCar = false))
+  }
+
 }

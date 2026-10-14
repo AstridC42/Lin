@@ -161,6 +161,50 @@ class SettingsRepository(private val context: Context) {
   suspend fun setAllowDirectCalls(value: Boolean) = write(ALLOW_DIRECT_CALLS, value)
 
   /**
+   * Where Lin may ring somebody without the last tap being a person's: nowhere, in the car, or
+   * anywhere. See [com.lin.agent.core.car.DialPolicy].
+   *
+   * Reading falls back to the old yes/no switch while nothing has been chosen here, so somebody
+   * who turned direct calls on does not silently lose it to a new setting they have never seen.
+   * Writing only ever touches the new key; the old one is left where it is, because a half-
+   * migrated pair that disagree is worse than one that is merely stale.
+   */
+  val dialPolicy: Flow<String> =
+    kotlinx.coroutines.flow.combine(read(DIAL_POLICY, ""), allowDirectCalls) { chosen, oldSwitch ->
+      when {
+        chosen.isNotBlank() -> chosen
+        oldSwitch -> "ALWAYS"
+        else -> "NEVER"
+      }
+    }
+
+  suspend fun setDialPolicy(value: String) = write(DIAL_POLICY, value)
+
+  /**
+   * Whether the panel may appear over the lock screen.
+   *
+   * Off, and it has to be: a summoned panel shows the conversation, and over a locked phone
+   * that is the conversation on a screen anybody can see. It is here because in a car the phone
+   * is locked by definition - Android Auto locks it while projecting - so without this, being
+   * summoned while driving opens nothing you can look at.
+   */
+  val answerWhenLocked: Flow<Boolean> = read(ANSWER_WHEN_LOCKED, false)
+
+  suspend fun setAnswerWhenLocked(value: Boolean) = write(ANSWER_WHEN_LOCKED, value)
+
+  /**
+   * Whether the "listen in the car" notification is kept up.
+   *
+   * It exists because of a platform rule rather than a preference: a microphone foreground
+   * service may not be started from the background at all, and none of the usual exemptions
+   * cover it - but a service started by somebody tapping a notification is allowed. So the
+   * notification is how Lin can start listening in a car without the app being opened.
+   */
+  val carNotification: Flow<Boolean> = read(CAR_NOTIFICATION, false)
+
+  suspend fun setCarNotification(value: Boolean) = write(CAR_NOTIFICATION, value)
+
+  /**
    * Whether Lin reads its replies out when it was spoken to.
    *
    * On by default, unlike the other switches here, and the reason is the asymmetry: being
@@ -354,9 +398,12 @@ class SettingsRepository(private val context: Context) {
     val SERVER_AUTH_HEADER = stringPreferencesKey("ollama_auth_header")
     val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
     val MUSIC_APP = stringPreferencesKey("music_app")
+    val DIAL_POLICY = stringPreferencesKey("dial_policy")
     val SERVER_MODEL_NAME = stringPreferencesKey("server_model_name")
     val ANSWER_ON_SERVER = booleanPreferencesKey("answer_on_server")
     val ALLOW_DIRECT_CALLS = booleanPreferencesKey("allow_direct_calls")
+    val ANSWER_WHEN_LOCKED = booleanPreferencesKey("answer_when_locked")
+    val CAR_NOTIFICATION = booleanPreferencesKey("car_notification")
     val SPOKEN_REPLIES = booleanPreferencesKey("spoken_replies")
     val DIGEST_CONVERSATIONS = booleanPreferencesKey("digest_conversations")
     val REASONING = stringPreferencesKey("reasoning")

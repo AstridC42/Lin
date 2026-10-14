@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.lin.agent.car.CarNotification
 import com.lin.agent.core.diag.CrashReport
 import com.lin.agent.core.diag.LaunchHealth
 import android.content.Intent
@@ -186,6 +187,10 @@ class MainActivity : ComponentActivity() {
               )
               .settings()
           if (settings.wakeWord.first()) WakeService.start(this@MainActivity)
+          // Put the car notification back after a restart. It is how listening is started
+          // without opening the app, so it has to outlive the app being closed - and a
+          // notification does not survive a reboot on its own.
+          CarNotification.show(this@MainActivity, settings.carNotification.first())
         }
       }
     }

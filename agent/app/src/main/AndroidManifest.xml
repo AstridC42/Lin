@@ -276,6 +276,17 @@
                 <action android:name="android.intent.action.VOICE_COMMAND" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!--
+              The other thing a head unit or headset sends when its voice button is pressed.
+              Android's own name for it is "voice search, hands free" - meant for a prompt
+              that needs neither the user's eyes nor their hands, which is exactly the panel.
+              Offered alongside VOICE_COMMAND because which of the two arrives belongs to the
+              car rather than to this app.
+            -->
+            <intent-filter>
+                <action android:name="android.speech.action.VOICE_SEARCH_HANDS_FREE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <!-- Listens for "Hey Lin". Started by the setting, and stopped with it. -->

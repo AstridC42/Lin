@@ -101,11 +101,28 @@
   <string name="found_photo">A photo Lin found</string>
 
   <string name="settings_phone_heading">The phone</string>
+  <string name="settings_car_heading">In the car</string>
+  <string name="settings_car_detail">Android Auto\'s microphone button always calls Google\'s own
+    assistant — no app can take it, and with Gemini not installed it does nothing at all. What
+    does reach Lin in a car is the voice button over plain Bluetooth, and “Hey Lin” on the
+    phone itself. Both need Lin to already be listening, and Android does not let an app start
+    listening in the background — so the notification below is the one tap that starts it.</string>
+  <string name="settings_car_notification">Keep a “listen” notification</string>
+  <string name="settings_car_notification_detail">One tap starts Lin listening, without opening
+    the app. Tap it before you set off.</string>
+  <string name="settings_car_locked">Answer over the lock screen</string>
+  <string name="settings_car_locked_detail">Needed in a car, where the phone is locked while
+    Android Auto runs. Off by default: it shows the conversation to whoever is holding the
+    phone.</string>
+  <string name="settings_dial_never">Never dial straight out</string>
+  <string name="settings_dial_never_detail">Lin fills the dialer in and you press call</string>
+  <string name="settings_dial_in_the_car">Only in the car</string>
+  <string name="settings_dial_in_the_car_detail">Dials straight out while the phone is in car
+    mode, fills the dialer in everywhere else</string>
+  <string name="settings_dial_always">Always dial straight out</string>
+  <string name="settings_dial_always_detail">A misheard name rings somebody, with no tap in
+    between</string>
   <string name="settings_direct_calls">Let Lin place calls itself</string>
-  <string name="settings_direct_calls_off">Off: a call opens the dialer with the number in it
-    and you tap to call. A message always waits in the composer, whatever this is set to.</string>
-  <string name="settings_direct_calls_on">On: Lin can ring someone without you tapping. A
-    misheard name or a mistyped digit then becomes a call you cannot take back.</string>
 
   <string name="settings_answer_heading">Who answers</string>
   <string name="settings_answer_detail">Your choice, not a guess. Deciding automatically needs a
@@ -178,6 +195,11 @@
   <string name="wake_listening_detail">Tap to open. Turn this off in settings to stop
     listening.</string>
   <string name="wake_channel">Listening</string>
+  <string name="wake_stop">Stop</string>
+  <string name="car_channel">In the car</string>
+  <string name="car_title">Lin, for the car</string>
+  <string name="car_detail">Tap to start listening for “Hey Lin”.</string>
+  <string name="car_listen">Listen</string>
   <string name="wake_heard_channel">Heard</string>
   <string name="wake_heard_title">Lin heard you</string>
   <string name="wake_heard_detail">Tap to answer.</string>
