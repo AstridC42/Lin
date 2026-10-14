@@ -37,6 +37,7 @@ import com.lin.agent.MainActivity
 import com.lin.agent.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.lin.agent.car.CarNotification
 import com.lin.agent.core.voice.WakeRoute
 import com.lin.agent.core.voice.WakeWord
 import com.lin.agent.core.voice.wakeRoute
@@ -64,13 +65,30 @@ class WakeService : Service() {
   private var recognizer: SpeechRecognizer? = null
   private var stopping = false
 
+  /** Whether the "listen in the car" offer was on screen when this started. */
+  private var carNotificationWasUp = false
+
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    // Stopped from its own notification, which is the only way to stop it without opening the
+    // app - and in a car that matters. stopSelf before anything else, because this can arrive
+    // as a foreground start for a service that is no longer running.
+    if (intent?.action == ACTION_STOP) {
+      stopSelf()
+      return START_NOT_STICKY
+    }
+
     if (!goForeground()) {
       stopSelf()
       return START_NOT_STICKY
     }
+
+    // One notification at a time: the car one is an offer to start listening, and while Lin
+    // is listening the offer is noise. Put back on the way out, if it was there.
+    carNotificationWasUp = CarNotification.isShowing(this)
+    if (carNotificationWasUp) CarNotification.show(this, false)
+
     startListening()
     // Restarted if the system kills it, because a wake word that quietly stops working is
     // worse than one that was never turned on.
@@ -79,6 +97,7 @@ class WakeService : Service() {
 
   override fun onDestroy() {
     stopping = true
+    if (carNotificationWasUp) CarNotification.show(this, true)
     runCatching {
       recognizer?.stopListening()
       recognizer?.destroy()
@@ -97,6 +116,16 @@ class WakeService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE,
           )
+        // Stopping has to be reachable from the notification itself. The switch in settings
+        // means "listen when Lin opens"; this is "stop listening now", and in a car the
+        // settings screen is not somewhere anybody should be going.
+        val stop =
+          PendingIntent.getForegroundService(
+            this,
+            1,
+            Intent(this, WakeService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+          )
         val notification =
           Notification.Builder(this, CHANNEL)
             .setContentTitle(getString(R.string.wake_listening))
@@ -104,6 +133,14 @@ class WakeService : Service() {
             .setSmallIcon(R.drawable.ic_mic)
             .setOngoing(true)
             .setContentIntent(open)
+            .addAction(
+              Notification.Action.Builder(
+                  android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_mic),
+                  getString(R.string.wake_stop),
+                  stop,
+                )
+                .build()
+            )
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -285,6 +322,9 @@ class WakeService : Service() {
     /** Heard something, but could not open a window for it. See askToOpen. */
     private const val HEARD_CHANNEL = "lin-heard"
     private const val HEARD_ID = 43
+
+    /** Stops listening, from the notification. */
+    const val ACTION_STOP = "com.lin.agent.action.STOP_LISTENING"
 
     /** How the activity knows it was opened by the wake word rather than by a tap. */
     const val ACTION_WOKEN = "com.lin.agent.action.WOKEN"

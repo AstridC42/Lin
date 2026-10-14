@@ -32,6 +32,7 @@ import com.lin.agent.engine.reasoningNamed
 import com.lin.agent.engine.ToolRegistry
 import com.lin.agent.engine.TurnLoop
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.car.inCar
 import com.lin.agent.core.voice.Asked
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.core.voice.Summon
@@ -483,7 +484,11 @@ constructor(
                 )
               }
               persist(complete)
-              if (shouldSpeak(settings.spokenReplies.first(), asked)) speaker.say(event.text)
+              // In a car a spoken question gets a spoken answer whatever the switch says -
+              // an answer only on screen is no answer to somebody driving.
+              if (shouldSpeak(settings.spokenReplies.first(), asked, inCar(appContext))) {
+                speaker.say(event.text)
+              }
             }
             is LoopEvent.Failed -> {
               val shown =
