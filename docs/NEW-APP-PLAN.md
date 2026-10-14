@@ -670,6 +670,47 @@ intent filter. Lin is selectable under Android's digital assistant app, and
 being summoned that way opens listening, because there is no keyboard in that
 gesture.
 
+**Done: the summon is a panel, not a launch.** Being summoned brings up a strip
+at the bottom of the screen over a dimmed view of whatever was already there.
+A full screen is the wrong shape for a ten-second question — it replaces what
+somebody was reading, and coming back out of it is a second deliberate act.
+The panel grows with its contents up to a fraction of the window: a fixed
+height shows an expanse of empty surface before the first word and then clips
+the reply, and a fraction rather than dp keeps it a panel on a Fold's inner
+screen as well as on a phone.
+
+It is its own activity, which is a platform constraint rather than a
+preference: a window's theme is fixed when it is created, so one activity
+cannot be both a full-screen app and a translucent panel. What is shared is
+everything below the chrome — one `ConversationBody`, with a height for the
+list where the full screen uses a weight, so the two frames cannot drift
+apart. The panel holds its own conversation rather than the app's, so there is
+no "expand this into the full app" yet; the conversation lives in the screen's
+saved state, and sharing it across both windows is a change to where it lives.
+
+**Done: saying whether Lin holds the role.** Android does not let an app take
+the assistant role — it cannot be requested, and the request intent is refused
+*silently* on the phones that refuse it, so a button using it would appear to
+do nothing. What the role does do is go back to whichever app came with the
+phone whenever Lin is uninstalled, which is the likely answer to "summoning
+stopped working". So settings says which app holds it, re-read whenever that
+screen returns to the front, in three states — the third being the phone
+declining to say, where guessing "no" would be a made-up fact on the one
+screen meant to clear this up. The button that goes there asks the package
+manager which of those screens this phone has before starting one; starting an
+intent nothing handles throws, and that throw was being swallowed. There is
+also a button that opens the panel directly, which is half a feature and half
+a diagnosis: if it appears from there but not from the power button, the
+problem is the role or the phone's own side-button and gesture settings.
+
+**A summon happens once.** A screen's start-up effect runs again whenever the
+screen is recreated, and on a foldable that is every fold — so unfolding the
+phone after "Hey Lin, what's the time" asked it a second time. Keying the
+effect on the words cannot fix it: the words are the same and it is the
+composition that is new. Each summon carries a token, the view model remembers
+which one it acted on, and the wake service mints a fresh one per wake, so a
+recreated screen does not re-ask and somebody repeating themselves still does.
+
 The microphone rules are a tested function rather than care taken in the UI.
 It opens only when summoned as the assistant or when the button is pressed,
 never because the app came to the front, and the permission is asked for at
