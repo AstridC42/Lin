@@ -101,6 +101,90 @@ class OpenAiDialectTest {
     assertEquals("object", schema.getJSONObject("schema").getString("type"))
   }
 
+  // ---- pictures ----
+
+  @Test
+  fun aPictureTravelsAsADataUriBesideTheText() {
+    val sent =
+      body(
+        TurnRequest(
+          messages =
+            listOf(
+              Message(
+                Message.Role.USER,
+                "What is this?",
+                attachments = listOf(Attachment.Picture("a.jpg", byteArrayOf(1, 2, 3))),
+              )
+            )
+        )
+      )
+    val content = sent.getJSONArray("messages").getJSONObject(0).getJSONArray("content")
+    assertEquals("image_url", content.getJSONObject(0).getString("type"))
+    assertTrue(
+      content.getJSONObject(0).getJSONObject("image_url").getString("url")
+        .startsWith("data:image/jpeg;base64,")
+    )
+    assertEquals("What is this?", content.getJSONObject(1).getString("text"))
+  }
+
+  /**
+   * A plain message keeps a plain string.
+   *
+   * Some servers reject a content list on a message with no parts in it, and there is nothing
+   * to gain by sending one.
+   */
+  @Test
+  fun aMessageWithNoPictureKeepsAPlainStringContent() {
+    val sent = body(ask())
+    assertEquals("hello", sent.getJSONArray("messages").getJSONObject(0).getString("content"))
+  }
+
+  /** The default base64 wraps every 76 characters, which is valid base64 and invalid JSON. */
+  @Test
+  fun theEncodedPictureHasNoLineBreaksInIt() {
+    val sent =
+      body(
+        TurnRequest(
+          messages =
+            listOf(
+              Message(
+                Message.Role.USER,
+                "x",
+                attachments = listOf(Attachment.Picture("a.jpg", ByteArray(500) { 7 })),
+              )
+            )
+        )
+      )
+    val url =
+      sent.getJSONArray("messages").getJSONObject(0).getJSONArray("content").getJSONObject(0)
+        .getJSONObject("image_url")
+        .getString("url")
+    assertFalse(url.contains("\n"))
+  }
+
+  @Test
+  fun ollamaTakesPicturesAsBareBase64Instead() {
+    val sent =
+      org.json.JSONObject(
+        chatRequestBody(
+          "gemma4",
+          TurnRequest(
+            messages =
+              listOf(
+                Message(
+                  Message.Role.USER,
+                  "What is this?",
+                  attachments = listOf(Attachment.Picture("a.jpg", byteArrayOf(1, 2, 3))),
+                )
+              )
+          ),
+        )
+      )
+    val message = sent.getJSONArray("messages").getJSONObject(0)
+    assertEquals("What is this?", message.getString("content"))
+    assertEquals(1, message.getJSONArray("images").length())
+  }
+
   // ---- thinking, which is not an OpenAI field ----
 
   @Test

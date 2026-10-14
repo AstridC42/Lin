@@ -18,6 +18,7 @@ package com.lin.agent.engine
 
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
@@ -260,6 +261,7 @@ class OnDeviceBackend(
               live = built?.conversation ?: live,
               prompt = prompt,
               format = built?.format,
+            pictures = if (supportsImages) request.picturesOfLastMessage() else emptyList(),
             thinking = thinkingFor(request.reasoning, structured = request.responseSchema != null),
               // A structured turn's conversation is closed when the turn ends - see [Built].
               closeAfter = built?.takeIf { it.throwaway }?.conversation,
@@ -370,6 +372,7 @@ class OnDeviceBackend(
     live: Conversation,
     prompt: String,
     format: ResponseFormat?,
+    pictures: List<Attachment.Picture>,
     thinking: ThinkingBudget?,
     closeAfter: Conversation?,
   ): Flow<TurnEvent> {
@@ -430,21 +433,31 @@ class OnDeviceBackend(
 
       try {
         // The Contents overload rather than the Message one: Message's constructor is internal
-        // to the library, and Contents is the form that will carry an image or a clip later.
+        // to the library, and Contents is what carries a picture beside the words.
+        //
+        // Pictures first. These models are trained with the image ahead of the question, and
+        // asking about something the model has not been shown yet is how a vision turn comes
+        // back describing nothing.
         // Branched rather than passing nulls, so a plain turn makes exactly the call that is
         // already proven against these models. Only what a turn actually asked for is passed.
         val thinkingConfig =
           thinking?.let { ThinkingConfig(enableThinking = true, thinkingTokenBudget = it.tokens) }
+        val contents =
+          if (pictures.isEmpty()) Contents.of(prompt)
+          else
+            Contents.of(
+              pictures.map { Content.ImageBytes(it.bytes) } + Content.Text(prompt)
+            )
         when {
           format == null && thinkingConfig == null ->
-            live.sendMessageAsync(Contents.of(prompt), callback)
+            live.sendMessageAsync(contents, callback)
           format == null ->
-            live.sendMessageAsync(Contents.of(prompt), callback, thinkingConfig = thinkingConfig)
+            live.sendMessageAsync(contents, callback, thinkingConfig = thinkingConfig)
           thinkingConfig == null ->
-            live.sendMessageAsync(Contents.of(prompt), callback, responseFormat = format)
+            live.sendMessageAsync(contents, callback, responseFormat = format)
           else ->
             live.sendMessageAsync(
-              Contents.of(prompt),
+              contents,
               callback,
               thinkingConfig = thinkingConfig,
               responseFormat = format,
