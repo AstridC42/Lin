@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.core.models.DownloadState
+import com.lin.agent.core.models.ModelRole
 import com.lin.agent.engine.ServerModel
 import com.lin.agent.model.IndexState
 import android.content.Intent
@@ -624,6 +625,19 @@ fun SettingsScreen(
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Only for what is actually here. Offering to use something not downloaded would
+            // be a button that cannot work.
+            if (line.present && line.model.role == ModelRole.CHAT) {
+              if (state.chatModel == line.name) {
+                TextButton(onClick = { viewModel.useChatModel(line.name) }) {
+                  Text(stringResource(R.string.model_chosen))
+                }
+              } else {
+                OutlinedButton(onClick = { viewModel.useChatModel(line.name) }) {
+                  Text(stringResource(R.string.model_use))
+                }
+              }
+            }
             when (val download = line.download) {
               DownloadState.Waiting ->
                 // Indeterminate, because nothing is moving yet. Showing a bar stuck at zero is

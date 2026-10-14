@@ -36,7 +36,7 @@ internal fun tokensOf(text: String): Int = (text.length + CHARS_PER_TOKEN - 1) /
  */
 internal const val TOKENS_PER_PICTURE = 300
 
-private const val CHARS_PER_TOKEN = 4
+internal const val CHARS_PER_TOKEN = 4
 
 /**
  * As much of [messages] as will fit in [contextTokens], newest first.
@@ -48,8 +48,11 @@ private const val CHARS_PER_TOKEN = 4
  *
  * Three rules, in order of how much they cost:
  *
- *  1. The last message is always kept, whatever it costs. It is the question being asked, and a
- *     turn without it is not a shorter conversation but a different one.
+ *  1. The last message is always kept - but cut to fit if it has to be. It is the question
+ *     being asked, and a turn without it is not a shorter conversation but a different one;
+ *     sending it whole when it cannot fit is not keeping it either, it is a guaranteed engine
+ *     failure. Somebody who attaches a long document should get an answer about the part that
+ *     fitted, told that is what happened.
  *  2. Pictures are dropped from older messages before the messages themselves. A picture is
  *     worth a few hundred tokens and is almost never what a later question is about, so this
  *     buys the most history back per token.
@@ -67,7 +70,7 @@ fun fitToContext(messages: List<Message>, contextTokens: Int, reserve: Int = RES
   val budget = contextTokens - reserve
   if (budget <= 0) return listOf(messages.last())
 
-  val last = messages.last()
+  val last = cutToFit(messages.last(), budget)
   var spent = costOf(last)
   val kept = ArrayDeque<Message>()
   kept.addFirst(last)
@@ -87,6 +90,28 @@ fun fitToContext(messages: List<Message>, contextTokens: Int, reserve: Int = RES
   while (kept.size > 1 && kept.first().role == Message.Role.TOOL) kept.removeFirst()
   return kept.toList()
 }
+
+/**
+ * [message] shortened until it fits in [budget], or unchanged if it already does.
+ *
+ * The cut is at the end and it is announced, because the alternative - silence - leaves
+ * somebody reading an answer about the first third of their document believing it is about all
+ * of it. Pictures are dropped first: a picture is a few hundred tokens that cannot be cut in
+ * half, and losing it costs less than losing the words asking about it.
+ */
+private fun cutToFit(message: Message, budget: Int): Message {
+  if (costOf(message) <= budget) return message
+
+  val withoutPictures = message.copy(attachments = emptyList())
+  if (costOf(withoutPictures) <= budget) return withoutPictures
+
+  val room = (budget * CHARS_PER_TOKEN - CUT_NOTE.length).coerceAtLeast(0)
+  if (room == 0) return withoutPictures.copy(text = CUT_NOTE.trim())
+  return withoutPictures.copy(text = withoutPictures.text.take(room).trimEnd() + CUT_NOTE)
+}
+
+private const val CUT_NOTE =
+  "\n\n[Cut off here - this was too long for the model. Only what is above was read.]"
 
 /** What a message costs: its words, plus a fixed block for each picture on it. */
 private fun costOf(message: Message): Int =

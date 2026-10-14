@@ -209,12 +209,18 @@ fun forReading(text: String, limit: Int = READABLE_CHARACTERS): String {
 }
 
 /**
- * Roughly four thousand tokens of a document, leaving room for a conversation around it.
+ * About two thousand tokens of a document.
+ *
+ * Was double this, which was too generous and produced the failure it was meant to avoid: on
+ * an eight-thousand-token model, a four-thousand-token document plus a system prompt plus the
+ * tool schemas plus whatever the conversation already held left nothing, and the engine
+ * refused the turn outright. Half of it still answers "what does this say" about anything
+ * shorter than a long report, and what is cut is said in the text.
  *
  * Characters rather than tokens because tokenising here would mean asking the engine, and this
- * has to work the same for a document going to a server model as for one going to the phone.
+ * has to work the same for a document going to a server as for one going to the phone.
  */
-private const val READABLE_CHARACTERS = 16_000
+private const val READABLE_CHARACTERS = 8_000
 
 /** Longer than any entity this handles, so a bare `&` before a distant `;` is left alone. */
 private const val MAX_ENTITY = 10
