@@ -156,18 +156,19 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
   private fun none(): ChatReadiness =
     ChatReadiness.NoModel(suggested = ModelCatalog.defaultChatModel(store.memoryGb()))
 
-  private fun localBackend(): OnDeviceBackend? {
+  private suspend fun localBackend(): OnDeviceBackend? {
     val present = store.available(ModelRole.CHAT)
     if (present.isEmpty()) return null
 
-    // Of what is actually here, prefer the one this phone should be running. On 12 GB that is
-    // E2B even when E4B is also downloaded, for the reason recorded in the catalogue - but a user
-    // who has deliberately fetched only E4B gets E4B rather than nothing.
-    val preferred = ModelCatalog.defaultChatModel(store.memoryGb())
+    // The user's choice first, then what this phone should be running, then whatever is here.
+    // Until now only the middle rule existed and the choice was read by nothing - see
+    // ModelCatalog.chatModelToUse.
     val model =
-      present.firstOrNull { it == preferred }
-        ?: present.minByOrNull { it.build.sizeBytes }
-        ?: present[0]
+      ModelCatalog.chatModelToUse(
+        present = present,
+        chosenName = settings.chatModelName.first(),
+        memoryGb = store.memoryGb(),
+      ) ?: return null
 
     return OnDeviceBackend(
       modelPath = store.fileFor(model).absolutePath,

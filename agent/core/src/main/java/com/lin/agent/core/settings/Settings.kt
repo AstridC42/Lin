@@ -98,7 +98,12 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setServerAuthHeader(value: String) = write(SERVER_AUTH_HEADER, value)
 
-  /** Which on-device chat model the user chose, by name. Empty means "decide from the device". */
+  /**
+   * Which downloaded chat model should answer, by name. Empty means let the phone decide.
+   *
+   * Stored since the model screen was first written and read by nothing until the choice was
+   * wired up - see [com.lin.agent.core.models.ModelCatalog.chatModelToUse].
+   */
   val chatModelName: Flow<String> = read(CHAT_MODEL_NAME, "")
 
   suspend fun setChatModelName(value: String) = write(CHAT_MODEL_NAME, value)

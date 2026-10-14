@@ -35,7 +35,6 @@ import com.lin.agent.core.diag.LaunchHealth
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.IntentCompat
-import com.lin.agent.core.voice.Launch
 import com.lin.agent.ui.ConversationScreen
 import com.lin.agent.ui.DocumentsScreen
 import com.lin.agent.voice.WakeService
@@ -50,7 +49,9 @@ import com.lin.agent.ui.theme.LinTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
- * The only activity.
+ * Lin opened rather than summoned: the whole app, with the conversation and the settings behind
+ * it. Being summoned brings up a panel instead, which is its own activity for reasons stated in
+ * [AssistActivity].
  *
  * Note what is *not* here: the saved instance state is passed through to `super` rather than
  * discarded. The app this replaces deliberately passed null, to "start cleanly after an OS kill" -
@@ -154,26 +155,12 @@ class MainActivity : ComponentActivity() {
               incoming = shared,
             )
           else ->
+            // No launch to read here, and that is the point: every way of being summoned - the
+            // power button, a car kit's voice button, the wake word - now brings up the panel
+            // instead, which is where the microphone opens on its own. This screen is only ever
+            // opened deliberately, and an app that started recording because somebody tapped
+            // its icon would be a surprise of exactly the kind an assistant has to avoid.
             ConversationScreen(
-              // How the app was opened, which decides whether the microphone opens with it.
-              // Read from the intent rather than remembered, so returning to a summoned
-              // session later does not start listening again.
-              // Three ways of being summoned rather than opened, and they mean the same
-              // thing: the power button, a car kit's voice button over Bluetooth, and the
-              // wake word. None of them involves a keyboard, so all three open the
-              // microphone - see shouldListenOnLaunch.
-              launch =
-                if (
-                  intent?.action == Intent.ACTION_ASSIST ||
-                    intent?.action == ACTION_VOICE_COMMAND ||
-                    intent?.action == WakeService.ACTION_WOKEN
-                ) {
-                  Launch.ASSIST
-                } else Launch.NORMAL,
-              // "Hey Lin, what's the time" asks the question. Without this the wake word only
-              // opens the microphone and the whole thing has to be said again, which makes it
-              // slower than picking the phone up.
-              spoken = intent?.getStringExtra(WakeService.EXTRA_SAID).orEmpty(),
               onOpenSettings = { screen = SETTINGS },
               // The empty state's button goes to the same screen the gear does, which is where
               // the downloads live. One place to manage models, not two.
@@ -212,9 +199,6 @@ private const val MEMORY = "memory"
 private const val DOCUMENTS = "documents"
 private const val TRAINING = "training"
 private const val BACKUP = "backup"
-
-/** A Bluetooth car kit or headset voice button. Not Android Auto's, which is not open. */
-private const val ACTION_VOICE_COMMAND = "android.intent.action.VOICE_COMMAND"
 
 /** Reading one setting from an activity, without making the activity a view model's owner. */
 @dagger.hilt.EntryPoint

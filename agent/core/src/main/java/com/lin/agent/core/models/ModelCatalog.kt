@@ -212,6 +212,27 @@ object ModelCatalog {
   fun defaultChatModel(memoryGb: Int): CatalogModel? =
     chatModels.filter { it.minMemoryGb <= memoryGb }.minByOrNull { it.build.sizeBytes }
 
+  /**
+   * Which downloaded chat model should answer.
+   *
+   * Nothing read the user's choice before this. `chatModelName` was stored by the settings
+   * screen, carried in the settings file and consulted by no one, so downloading a second
+   * model gave no way to use it - the app picked for you and there was no argument to be had.
+   *
+   * The order is: what the user asked for, if it is actually here; otherwise the one this
+   * phone should be running; otherwise the smallest thing present. A choice that is no longer
+   * downloaded falls through rather than leaving the app with nothing to answer with - the
+   * setting is a preference, not a promise that the file exists.
+   */
+  fun chatModelToUse(present: List<CatalogModel>, chosenName: String, memoryGb: Int): CatalogModel? {
+    if (present.isEmpty()) return null
+    present.firstOrNull { it.name == chosenName }?.let {
+      return it
+    }
+    val preferred = defaultChatModel(memoryGb)
+    return present.firstOrNull { it == preferred } ?: present.minByOrNull { it.build.sizeBytes }
+  }
+
   /** Whether [model] is at or below the device's comfortable limit. */
   fun isComfortable(model: CatalogModel, memoryGb: Int): Boolean =
     memoryGb > model.minMemoryGb

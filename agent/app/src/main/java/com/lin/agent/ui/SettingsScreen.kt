@@ -62,8 +62,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.core.models.DownloadState
+import com.lin.agent.core.models.ModelRole
 import com.lin.agent.engine.ServerModel
 import com.lin.agent.model.IndexState
 import android.content.Intent
@@ -73,7 +79,12 @@ import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
 import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
+import com.lin.agent.AssistActivity
 import com.lin.agent.voice.WakeService
+import com.lin.agent.voice.canAppearOverOtherApps
+import com.lin.agent.voice.linIsTheAssistant
+import com.lin.agent.voice.openAppearOverOtherApps
+import com.lin.agent.voice.openAssistantSettings
 
 /**
  * Settings, which for now is the server address and what the phone can run.
@@ -98,6 +109,26 @@ fun SettingsScreen(
   viewModel: SettingsViewModel = hiltViewModel(),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
+
+  // Two things the phone grants and this screen only reports: whether Lin is the assistant, and
+  // whether it may open a window from the background. Both are set in the phone's own settings,
+  // so both are stale the moment somebody goes there and comes back - hence read again on every
+  // return to the front rather than once. They are declared here, above every section that uses
+  // them, because the wake word reads the second one and comes first on screen.
+  val systemContext = LocalContext.current
+  var isAssistant by remember { mutableStateOf(linIsTheAssistant(systemContext)) }
+  var mayAppearOverOtherApps by remember { mutableStateOf(canAppearOverOtherApps(systemContext)) }
+  val systemLifecycle = LocalLifecycleOwner.current
+  DisposableEffect(systemLifecycle) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) {
+        isAssistant = linIsTheAssistant(systemContext)
+        mayAppearOverOtherApps = canAppearOverOtherApps(systemContext)
+      }
+    }
+    systemLifecycle.lifecycle.addObserver(observer)
+    onDispose { systemLifecycle.lifecycle.removeObserver(observer) }
+  }
 
   Scaffold(
     topBar = {
@@ -258,6 +289,29 @@ fun SettingsScreen(
         }
       }
 
+      // The second half of a working wake word, and the half nobody would guess at. Shown only
+      // while the wake word is on: it is not a permission to ask for otherwise.
+      if (state.wakeWord) {
+        Text(
+          stringResource(
+            if (mayAppearOverOtherApps) R.string.settings_overlay_granted
+            else R.string.settings_overlay_missing
+          ),
+          style = MaterialTheme.typography.bodySmall,
+          color =
+            if (mayAppearOverOtherApps) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.error,
+        )
+        if (!mayAppearOverOtherApps) {
+          OutlinedButton(
+            onClick = { openAppearOverOtherApps(wakeContext) },
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(stringResource(R.string.settings_overlay_button))
+          }
+        }
+      }
+
       Text(
         stringResource(R.string.settings_calendar_heading),
         style = MaterialTheme.typography.titleMedium,
@@ -413,23 +467,66 @@ fun SettingsScreen(
         }
       }
       val context = LocalContext.current
+
+      // Whether Lin is actually the assistant, read again every time this screen comes back to
+      // the front - because the only way to change it is to leave for the system's settings and
+      // come back, so a value read once is stale exactly when somebody is looking at it.
+
+      // Said before the button rather than after it, because this is the answer to the question
+      // somebody opens this section with: the power button does nothing, is Lin even set? Three
+      // states and not two - null is the phone declining to say, and guessing "no" there would
+      // be a made-up fact on the one screen meant to clear this up.
+      var noAssistantScreen by remember { mutableStateOf(false) }
+      Text(
+        stringResource(
+          when (isAssistant) {
+            true -> R.string.settings_assistant_is_lin
+            false -> R.string.settings_assistant_is_other
+            null -> R.string.settings_assistant_unknown
+          }
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        color =
+          if (isAssistant == true) MaterialTheme.colorScheme.onSurface
+          else MaterialTheme.colorScheme.error,
+      )
+      OutlinedButton(
+        // Android gives no way to request the assistant role directly - it is the user's
+        // choice to make in their own settings, which is correct. This only takes them there,
+        // to whichever of those screens the phone actually has: starting one it does not
+        // throws, and this button used to swallow that and look broken.
+        onClick = { noAssistantScreen = !openAssistantSettings(context) },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(stringResource(R.string.settings_set_assistant))
+      }
+      Text(
+        stringResource(
+          if (noAssistantScreen) R.string.settings_assistant_no_screen
+          else R.string.settings_assistant_detail
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+
+      // The panel, from inside the app. Half a feature and half a diagnosis: it is the only way
+      // to see the thing without a working summon, and whether it appears from here says which
+      // half is broken - Lin, or the phone's idea of which app it should be asking.
       OutlinedButton(
         onClick = {
-          // Android gives no way to request the assistant role directly - it is the user's
-          // choice to make in their own settings, which is correct. This only takes them there.
           runCatching {
             context.startActivity(
-              Intent(AndroidSettings.ACTION_VOICE_INPUT_SETTINGS)
+              Intent(context, AssistActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
           }
         },
         modifier = Modifier.fillMaxWidth(),
       ) {
-        Text(stringResource(R.string.settings_set_assistant))
+        Text(stringResource(R.string.settings_try_panel))
       }
       Text(
-        stringResource(R.string.settings_assistant_detail),
+        stringResource(R.string.settings_try_panel_detail),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -624,6 +721,19 @@ fun SettingsScreen(
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Only for what is actually here. Offering to use something not downloaded would
+            // be a button that cannot work.
+            if (line.present && line.model.role == ModelRole.CHAT) {
+              if (state.chatModel == line.name) {
+                TextButton(onClick = { viewModel.useChatModel(line.name) }) {
+                  Text(stringResource(R.string.model_chosen))
+                }
+              } else {
+                OutlinedButton(onClick = { viewModel.useChatModel(line.name) }) {
+                  Text(stringResource(R.string.model_use))
+                }
+              }
+            }
             when (val download = line.download) {
               DownloadState.Waiting ->
                 // Indeterminate, because nothing is moving yet. Showing a bar stuck at zero is
