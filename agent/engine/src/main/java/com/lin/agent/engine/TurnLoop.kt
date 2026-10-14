@@ -78,6 +78,7 @@ class TurnLoop(
     val messages = conversation.toMutableList()
     val alreadyRun = mutableSetOf<String>()
     var toolCalls = 0
+    var toolCallRetries = 0
 
     while (true) {
       val outcome = oneExchange(messages, tools) { emit(it) }
@@ -88,6 +89,19 @@ class TurnLoop(
           return@flow
         }
         is Exchange.Failed -> {
+          // The one failure the model itself can fix: it wrote a tool call the engine could
+          // not read. Telling it so and letting it write the call again costs one exchange
+          // and usually works - throwing the turn away over a formatting slip does not.
+          // Every other failure is terminal here, because retrying an out-of-memory or a
+          // model that is still loading only fails again, more slowly.
+          if (
+            isMalformedToolCall(outcome.message, outcome.detail) &&
+              toolCallRetries < budget.maxToolCallRetries
+          ) {
+            toolCallRetries++
+            messages.add(Message(Message.Role.USER, MALFORMED_TOOL_CALL_NUDGE))
+            continue
+          }
           emit(LoopEvent.Failed(outcome.message, outcome.detail))
           return@flow
         }

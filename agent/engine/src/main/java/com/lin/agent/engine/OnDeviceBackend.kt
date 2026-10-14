@@ -553,9 +553,12 @@ internal fun explain(error: Throwable): String {
         "new one with the + button and attach it again - or let the server answer, which has " +
         "far more room."
 
+    // Reaching the user means the retry in TurnLoop failed too - it is told to try again by
+    // isMalformedToolCall, which matches this sentence as well as the parser's own words. So
+    // this no longer suggests asking again: it has already been asked again.
     text.contains("failed to parse tool calls") || text.contains("parse fc tool calls") ->
-      "The model tried to use a tool and wrote the request wrongly, so nothing ran. Asking again " +
-        "often works."
+      "The model wrote a tool call that could not be read, twice over, so nothing ran. Asking " +
+        "for the same thing in different words usually gets past it."
 
     text.contains("not initialized") -> "The model is still loading."
 

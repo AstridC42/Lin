@@ -426,6 +426,22 @@ Written so a turn with no tools never touches any of it — that path is the cod
 already answering on the device, and tool calling is the part that cannot be
 checked without a phone.
 
+**A tool call the engine cannot read is given back to the model, once.** Seen
+on a phone: asked to describe a photo, Gemma wrote
+`call:find_photo{describe:<|"|>…<|"|>, with:<|"|>,look:true}` — the
+formatter's own quote markers inside the arguments, a parameter the tool does
+not have, and the opening tag used to close the block. The parse threw, the
+turn died, and the user got a page of ANTLR internals.
+
+Nothing in this app produced that and nothing in it can prevent it, but it is
+the one failure the model itself can fix. So the loop tells it exactly what
+was wrong — only the parameter names that tool has, plain values, no markers
+of its own — and lets it write the call again. Once: a third exchange is the
+same slow failure with somebody watching. Every other failure stays terminal,
+because retrying an out-of-memory or a model that is still loading only fails
+again, more slowly, and which is which is a tested function rather than a
+guess at the call site.
+
 **Still to do:** the other four tools (`recall`, `phoneAction`, `ask`,
 `answer`), the brief under `ResponseFormat.json` rather than as tool arguments,
 and the eval set. The gate below needs a device, so it is the user's to run.
@@ -1151,6 +1167,43 @@ for it.
 nobody any way to say "that is finished"; the only way to begin again was to
 put the phone down and wait. The conversation being left is recorded for the
 corpus first, so starting a new one never loses the last.
+
+### Phase 11 — A design pass, not yet taken
+
+Asked for in October 2026 and written down rather than started, because a
+redesign begun between two feature requests is a repaint.
+
+**What the interface is now, honestly.** It grew a feature at a time and it
+shows. The conversation screen is Material defaults with bubbles; settings
+was one scrolling page until it had fourteen sections and is now five tabs;
+the panel is new and is the only part designed as a shape rather than
+assembled from controls. Nothing has had a pass where someone asked what this
+app should feel like to use rather than what it needs to contain. Four
+screens behind buttons on a settings page — memory, documents, training,
+backup — are there because they had to live somewhere.
+
+**What a pass would have to decide**, rather than what it should produce:
+
+- What Lin looks like when it has nothing to say yet. The empty conversation
+  is the first thing anybody sees and it is currently a title bar and a text
+  box.
+- Whether the panel and the full screen are two views of one conversation or
+  two conversations. They are two today, and that is a layout decision
+  standing in for a product one — see the note in Phase 6.
+- What a tool doing something looks like. Running, staged, failed and
+  "opened, you finish it" are four different states and three of them are
+  currently a line of small grey text.
+- What the big screen is for. On a Fold's inner screen the conversation is
+  width-capped and the rest is empty; the plan has always said a two-pane
+  layout arrives when there is tool activity worth showing beside the
+  conversation, and there now is.
+- Whether settings is five tabs or something else once the screens behind it
+  are part of the design rather than appended to it.
+
+**The constraint worth keeping through any of it:** every screen in this app
+says what is actually true - which model answered, whether a thing was done or
+only opened, whether Lin can see a picture it is being asked about. A prettier
+interface that smooths those over would be a worse one.
 
 ## Risks and kill criteria
 

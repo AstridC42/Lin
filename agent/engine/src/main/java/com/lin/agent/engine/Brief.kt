@@ -33,10 +33,20 @@ enum class OutputShape {
 }
 
 /** What a delegated task is allowed to spend. A sub-agent with no ceiling is a hung app. */
-data class Budget(val maxSeconds: Int = DEFAULT_SECONDS, val maxToolCalls: Int = DEFAULT_CALLS) {
+data class Budget(
+  val maxSeconds: Int = DEFAULT_SECONDS,
+  val maxToolCalls: Int = DEFAULT_CALLS,
+  /**
+   * How many times a turn may be given back to the model after it wrote a tool call the
+   * engine could not read. One: the second attempt usually works, and a third would be the
+   * same slow exchange failing the same way with the user watching.
+   */
+  val maxToolCallRetries: Int = DEFAULT_TOOL_CALL_RETRIES,
+) {
   companion object {
     const val DEFAULT_SECONDS = 120
     const val DEFAULT_CALLS = 6
+    const val DEFAULT_TOOL_CALL_RETRIES = 1
   }
 }
 
