@@ -21,6 +21,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +38,7 @@ import androidx.core.content.IntentCompat
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.ui.ConversationScreen
 import com.lin.agent.ui.DocumentsScreen
+import com.lin.agent.ui.BackupScreen
 import com.lin.agent.ui.MemoryScreen
 import com.lin.agent.ui.TrainingScreen
 import com.lin.agent.ui.RecoveryScreen
@@ -109,6 +111,24 @@ class MainActivity : ComponentActivity() {
             IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
           } else null
         var screen by rememberSaveable { mutableStateOf(if (shared != null) DOCUMENTS else CONVERSATION) }
+
+        // Where the back arrow goes, and - the part that was missing - where the phone's own
+        // back button goes. Without a BackHandler the system back finishes the activity, so
+        // pressing it anywhere but the conversation closed the whole app instead of going up
+        // one screen. One value for both, so they cannot drift apart.
+        val backTo: String? =
+          when (screen) {
+            SETTINGS -> CONVERSATION
+            MEMORY, TRAINING, BACKUP -> SETTINGS
+            // A share has no settings screen behind it, so back goes where the user would
+            // otherwise have been.
+            DOCUMENTS -> if (shared != null) CONVERSATION else SETTINGS
+            // The conversation is the bottom of the stack: back there means leaving, which is
+            // what the system does on its own.
+            else -> null
+          }
+        BackHandler(enabled = backTo != null) { backTo?.let { screen = it } }
+
         when (screen) {
           SETTINGS ->
             SettingsScreen(
@@ -116,11 +136,13 @@ class MainActivity : ComponentActivity() {
               onOpenMemory = { screen = MEMORY },
               onOpenDocuments = { screen = DOCUMENTS },
               onOpenTraining = { screen = TRAINING },
+              onOpenBackup = { screen = BACKUP },
             )
           // Back goes to settings, not the conversation: that is where it was opened from, and
           // landing somewhere else after deleting something reads as the app losing its place.
           MEMORY -> MemoryScreen(onBack = { screen = SETTINGS })
           TRAINING -> TrainingScreen(onBack = { screen = SETTINGS })
+          BACKUP -> BackupScreen(onBack = { screen = SETTINGS })
           DOCUMENTS ->
             DocumentsScreen(
               // A share has no settings screen behind it, so back goes where the user would
@@ -159,3 +181,4 @@ private const val SETTINGS = "settings"
 private const val MEMORY = "memory"
 private const val DOCUMENTS = "documents"
 private const val TRAINING = "training"
+private const val BACKUP = "backup"

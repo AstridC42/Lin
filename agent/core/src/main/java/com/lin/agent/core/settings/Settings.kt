@@ -24,6 +24,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import org.json.JSONObject
+import kotlinx.coroutines.flow.first
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.lin.agent.core.diag.CrashReport
 import kotlinx.coroutines.flow.Flow
@@ -225,6 +230,66 @@ class SettingsRepository(private val context: Context) {
    * likely one on a phone that has just taken gigabytes of weights. The failure is reported and
    * the default served, so a disk problem degrades the app rather than closing it.
    */
+  /**
+   * Every setting, as JSON, for a backup.
+   *
+   * Whatever is actually stored rather than a hand-written list of fields. A list would be
+   * one more place to forget a setting when adding one, and the symptom - a restore that
+   * loses the server address but keeps everything else - is the kind nobody notices until
+   * they need it.
+   *
+   * The API key in the header field goes in here. The backup is a file the user keeps, so
+   * that is on balance what they want; it is worth knowing, and the screen says so.
+   */
+  suspend fun exportAll(): String =
+    runCatching {
+        val preferences = context.dataStore.data.first()
+        val out = JSONObject()
+        preferences.asMap().forEach { (key, value) ->
+          when (value) {
+            is String -> out.put(key.name, value)
+            is Boolean -> out.put(key.name, value)
+            is Int -> out.put(key.name, value)
+            is Long -> out.put(key.name, value)
+            is Float -> out.put(key.name, value.toDouble())
+            else -> Unit
+          }
+        }
+        out.toString()
+      }
+      .onFailure { Log.w(TAG, "Could not export settings", it) }
+      .getOrDefault("{}")
+
+  /**
+   * Puts settings back, replacing what is there.
+   *
+   * Replacing rather than merging, because these are a deliberate configuration rather than
+   * accumulated data: half of an old server setup and half of a new one is a state nobody
+   * chose. Unknown keys are kept as they come - a backup from a later build should not lose
+   * them on the way through an older one.
+   */
+  suspend fun importAll(json: String): Int =
+    runCatching {
+        val parsed = JSONObject(json)
+        var applied = 0
+        context.dataStore.edit { preferences ->
+          parsed.keys().forEach { name ->
+            when (val value = parsed.get(name)) {
+              is String -> preferences[stringPreferencesKey(name)] = value
+              is Boolean -> preferences[booleanPreferencesKey(name)] = value
+              is Int -> preferences[intPreferencesKey(name)] = value
+              is Long -> preferences[longPreferencesKey(name)] = value
+              is Double -> preferences[floatPreferencesKey(name)] = value.toFloat()
+              else -> return@forEach
+            }
+            applied++
+          }
+        }
+        applied
+      }
+      .onFailure { Log.w(TAG, "Could not restore settings", it) }
+      .getOrDefault(0)
+
   private fun <T> read(key: Preferences.Key<T>, default: T): Flow<T> =
     context.dataStore.data
       .catch { error ->

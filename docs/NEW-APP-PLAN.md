@@ -774,8 +774,49 @@ has been invented here.
 
 ### Phase 7 — Replace
 
-Take over `com.lin.assistant`, migrate the memory vault out of the fork, retire
-the fork.
+As written: take over `com.lin.assistant`, migrate the memory vault out of the
+fork, retire the fork.
+
+**Two thirds of that is already true and the last third is now a bad trade.**
+The fork is archived — not built, not released, not meant to be installed —
+so it is retired in substance. What remains is the rename, and it has
+inverted since this was written. `com.lin.agent` is no longer the sketch: it
+holds 2.6 GB of models, the memories, the photo index, the documents and the
+training corpus. Changing an applicationId is a fresh install to Android, a
+different data directory, so the rename costs every one of those to gain a
+package name nothing is competing for. The identity worth keeping is now the
+new app's.
+
+So the recommendation is to **keep `com.lin.agent`** and treat the fork's
+package as abandoned rather than inherited. If the rename is wanted anyway —
+for the name itself — it is now survivable rather than destructive, because
+the thing that made it destructive has been built.
+
+**Done: backup and restore.** The prerequisite for any identity change, and
+worth having on its own: until now every irreplaceable thing in this app
+existed in exactly one place, on one phone, with no way off it.
+
+A zip of JSON, deliberately dull — somebody opening it in a year, after the
+app has been rebuilt or renamed, should be able to see what is in it without
+this code. What goes in is decided by what cannot be regenerated: the
+memories (with their vectors, so a restored memory can be found by meaning
+without re-embedding), the training corpus, and the settings. The models are
+not in it — gigabytes, re-downloadable, and a backup nobody can email is a
+backup nobody makes — and neither is the photo index, which rebuilds from
+photos still on the phone.
+
+Restoring is additive and never deletes. The common case is an empty app
+where it makes no difference; the dangerous case is restoring onto a
+populated one, where replacing would throw away everything learnt since.
+Settings are the exception and are replaced, because half of an old server
+setup and half of a new one is a state nobody chose.
+
+A newer backup is refused rather than half-read: reading what this build
+understands and silently dropping the rest, from the only copy of somebody's
+memories, is worse than saying it cannot be read. And a zip entry called
+`training/../../evil` is ignored rather than trusted — the oldest bug in
+archive handling, and the one worth a test even when the current reader
+never writes to a path from the file.
 
 ## Risks and kill criteria
 
