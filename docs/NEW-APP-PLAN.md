@@ -426,6 +426,22 @@ Written so a turn with no tools never touches any of it — that path is the cod
 already answering on the device, and tool calling is the part that cannot be
 checked without a phone.
 
+**A tool call the engine cannot read is given back to the model, once.** Seen
+on a phone: asked to describe a photo, Gemma wrote
+`call:find_photo{describe:<|"|>…<|"|>, with:<|"|>,look:true}` — the
+formatter's own quote markers inside the arguments, a parameter the tool does
+not have, and the opening tag used to close the block. The parse threw, the
+turn died, and the user got a page of ANTLR internals.
+
+Nothing in this app produced that and nothing in it can prevent it, but it is
+the one failure the model itself can fix. So the loop tells it exactly what
+was wrong — only the parameter names that tool has, plain values, no markers
+of its own — and lets it write the call again. Once: a third exchange is the
+same slow failure with somebody watching. Every other failure stays terminal,
+because retrying an out-of-memory or a model that is still loading only fails
+again, more slowly, and which is which is a tested function rather than a
+guess at the call site.
+
 **Still to do:** the other four tools (`recall`, `phoneAction`, `ask`,
 `answer`), the brief under `ResponseFormat.json` rather than as tool arguments,
 and the eval set. The gate below needs a device, so it is the user's to run.

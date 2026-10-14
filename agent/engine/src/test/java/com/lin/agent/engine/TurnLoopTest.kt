@@ -305,6 +305,65 @@ class TurnLoopTest {
     }
   }
 
+  // ---- the model writing a tool call the engine cannot read ----
+
+  /**
+   * A tool call that would not parse is handed back to the model, once.
+   *
+   * Seen on a phone: Gemma emitted the formatter's own quote markers inside the arguments,
+   * invented a parameter the tool does not have, and closed the block with the opening tag.
+   * The turn died on it and the user got a page of parser internals. Nothing here can stop a
+   * model writing that; what it can do is say so and let it write the call again.
+   */
+  @Test
+  fun aMalformedToolCallIsHandedBackToTheModelOnce() = runTest {
+    val backend =
+      ScriptedBackend(
+        listOf(
+          listOf(
+            TurnEvent.Failed(
+              message = "The model tried to use a tool and wrote the request wrongly.",
+              detail = "Failed to parse tool calls from code block: call:find_photo{...}",
+            )
+          ),
+          says("It is a computer case."),
+        )
+      )
+
+    val events = loop(backend).run(ask("describe the photo")).toList()
+
+    assertEquals(listOf(LoopEvent.Done("It is a computer case.")), events)
+    // And the second attempt was told what was wrong with the first, rather than being asked
+    // the same question again and writing the same thing.
+    assertEquals(MALFORMED_TOOL_CALL_NUDGE, backend.seen[1].messages.last().text)
+  }
+
+  @Test
+  fun aSecondUnreadableToolCallIsReportedRatherThanRetriedAgain() = runTest {
+    val unreadable =
+      listOf(TurnEvent.Failed("wrote the request wrongly", "Failed to parse FC tool calls"))
+    val backend = ScriptedBackend(listOf(unreadable, unreadable))
+
+    val events = loop(backend).run(ask("describe the photo")).toList()
+
+    assertTrue(events.single() is LoopEvent.Failed)
+    // Twice, not three times: a third exchange is the same slow failure with the user watching.
+    assertEquals(2, backend.seen.size)
+  }
+
+  @Test
+  fun aFailureTheModelCannotFixIsNotRetried() = runTest {
+    val backend =
+      ScriptedBackend(
+        listOf(listOf(TurnEvent.Failed("This model is too large for this phone's free memory.")))
+      )
+
+    val events = loop(backend).run(ask("hello")).toList()
+
+    assertTrue(events.single() is LoopEvent.Failed)
+    assertEquals(1, backend.seen.size)
+  }
+
   /** The registry refuses two tools with one name, because one of them could never be called. */
   @Test
   fun twoToolsCannotShareAName() {
