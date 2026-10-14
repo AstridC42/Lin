@@ -84,6 +84,7 @@ import android.os.Build
 import android.provider.Settings as AndroidSettings
 import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
+import com.lin.agent.core.car.DialPolicy
 import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
 import com.lin.agent.AssistActivity
@@ -666,6 +667,60 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
     }
   }
 
+  Text(
+    stringResource(R.string.settings_car_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_car_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Column {
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            stringResource(R.string.settings_car_notification),
+            style = MaterialTheme.typography.bodyLarge,
+          )
+          Text(
+            stringResource(R.string.settings_car_notification_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(checked = state.carNotification, onCheckedChange = viewModel::setCarNotification)
+      }
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            stringResource(R.string.settings_car_locked),
+            style = MaterialTheme.typography.bodyLarge,
+          )
+          Text(
+            stringResource(R.string.settings_car_locked_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(
+          checked = state.answerWhenLocked,
+          onCheckedChange = viewModel::setAnswerWhenLocked,
+        )
+      }
+    }
+  }
+
   // The second half of a working wake word, and the half nobody would guess at. Shown only
   // while the wake word is on: it is not a permission to ask for otherwise.
   if (state.wakeWord) {
@@ -698,43 +753,33 @@ private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewMo
     style = MaterialTheme.typography.titleMedium,
     modifier = Modifier.padding(top = 12.dp),
   )
-  // The permission is asked for as the switch goes on, and a refusal leaves it off - a
-  // stored "yes" the permission does not back would make the setting lie about what Lin
-  // can do, and the policy requires both regardless.
+  Text(
+    stringResource(R.string.settings_direct_calls),
+    style = MaterialTheme.typography.bodyLarge,
+  )
+  // Three choices rather than a switch, because the right answer is different at a desk and
+  // at 70mph: staging the call costs one tap, and that tap is the thing nobody should be
+  // doing while driving. The permission is asked for as a dialling choice is made, and a
+  // refusal leaves it on "never" - a stored yes the permission does not back would make this
+  // lie about what Lin can do.
   val callPermission =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-      viewModel.setAllowDirectCalls(allow = granted, granted = granted)
+      viewModel.setDialPolicy(viewModel.wantedDialPolicy, granted = granted)
     }
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          stringResource(R.string.settings_direct_calls),
-          style = MaterialTheme.typography.bodyLarge,
-        )
-        Text(
-          stringResource(
-            if (state.allowDirectCalls) R.string.settings_direct_calls_on
-            else R.string.settings_direct_calls_off
-          ),
-          style = MaterialTheme.typography.bodySmall,
-          color =
-            if (state.allowDirectCalls) MaterialTheme.colorScheme.error
-            else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-      Switch(
-        checked = state.allowDirectCalls,
-        onCheckedChange = { wanted ->
-          if (wanted) callPermission.launch(Manifest.permission.CALL_PHONE)
-          else viewModel.setAllowDirectCalls(allow = false, granted = false)
-        },
-      )
-    }
+  for (policy in DialPolicy.entries) {
+    ChoiceRow(
+      title = stringResource(dialPolicyLabel(policy)),
+      detail = stringResource(dialPolicyDetail(policy)),
+      selected = state.dialPolicy == policy,
+      onPick = {
+        if (policy == DialPolicy.NEVER) {
+          viewModel.setDialPolicy(policy, granted = false)
+        } else {
+          viewModel.wantedDialPolicy = policy
+          callPermission.launch(Manifest.permission.CALL_PHONE)
+        }
+      },
+    )
   }
 
   Text(
@@ -1210,3 +1255,17 @@ private fun TypedModel(picked: String, typed: Boolean, onType: (String) -> Unit)
     }
   }
 }
+
+private fun dialPolicyLabel(policy: DialPolicy): Int =
+  when (policy) {
+    DialPolicy.NEVER -> R.string.settings_dial_never
+    DialPolicy.IN_THE_CAR -> R.string.settings_dial_in_the_car
+    DialPolicy.ALWAYS -> R.string.settings_dial_always
+  }
+
+private fun dialPolicyDetail(policy: DialPolicy): Int =
+  when (policy) {
+    DialPolicy.NEVER -> R.string.settings_dial_never_detail
+    DialPolicy.IN_THE_CAR -> R.string.settings_dial_in_the_car_detail
+    DialPolicy.ALWAYS -> R.string.settings_dial_always_detail
+  }

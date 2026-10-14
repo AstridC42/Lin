@@ -803,12 +803,36 @@ a sideloaded one. Worth doing if the car is the point, and worth knowing it
 buys "play X" rather than Lin.
 
 *What does work in a car today.* The older Bluetooth path: a car kit or
-headset's voice-dial button sends `VOICE_COMMAND` to the phone, and Lin
-answers it — summoned, so the microphone opens, exactly as the power button
-does. This is the hands-free profile rather than projection, so it works when
-the phone is connected by Bluetooth and Android Auto is not running; whether
-a given head unit sends it belongs to the head unit. And "Hey Lin" on the
-phone itself, which needs the overlay permission to be able to open anything.
+headset's voice-dial button sends `VOICE_COMMAND` — or
+`VOICE_SEARCH_HANDS_FREE`, which Lin now also answers, because which of the
+two a head unit sends belongs to the head unit — and Lin is summoned, so the
+microphone opens exactly as it does for the power button. This is the
+hands-free profile rather than projection, so it works when the phone is
+connected by Bluetooth and Android Auto is not running. And "Hey Lin" on the
+phone itself, which works alongside Android Auto because it uses the phone's
+own microphone rather than the car's.
+
+*The rule that shapes all of it.* A microphone foreground service may not be
+created from the background. This is not the ordinary background-start
+restriction, which several things exempt an app from — it is the stricter
+while-in-use rule on top, and the documentation is explicit that the general
+exemptions do not cover it. So Lin cannot start listening when it notices a
+car, however it notices. What *is* allowed is a service started by somebody
+interacting with a notification, which is why "in the car" is a notification
+with one button rather than something automatic. (The other exemption on that
+list is an app providing a `VoiceInteractionService` — the deferred half of
+this phase, and the only route to true hands-free starting.)
+
+*What car mode changes, once listening.* A spoken question gets a spoken
+answer whatever the replies switch says, because an answer only on screen is
+no answer to somebody driving. Calls can dial straight out — the setting is
+three ways now rather than a switch, and "only in the car" exists because the
+tap that makes staging safe is the one thing nobody should be doing at 70mph.
+The panel may appear over the lock screen, off by default, because Android
+Auto locks the phone while it projects and otherwise there is nothing to see.
+Car mode itself is the system's own: `UI_MODE_TYPE_CAR`, which Android Auto
+sets while projecting. It is not true in a Bluetooth-only car, so nothing
+depends on it that is unsafe to get wrong in the careful direction.
 
 *Android Automotive* — the Android built into a car rather than projected to
 it — does allow a third-party `VoiceInteractionService` to take the wheel

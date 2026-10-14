@@ -24,6 +24,9 @@ import com.lin.agent.core.models.ModelCatalog
 import com.lin.agent.core.models.ModelDownloads
 import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
+import com.lin.agent.car.CarNotification
+import com.lin.agent.core.car.DialPolicy
+import com.lin.agent.core.car.dialPolicyNamed
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.model.installedMusicApps
 import com.lin.agent.core.calendar.Calendars
@@ -92,6 +95,12 @@ data class SettingsState(
   val serverModelTyped: Boolean = false,
   val answerOnServer: Boolean = false,
   val allowDirectCalls: Boolean = false,
+  /** Where Lin may ring somebody without a tap: nowhere, in the car, or anywhere. */
+  val dialPolicy: DialPolicy = DialPolicy.NEVER,
+  /** Whether the "listen in the car" notification is kept up. */
+  val carNotification: Boolean = false,
+  /** Whether the panel may appear over the lock screen, which a car needs. */
+  val answerWhenLocked: Boolean = false,
   val spokenReplies: Boolean = true,
   /** Whether Lin is listening for its name. Off by default; it holds the microphone. */
   val wakeWord: Boolean = false,
@@ -153,6 +162,9 @@ constructor(
           serverModelTyped = settings.serverModelTyped.first(),
           answerOnServer = settings.answerOnServer.first(),
           allowDirectCalls = settings.allowDirectCalls.first(),
+          dialPolicy = dialPolicyNamed(settings.dialPolicy.first()),
+          carNotification = settings.carNotification.first(),
+          answerWhenLocked = settings.answerWhenLocked.first(),
           spokenReplies = settings.spokenReplies.first(),
           wakeWord = settings.wakeWord.first(),
           chatModel = settings.chatModelName.first(),
@@ -413,10 +425,45 @@ constructor(
     viewModelScope.launch { settings.setSpokenReplies(on) }
   }
 
-  fun setAllowDirectCalls(allow: Boolean, granted: Boolean) {
-    val effective = allow && granted
-    _state.update { it.copy(allowDirectCalls = effective) }
-    viewModelScope.launch { settings.setAllowDirectCalls(effective) }
+  /**
+   * Which dialling choice is waiting on the permission dialog.
+   *
+   * Held here rather than passed through the launcher because the result callback cannot carry
+   * it, and the alternative - a launcher per choice - is three launchers that can disagree.
+   */
+  var wantedDialPolicy: DialPolicy = DialPolicy.NEVER
+
+  /**
+   * Sets where Lin may dial straight out.
+   *
+   * A refusal lands on NEVER rather than on what was tapped: a stored choice the permission
+   * does not back would have this screen claiming Lin can place calls it cannot, and the call
+   * policy would stage them anyway. Better that the screen says what will happen.
+   */
+  fun setDialPolicy(policy: DialPolicy, granted: Boolean) {
+    val effective = if (policy == DialPolicy.NEVER || granted) policy else DialPolicy.NEVER
+    _state.update {
+      it.copy(dialPolicy = effective, allowDirectCalls = effective == DialPolicy.ALWAYS)
+    }
+    viewModelScope.launch {
+      settings.setDialPolicy(effective.name)
+      // The old switch is kept in step rather than left behind: it is what the reading of the
+      // new setting falls back to, so a stale "true" there would resurrect ALWAYS.
+      settings.setAllowDirectCalls(effective == DialPolicy.ALWAYS)
+    }
+  }
+
+  fun setCarNotification(on: Boolean) {
+    _state.update { it.copy(carNotification = on) }
+    viewModelScope.launch {
+      settings.setCarNotification(on)
+      CarNotification.show(appContext, on)
+    }
+  }
+
+  fun setAnswerWhenLocked(on: Boolean) {
+    _state.update { it.copy(answerWhenLocked = on) }
+    viewModelScope.launch { settings.setAnswerWhenLocked(on) }
   }
 
   fun setAnswerOnServer(onServer: Boolean) {

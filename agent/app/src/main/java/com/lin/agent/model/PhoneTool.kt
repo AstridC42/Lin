@@ -23,6 +23,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.ContactsContract
 import android.util.Log
+import com.lin.agent.car.inCar
+import com.lin.agent.core.car.dialPolicyNamed
+import com.lin.agent.core.car.mayDialDirectly
 import com.lin.agent.core.phone.CallDecision
 import com.lin.agent.core.phone.KnownNumber
 import com.lin.agent.core.phone.decideCall
@@ -109,7 +112,11 @@ class PhoneTool(
         requested = who,
         matches = lookUp(who),
         addressBook = if (looksLikeANumber(who)) everyone() else emptyList(),
-        optedInToDirectCalls = settings.allowDirectCalls.first(),
+        // Where, not whether: the middle setting dials straight out in a car and stages it
+        // everywhere else, because the tap that makes staging safe is the one thing nobody
+        // should be doing while driving.
+        optedInToDirectCalls =
+          mayDialDirectly(dialPolicyNamed(settings.dialPolicy.first()), inCar(context)),
         callPermissionGranted = granted(Manifest.permission.CALL_PHONE),
       )
 
