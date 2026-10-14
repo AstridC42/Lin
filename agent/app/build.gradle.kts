@@ -129,6 +129,10 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.lifecycle.runtime.compose)
+  // ProcessLifecycleOwner, for one question: does this app have a window on screen? It decides
+  // whether the wake word may open the panel at all - see WakeRoute. Already on the classpath
+  // through something else, and declared here because a transitive dependency is not a promise.
+  implementation(libs.androidx.lifecycle.process)
   implementation(libs.androidx.activity.compose)
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.ui)

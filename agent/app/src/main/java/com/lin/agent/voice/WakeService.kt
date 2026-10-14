@@ -27,13 +27,19 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import com.lin.agent.AssistActivity
 import com.lin.agent.MainActivity
 import com.lin.agent.R
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
+import com.lin.agent.core.voice.WakeRoute
 import com.lin.agent.core.voice.WakeWord
+import com.lin.agent.core.voice.wakeRoute
 
 /**
  * Listens for "Hey Lin" while the app is not open.
@@ -150,16 +156,77 @@ class WakeService : Service() {
       }
   }
 
-  /** Opens the app, listening, with whatever was said after the phrase. */
+  /**
+   * Brings up the panel, listening, with whatever was said after the phrase.
+   *
+   * The panel rather than the whole app: "Hey Lin, what's the time" should not take over the
+   * screen of whatever somebody was doing when they said it. See [com.lin.agent.AssistActivity].
+   *
+   * A token per wake, so that two wakes are two summons even when the same words were said
+   * both times - and so that the panel being recreated mid-answer does not ask again. See
+   * [com.lin.agent.core.voice.Summon].
+   */
   private fun wake(heard: String) {
     val question = WakeWord.afterWake(heard)
-    startActivity(
-      Intent(this, MainActivity::class.java).apply {
+    val panel =
+      Intent(this, AssistActivity::class.java).apply {
         action = ACTION_WOKEN
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        putExtra(EXTRA_TOKEN, java.util.UUID.randomUUID().toString())
         if (question.isNotBlank()) putExtra(EXTRA_SAID, question)
       }
-    )
+
+    val route =
+      wakeRoute(
+        canAppearOverOtherApps = Settings.canDrawOverlays(this),
+        // An app with a window on screen may start another, so this works while Lin is open
+        // even with nothing granted. Read from the process lifecycle rather than guessed.
+        appHasVisibleWindow =
+          ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED),
+      )
+
+    when (route) {
+      WakeRoute.PANEL -> startActivity(panel)
+      // The launch would be dropped silently - see wakeRoute - so the question goes somewhere
+      // it can be seen instead. A tap is not hands-free, and that is the honest cost of not
+      // having the permission rather than a wake word that appears to be deaf.
+      WakeRoute.NOTIFICATION -> askToOpen(panel, question)
+    }
+  }
+
+  /**
+   * Puts what was heard in a notification that opens the panel.
+   *
+   * Its own channel at high importance, so it arrives as a heads-up rather than sitting under
+   * the silent one the microphone holds up. Tapping it is a system-sent pending intent, which
+   * is the one background activity start that is always allowed.
+   */
+  private fun askToOpen(panel: Intent, question: String) {
+    runCatching {
+      ensureChannel(HEARD_CHANNEL, NotificationManager.IMPORTANCE_HIGH, R.string.wake_heard_channel)
+      val open =
+        PendingIntent.getActivity(
+          this,
+          // A request code per wake, so a second question does not reuse the first one's
+          // intent and ask the wrong thing.
+          (System.currentTimeMillis() and 0xFFFF).toInt(),
+          panel,
+          PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+      getSystemService(NotificationManager::class.java)
+        ?.notify(
+          HEARD_ID,
+          Notification.Builder(this, HEARD_CHANNEL)
+            .setContentTitle(getString(R.string.wake_heard_title))
+            .setContentText(
+              question.ifBlank { getString(R.string.wake_heard_detail) }
+            )
+            .setSmallIcon(R.drawable.ic_mic)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build(),
+        )
+    }
   }
 
   private inner class Listener : RecognitionListener {
@@ -200,12 +267,14 @@ class WakeService : Service() {
     override fun onEvent(type: Int, params: Bundle?) = Unit
   }
 
-  private fun ensureChannel() {
+  private fun ensureChannel(
+    id: String = CHANNEL,
+    importance: Int = NotificationManager.IMPORTANCE_LOW,
+    name: Int = R.string.wake_channel,
+  ) {
     val manager = getSystemService(NotificationManager::class.java) ?: return
-    if (manager.getNotificationChannel(CHANNEL) != null) return
-    manager.createNotificationChannel(
-      NotificationChannel(CHANNEL, getString(R.string.wake_channel), NotificationManager.IMPORTANCE_LOW)
-    )
+    if (manager.getNotificationChannel(id) != null) return
+    manager.createNotificationChannel(NotificationChannel(id, getString(name), importance))
   }
 
   companion object {
@@ -213,11 +282,18 @@ class WakeService : Service() {
     private const val CHANNEL = "lin-listening"
     private const val ID = 42
 
+    /** Heard something, but could not open a window for it. See askToOpen. */
+    private const val HEARD_CHANNEL = "lin-heard"
+    private const val HEARD_ID = 43
+
     /** How the activity knows it was opened by the wake word rather than by a tap. */
     const val ACTION_WOKEN = "com.lin.agent.action.WOKEN"
 
     /** Whatever was said after "Hey Lin", so it does not have to be said twice. */
     const val EXTRA_SAID = "com.lin.agent.extra.SAID"
+
+    /** Which wake this is, so the question goes exactly once. See Summon. */
+    const val EXTRA_TOKEN = "com.lin.agent.extra.TOKEN"
 
     fun start(context: Context) {
       runCatching {

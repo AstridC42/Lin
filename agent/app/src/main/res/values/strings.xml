@@ -5,6 +5,7 @@
   <string name="send">Send</string>
   <string name="speak">Speak</string>
   <string name="stop_listening">Stop listening</string>
+  <string name="close_panel">Close</string>
   <string name="listening">Listening…</string>
   <string name="settings_messages_heading">Messages</string>
   <string name="settings_messages_detail">Let Lin see messages that can be replied to, so it can
@@ -29,8 +30,21 @@
   <string name="settings_spoken_replies_detail">Typed questions are always answered in
     writing.</string>
   <string name="settings_set_assistant">Choose Lin as your assistant</string>
-  <string name="settings_assistant_detail">Opens Android\'s default apps settings. Lin appears
-    under Digital assistant app.</string>
+  <string name="settings_assistant_detail">Opens your phone\'s own settings, where Lin appears under
+    Digital assistant app. Android only lets you choose this yourself — and it goes back to
+    whichever app came with the phone if Lin is uninstalled, so if summoning stopped working after
+    a reinstall, this is why.</string>
+  <string name="settings_assistant_is_lin">Lin is the assistant on this phone.</string>
+  <string name="settings_assistant_is_other">Something else is the assistant, so the power button
+    and the assistant gesture will not reach Lin.</string>
+  <string name="settings_assistant_unknown">This phone will not say which app is its assistant.
+    If summoning Lin does nothing, this is the thing to set.</string>
+  <string name="settings_assistant_no_screen">This phone has no assistant screen Lin can open. It
+    is usually under Apps, then Default apps.</string>
+  <string name="settings_try_panel">Show me the panel</string>
+  <string name="settings_try_panel_detail">The same panel the power button summons. Worth trying if
+    summoning does nothing: if it appears from here but not from the button, it is the setting above
+    or the phone\'s own side-button and gesture settings, not Lin.</string>
   <string name="back">Back</string>
   <string name="open_settings">Settings</string>
 
@@ -125,6 +139,11 @@
   <string name="download_ready">On this phone</string>
   <string name="download_progress">%1$d%% · %2$s of %3$s GB</string>
   <string name="download_waiting">Queued — waiting for a connection</string>
+  <string name="model_use">Use this one</string>
+  <string name="model_chosen">✓ Answering with this — tap to let Lin choose</string>
+  <string name="settings_models_choose">Tap “Use this one” to pick which downloaded model
+    answers. Without a choice, Lin picks the one suited to this phone.</string>
+
   <string name="settings_models_where">Models are read from, and will be downloaded to:</string>
 
   <string name="settings_server_kind_ollama">Ollama\'s own API. Listens on 11434. No key
@@ -146,6 +165,9 @@
   <string name="wake_listening_detail">Tap to open. Turn this off in settings to stop
     listening.</string>
   <string name="wake_channel">Listening</string>
+  <string name="wake_heard_channel">Heard</string>
+  <string name="wake_heard_title">Lin heard you</string>
+  <string name="wake_heard_detail">Tap to answer.</string>
   <string name="settings_wake_heading">“Hey Lin”</string>
   <string name="settings_wake_detail">Lin listens for its name and opens when it hears it, even
     with the screen off. Off by default, and worth knowing why: this is not a wake-word chip —
@@ -153,6 +175,13 @@
     continuously and reads the words. It costs battery, and a notification stays up the whole
     time it is listening.</string>
   <string name="settings_wake">Listen for “Hey Lin”</string>
+  <string name="settings_overlay_granted">Lin can appear over other apps, so “Hey Lin” answers
+    straight away.</string>
+  <string name="settings_overlay_missing">Lin cannot appear over other apps — and Android will not
+    let an app in the background open a window without that, whatever else it is doing. So
+    “Hey Lin” will put what it heard in a notification to tap instead of answering
+    hands-free.</string>
+  <string name="settings_overlay_button">Let Lin appear over other apps</string>
 
   <string name="new_conversation">Start a new conversation</string>
   <string name="attach">Attach something</string>

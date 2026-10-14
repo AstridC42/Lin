@@ -91,6 +91,8 @@ data class SettingsState(
   val spokenReplies: Boolean = true,
   /** Whether Lin is listening for its name. Off by default; it holds the microphone. */
   val wakeWord: Boolean = false,
+  /** The downloaded chat model the user picked, or empty to let the phone decide. */
+  val chatModel: String = "",
   val digestConversations: Boolean = false,
   /** The reasoning level, as the engine's own enum. */
   val reasoning: Reasoning = Reasoning.OFF,
@@ -144,6 +146,7 @@ constructor(
           allowDirectCalls = settings.allowDirectCalls.first(),
           spokenReplies = settings.spokenReplies.first(),
           wakeWord = settings.wakeWord.first(),
+          chatModel = settings.chatModelName.first(),
           digestConversations = settings.digestConversations.first(),
           reasoning = reasoningNamed(settings.reasoning.first()),
           serverKind = serverKindNamed(settings.serverKind.first()),
@@ -357,6 +360,23 @@ constructor(
    * not back - the same rule as direct calling. A switch that says Lin is listening while it
    * cannot is worse than one that is plainly off.
    */
+  /**
+   * Chooses which downloaded model answers, or clears the choice.
+   *
+   * Clearing matters as much as choosing: somebody who tried the bigger model and wants the
+   * phone to go back to deciding should not have to work out which one it would have picked.
+   */
+  fun useChatModel(name: String) {
+    val chosen = if (name == _state.value.chatModel) "" else name
+    _state.update { it.copy(chatModel = chosen) }
+    viewModelScope.launch {
+      settings.setChatModelName(chosen)
+      // The conversation holds a resolved backend; without this the change is invisible until
+      // the app is restarted.
+      backends.refresh()
+    }
+  }
+
   fun setWakeWord(on: Boolean, granted: Boolean) {
     val effective = on && granted
     _state.update { it.copy(wakeWord = effective) }

@@ -34,6 +34,7 @@ import com.lin.agent.engine.TurnLoop
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.core.voice.Asked
 import com.lin.agent.core.voice.Launch
+import com.lin.agent.core.voice.Summon
 import com.lin.agent.core.voice.shouldListenOnLaunch
 import com.lin.agent.core.voice.shouldSpeak
 import com.lin.agent.model.DelegateTool
@@ -287,13 +288,28 @@ constructor(
   }
 
   /**
-   * Called once when the app opens, with how it was opened.
+   * Acts on a summon, exactly once.
    *
-   * Summoned as the assistant means somebody held the power button, and there is no keyboard
-   * in that gesture - so the microphone opens. Opened from the launcher, it never does.
+   * Summoned as the assistant means somebody held the power button, or said "Hey Lin", and
+   * there is no keyboard in either - so the microphone opens. Said words arrive already spoken
+   * and are simply asked: making somebody repeat the question they just asked is slower than
+   * not having a wake word at all. Opened from the launcher, neither happens.
+   *
+   * The guard is the part worth having. The screen's start-up effect runs again whenever the
+   * screen is recreated, and on a foldable that is every time the device is opened - so
+   * unfolding the phone after a wake-word question used to ask it a second time. [token]
+   * identifies the summon rather than the words, so a repeated question still goes and a
+   * recreated screen does not. Remembered in saved state, because that is what survives the
+   * recreation it has to outlive.
    */
-  fun onLaunched(launch: Launch, microphoneGranted: Boolean) {
-    if (shouldListenOnLaunch(launch, microphoneGranted)) startListening()
+  fun onSummoned(token: String, spoken: String, launch: Launch, microphoneGranted: Boolean) {
+    if (Summon.alreadyHandled(saved.get<String>(KEY_SUMMON), token)) return
+    saved[KEY_SUMMON] = token
+    if (spoken.isNotBlank()) {
+      send(spoken, spoken = true)
+    } else if (shouldListenOnLaunch(launch, microphoneGranted)) {
+      startListening()
+    }
   }
 
   /** Opens the microphone and sends what it hears. */
@@ -672,5 +688,6 @@ constructor(
     const val KEY_TEXTS = "conversation_texts"
     const val KEY_CONVERSATION_ID = "conversation_id"
     const val KEY_LAST_ACTIVE = "conversation_last_active"
+    const val KEY_SUMMON = "conversation_summon"
   }
 }

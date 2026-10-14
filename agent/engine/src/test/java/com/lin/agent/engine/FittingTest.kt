@@ -47,16 +47,44 @@ class FittingTest {
   }
 
   /**
-   * The newest message is kept whatever it costs.
+   * The newest message is never dropped - but it is cut if it has to be.
    *
-   * It is the question being asked. A turn without it is not a shorter conversation, it is a
-   * different one.
+   * It is the question being asked, so a turn without it is a different conversation. Sending
+   * it whole when it cannot fit is not keeping it either: that is the engine refusing the turn
+   * outright, which is what "Prefill input length exceeds available state entries" was.
    */
   @Test
-  fun theQuestionBeingAskedIsNeverDropped() {
+  fun theQuestionBeingAskedIsCutRatherThanDroppedOrSentWhole() {
     val huge = user(long(10_000))
-    val fitted = fitToContext(listOf(user("old"), huge), contextTokens = 2_000)
-    assertEquals(listOf(huge), fitted)
+    val fitted = fitToContext(listOf(user("old"), huge), contextTokens = 2_000, reserve = 100)
+
+    assertEquals(1, fitted.size)
+    assertTrue("it was sent whole", fitted.single().text.length < huge.text.length)
+    assertTrue("it fits", tokensOf(fitted.single().text) <= 1_900)
+  }
+
+  /** Silence would leave somebody reading an answer about a third of their document. */
+  @Test
+  fun aCutMessageSaysItWasCut() {
+    val fitted =
+      fitToContext(listOf(user(long(10_000))), contextTokens = 2_000, reserve = 100)
+    assertTrue(fitted.single().text, fitted.single().text.contains("Cut off here"))
+  }
+
+  /** A picture cannot be cut in half, so it goes before the words asking about it do. */
+  @Test
+  fun anOversizedMessageLosesItsPictureBeforeItsWords() {
+    val asking =
+      Message(
+        Message.Role.USER,
+        long(300),
+        attachments = listOf(Attachment.Picture("p.jpg", byteArrayOf(1))),
+      )
+    val fitted = fitToContext(listOf(asking), contextTokens = 500, reserve = 100)
+
+    assertTrue(fitted.single().attachments.isEmpty())
+    // The words survived whole: dropping the picture alone was enough.
+    assertEquals(asking.text, fitted.single().text)
   }
 
   @Test

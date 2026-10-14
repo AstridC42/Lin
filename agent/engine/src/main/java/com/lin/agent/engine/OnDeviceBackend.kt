@@ -543,6 +543,16 @@ internal fun explain(error: Throwable): String {
     text.contains("token ids are too long") || text.contains("maximum number of tokens") ->
       "This conversation no longer fits in the model's context. Start a new one."
 
+    // "Prefill input length exceeds available state entries (remaining capacity: 2906)" - the
+    // same thing in the engine's other vocabulary, and the one a long attachment produces.
+    // Worth its own branch because the words share nothing with the case above, and because
+    // the fix is specific: the engine holds this conversation's history itself, so trimming
+    // what this app sends cannot shrink it. Only a new conversation can.
+    text.contains("prefill input length") || text.contains("available state entries") ->
+      "That was too long for what is left of the model's memory on this conversation. Start a " +
+        "new one with the + button and attach it again - or let the server answer, which has " +
+        "far more room."
+
     text.contains("failed to parse tool calls") || text.contains("parse fc tool calls") ->
       "The model tried to use a tool and wrote the request wrongly, so nothing ran. Asking again " +
         "often works."
