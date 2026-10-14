@@ -707,6 +707,25 @@ When the model cannot, Lin says the picture was not sent, because a model
 with no vision answers about the question alone and sounds entirely
 confident.
 
+**And the other half of it: finding a photo and reading it.** `find_photo`
+already searched by what is in a picture, but the model could only be told
+how many matched — "you cannot see them, so never describe what is in one"
+was in the prompt because it was true. It no longer has to be. The tool
+takes a `look` argument, and when set, the best match is handed to the model
+as well as to the screen.
+
+Everything found still goes on screen, because a person takes in six
+thumbnails at a glance; at most **one** goes to the model, because each is a
+slice of a context window that has to hold the conversation too. When the
+model cannot see, the tool result says so and says not to describe it — a
+model handed nothing and told nothing describes the picture anyway, from the
+words that found it, and nothing on screen would suggest otherwise.
+
+The picture travels on a user-role message rather than the tool result,
+because that is the role every backend accepts one on: an OpenAI tool
+message takes a plain string. It is labelled as coming from the tool so the
+model does not read it as the person having spoken.
+
 Photos are sampled down on the way in. A phone camera makes twelve
 megapixels; a vision encoder sees a few hundred pixels a side whatever it is
 handed, and the rest is a base64 string big enough to make the request fail.

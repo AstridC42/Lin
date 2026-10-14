@@ -41,13 +41,16 @@ import com.lin.agent.engine.ToolResult
 class FindPhotoTool(
   private val memories: MemoryStore,
   private val embedders: Embedders,
+  private val attachments: Attachments,
+  private val context: android.content.Context,
 ) : AgentTool {
 
   override val name = "find_photo"
 
   override val description =
     "Find photos on this phone by what is in them - a place, an object, a scene. The pictures " +
-      "are shown to the user directly."
+      "are shown to the user directly. Set look to true to be shown the best match yourself, " +
+      "when the question is about what is in the photo rather than which photo it is."
 
   override val parameters =
     listOf(
@@ -56,7 +59,14 @@ class FindPhotoTool(
         type = ParamType.STRING,
         description = "What is in the photo, in plain words: \"a dog on a beach\", " +
           "\"a whiteboard with diagrams\".",
-      )
+      ),
+      ToolParameter(
+        name = "look",
+        type = ParamType.BOOLEAN,
+        description =
+          "True to look at the best match yourself - for \"what does the sign say\" rather " +
+            "than \"show me the beach photo\".",
+      ),
     )
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
@@ -97,11 +107,29 @@ class FindPhotoTool(
       )
     }
 
+    // Only when asked, and only the best one. Every photo on screen costs the user a glance;
+    // every photo sent to the model costs a slice of a context window that has to hold the
+    // conversation too, and on-device it stays there for the rest of the conversation.
+    val look = arguments["look"] as? Boolean ?: false
+    val best =
+      if (!look) null
+      else
+        found.firstOrNull()?.memory?.reference?.takeIf { it.isNotBlank() }?.let { reference ->
+          attachments.picture(android.net.Uri.parse(reference), context).getOrNull()
+        }
+
     return ToolResult.Ok(
       text =
-        "${found.size} photo(s) matched and are already on screen for the user. Do not " +
-          "describe them - you cannot see them. Say they are shown, and offer to narrow it down.",
+        if (best != null) {
+          "${found.size} photo(s) matched and are on screen. The best match is being shown to " +
+            "you as well - answer from what you can actually see in it."
+        } else {
+          "${found.size} photo(s) matched and are already on screen for the user. You have not " +
+            "been shown them, so do not describe them. Say they are shown, and offer to " +
+            "narrow it down."
+        },
       shows = found.map { it.memory.reference },
+      looksAt = listOfNotNull(best),
     )
   }
 
