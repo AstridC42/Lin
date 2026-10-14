@@ -504,7 +504,34 @@ clock change and drops the last event of the final evening; and a lenient
 asked for the end of the month — into the 3rd of March. All four fail tests
 when reintroduced.
 
-**Still to do:** media control, and MobileActions-270M as the intent parser.
+**Also done: media control.** `media` sees and changes what is playing —
+what, play, pause, next, previous, louder, quieter.
+
+Not staged, and that is the point of having a rule rather than a reflex:
+pausing music is seen the instant it happens and undone by saying so. The
+staged-action rule is for things that reach other people or cannot be taken
+back, and this is neither.
+
+Volume is the exception, upwards only. It is the one media control that can
+actually hurt somebody — headphones at full on a misheard "turn it up" is an
+injury rather than an annoyance — so a step is a step and a run of them stops
+at four fifths. Getting to the top stays possible by hand, where the person
+can hear what they are doing.
+
+Choosing *which* session is the whole difficulty: three apps hold one on an
+ordinary day, and "pause" reaching the podcast stopped last Tuesday instead
+of the music playing now is the difference between useful and infuriating.
+Something playing wins; among several, the most recent; with nothing playing,
+the most recent, so "play" resumes what was last listened to. A command the
+session cannot take is refused rather than attempted, because a transport
+control that goes nowhere is silent and the model would report a skip that
+never happened.
+
+Reaching the sessions needs notification access — the same grant that lets
+Lin answer messages. The alternative, `MEDIA_CONTENT_CONTROL`, is for system
+apps.
+
+**Still to do:** MobileActions-270M as the intent parser.
 
 **Measurement:** the staged-action policy holds — calls open the dialer unless
 directly authorised, messages wait for a send, and a notification reply is read

@@ -62,6 +62,7 @@ import com.lin.agent.model.AddToCalendarTool
 import com.lin.agent.model.AlarmTool
 import com.lin.agent.model.CalendarTool
 import com.lin.agent.model.ListDocumentsTool
+import com.lin.agent.model.MediaTool
 import com.lin.agent.model.ReadDocumentTool
 import com.lin.agent.model.ReplyTool
 import com.lin.agent.model.WriteDocumentTool
@@ -177,6 +178,7 @@ constructor(
         UnreadTool(relay),
         ReplyTool(relay),
         CalendarTool(calendars),
+        MediaTool(appContext),
         AddToCalendarTool(appContext),
         AlarmTool(appContext),
         ListDocumentsTool(documentLibrary),
@@ -581,7 +583,9 @@ constructor(
         "add_to_calendar opens the calendar filled in and the user saves it, so say it is " +
         "ready rather than saying it is in their calendar; work the date out from today's " +
         "date above and pass it as numbers. A timer is set straight away, but an alarm opens " +
-        "the clock to be confirmed - do not say an alarm is set."
+        "the clock to be confirmed - do not say an alarm is set. " +
+        "Use media to see or change what is playing; check with action \"what\" before " +
+        "saying what is on."
 
     const val DIGEST_WORK = "digest"
 
