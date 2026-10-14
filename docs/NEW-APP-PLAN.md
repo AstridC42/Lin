@@ -633,9 +633,48 @@ a privacy choice rather than a performance one — the rest of this app keeps
 what is said on the phone unless the user pointed it at their own server, and
 a cloud recogniser would quietly undo that for every spoken word.
 
-**Still to do:** the wake word and the resident service, which need a
-wake-word model this app does not have and a continuously open microphone it
-has not earned.
+**Done, with a caveat worth reading: "Hey Lin".** Off by default, and of all
+the defaults here that is the one least open to argument — it holds the
+microphone open indefinitely.
+
+It is **not a wake-word engine**. A real one listens to audio at almost no
+cost; there is no pre-trained model for "Hey Lin" (the open ones ship "Hey
+Jarvis" and "Okay Nabu", and a custom one means an account with somebody's
+cloud), so this runs the phone's recogniser continuously and reads the
+words. The battery cost is real and the setting says so. The matcher is kept
+apart in `WakeWord` so a proper model can replace the listening half without
+touching anything else.
+
+Where the care went is the matching. A recogniser returns "hey Lynn", "hey
+line", "hey len" and "heylin" for the same two syllables, so insisting on
+the spelling means it never fires; being loose means it fires in a pocket,
+which opens a microphone nobody asked to open. Both halves must be present
+and adjacent, each allowed one *substitution or insertion* — never a
+deletion, because that is what lets "he li" through, and two ordinary
+syllables must not wake it. A test caught exactly that.
+
+"Hey Lin, what's the time" asks the question rather than only opening the
+microphone, or the feature would be slower than picking the phone up.
+
+Listening restarts when the app is opened rather than at boot, which is a
+platform constraint: from Android 14 a microphone foreground service cannot
+be started from the background, so a `BOOT_COMPLETED` receiver would throw
+rather than listen. After a restart, Lin has to be opened once.
+
+**Lin in the car, and the honest limits.** Android Auto's microphone button
+goes to Assistant, and from 2026 to Gemini; it is not open to other apps and
+no amount of code changes that. What *is* open is the older path: a
+Bluetooth car kit or headset's voice button sends `VOICE_COMMAND` to the
+phone, and Lin now answers it — summoned, so the microphone opens, exactly
+as the power button does. Whether a given car sends it is a property of the
+head unit rather than of this app.
+
+Android Automotive — the Android built into a car rather than projected to
+it — does allow a third-party `VoiceInteractionService` to take the wheel
+button. That is a different product surface and a different build; it is
+noted here rather than attempted.
+
+**Decided: no rename.** `com.lin.agent` stays. See Phase 7.
 
 Notification replies shipped under Phase 4, and not with the read-back this
 planned. Lin writes the reply onto the screen and the person sends it: the

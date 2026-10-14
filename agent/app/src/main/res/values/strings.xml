@@ -142,6 +142,18 @@
   <string name="settings_server_type_use">Use this name</string>
   <string name="settings_server_type_using">Using %1$s</string>
 
+  <string name="wake_listening">Lin is listening for “Hey Lin”</string>
+  <string name="wake_listening_detail">Tap to open. Turn this off in settings to stop
+    listening.</string>
+  <string name="wake_channel">Listening</string>
+  <string name="settings_wake_heading">“Hey Lin”</string>
+  <string name="settings_wake_detail">Lin listens for its name and opens when it hears it, even
+    with the screen off. Off by default, and worth knowing why: this is not a wake-word chip —
+    there is no ready-made model for “Hey Lin”, so Lin runs the phone\'s speech recogniser
+    continuously and reads the words. It costs battery, and a notification stays up the whole
+    time it is listening.</string>
+  <string name="settings_wake">Listen for “Hey Lin”</string>
+
   <string name="new_conversation">Start a new conversation</string>
   <string name="attach">Attach something</string>
   <string name="attach_photo">A photo</string>
