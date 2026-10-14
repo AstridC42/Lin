@@ -766,18 +766,54 @@ hands-free, which is the honest cost of not having the permission. Lin draws
 no overlays; the permission is asked for only for this, and only once the wake
 word is on.
 
-**Lin in the car, and the honest limits.** Android Auto's microphone button
-goes to Assistant, and from 2026 to Gemini; it is not open to other apps and
-no amount of code changes that. What *is* open is the older path: a
-Bluetooth car kit or headset's voice button sends `VOICE_COMMAND` to the
-phone, and Lin now answers it — summoned, so the microphone opens, exactly
-as the power button does. Whether a given car sends it is a property of the
-head unit rather than of this app.
+**Lin in the car: checked properly, and the answer is still no.**
 
-Android Automotive — the Android built into a car rather than projected to
+This was asked twice, so here is the evidence rather than the conclusion.
+
+*Android Auto has no assistant category.* The published list of what a
+third-party app may be on Android Auto is: media (audio), navigation, point
+of interest, internet of things, weather, games (parked only), messaging
+notifications, and — in closed testing only — templated messaging and
+calling. There is no assistant category, so Lin cannot be an Android Auto app
+at all, let alone its assistant. In Google's own documentation the assistant
+appears only in the other direction: "Gemini or Google Assistant can launch
+installed apps with voice commands."
+
+*The voice stack belongs to Google.* Android's own page on media voice
+actions says the query is started "with the steering wheel button or the
+'OK Google' hotword", that "Android Auto or AAOS detects and interprets the
+voice action", and that what reaches an app is an already-interpreted media
+action — `onPlayFromSearch(query, extras)` on its media session. No app
+receives the audio, the transcript, or the button press. So when the wheel
+button appears to do nothing, it is the Google app or Gemini being summoned
+and not being there; nothing Lin declares can intercept that.
+
+*2026 changes nothing here.* Google is replacing Assistant with Gemini
+across Android Auto this year. Every announcement is about which Google
+assistant answers; none of them opens the seat to another one.
+
+*The one real opening, and its price.* A media app on Android Auto does
+receive voice through `onPlayFromSearch` — so Lin could answer "play
+something" from the wheel button by being a car media app with a
+`MediaBrowserService`. That is media-shaped and nothing else: no questions,
+no messages, no general assistant. And Android Auto refuses to run apps that
+did not come from a trusted store in a real car, which a GitHub release is
+not; it takes Android Auto's own developer "unknown sources" setting to run
+a sideloaded one. Worth doing if the car is the point, and worth knowing it
+buys "play X" rather than Lin.
+
+*What does work in a car today.* The older Bluetooth path: a car kit or
+headset's voice-dial button sends `VOICE_COMMAND` to the phone, and Lin
+answers it — summoned, so the microphone opens, exactly as the power button
+does. This is the hands-free profile rather than projection, so it works when
+the phone is connected by Bluetooth and Android Auto is not running; whether
+a given head unit sends it belongs to the head unit. And "Hey Lin" on the
+phone itself, which needs the overlay permission to be able to open anything.
+
+*Android Automotive* — the Android built into a car rather than projected to
 it — does allow a third-party `VoiceInteractionService` to take the wheel
-button. That is a different product surface and a different build; it is
-noted here rather than attempted.
+button. Different product surface, different build; noted rather than
+attempted.
 
 **Decided: no rename.** `com.lin.agent` stays. See Phase 7.
 
@@ -785,6 +821,47 @@ Notification replies shipped under Phase 4, and not with the read-back this
 planned. Lin writes the reply onto the screen and the person sends it: the
 read-back design puts a 2B model in charge of deciding what agreement sounds
 like, on an action with no composer and no undo.
+
+### Phase 9 — The phone itself
+
+Asked for after a build where "turn the flashlight on" was answered, correctly
+and uselessly, with "I do not have a tool to control the flashlight directly."
+
+**Done: the switches.** The flashlight and Do Not Disturb are Lin's to set and
+are set outright. Wi-Fi, Bluetooth, NFC and aeroplane mode are not, and the
+reason is worth writing down because the code looks like it should work:
+`WifiManager.setWifiEnabled` and `BluetoothAdapter.enable` are still in the
+SDK and still compile, and they return `false` rather than throwing. Android
+took Wi-Fi from apps in 10 and Bluetooth in 13; NFC never had an API and
+aeroplane mode never will. So for those four, Lin opens the system's own
+panel — one tap, and the user sees exactly what is being changed — and the
+tool result says it is ready to tap rather than done. The table is a tested
+function rather than a comment, because the failing version of this is an
+assistant that says "Wi-Fi is off" having changed nothing.
+
+A question is answered rather than acted on. A small model hands the whole
+sentence through as the argument, so "is the flashlight on?" arrived as the
+state to set; reading that as an instruction turns the torch on in somebody's
+pocket.
+
+**Done: opening apps**, by the name somebody says, matched in a tested
+function because opening Facebook Messenger for "messages" is not a near miss.
+Nothing is opened on a guess: an app that is not installed is said.
+
+**Done: playing music**, in the app the user chose — which Lin asks for rather
+than guessing, because somebody with three services installed pays for one of
+them. Three ways in, tried in order: Android's `MEDIA_PLAY_FROM_SEARCH`, then
+a search link into the app, then opening the app. Support for the first is
+uneven and undocumented per app and there is no way to ask an app which it
+does, so afterwards Lin looks at what the phone is actually playing and
+reports that — "it is open on the search" when that is what happened, rather
+than "I played it" because an intent did not throw.
+
+**Not MobileActions-270M.** The question came back with this work: would a
+small action model help? No, and the reason is the same as when it was parked.
+Nothing here was ever blocked on understanding "turn the flashlight on" — a 2B
+model does that from the tool name alone. What was missing was the tool, and
+what limits the rest is Android's permission model, which no model changes.
 
 ### Phase 8 — Thinking, and documents
 
