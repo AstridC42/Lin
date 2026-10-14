@@ -27,6 +27,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -44,7 +47,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -52,6 +57,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -87,16 +94,16 @@ import com.lin.agent.voice.openAppearOverOtherApps
 import com.lin.agent.voice.openAssistantSettings
 
 /**
- * Settings, which for now is the server address and what the phone can run.
+ * Settings, in five groups.
  *
- * The address is a single free-text URL rather than a host and a port, because it has to accept
- * both ways this server gets reached: a LAN address at home, and a Cloudflare tunnel hostname
- * from outside. Those differ in scheme, port and host shape.
+ * It was one page until it was fourteen sections long, at which point finding the music app
+ * meant scrolling past the model downloads - so the sections are grouped behind tabs, in the
+ * order somebody sets Lin up in. Nothing moved between sections and nothing was dropped; the
+ * page was cut into five.
  *
- * The header field is here from the start rather than added later, and it is worth saying why: a
- * tunnel puts the server on the public internet, and Ollama has no authentication of its own.
- * Without something in front of it, anyone who learns the hostname can use the GPU and read the
- * prompts. This is where a Cloudflare Access service token or a bearer token goes.
+ * Each group is a function below rather than a file of its own. They are one screen's worth of
+ * layout that shares one state object, and splitting them across files would mean passing that
+ * state through five public signatures to no benefit.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,11 +117,404 @@ fun SettingsScreen(
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
 
+  // Which group is open. Saved, because on a foldable the screen is recreated every time the
+  // device is opened and losing your place mid-setup is the whole reason this is not one long
+  // page any more. Held as an ordinal rather than the enum, because that is what survives being
+  // written into a Bundle without a Saver.
+  var openTab by rememberSaveable { mutableIntStateOf(0) }
+  val tab = SettingsTab.entries[openTab.coerceIn(SettingsTab.entries.indices)]
+
+  Scaffold(
+    topBar = {
+      Column {
+        TopAppBar(
+          title = { Text(stringResource(R.string.settings_title)) },
+          navigationIcon = {
+            IconButton(onClick = onBack) {
+              Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.back),
+              )
+            }
+          },
+        )
+        // Fixed rather than scrollable: five short labels fit across a phone, and tabs that
+        // have to be scrolled to be seen hide the thing somebody came here for.
+        PrimaryTabRow(selectedTabIndex = tab.ordinal) {
+          SettingsTab.entries.forEachIndexed { index, each ->
+            Tab(
+              selected = each == tab,
+              onClick = { openTab = index },
+              text = { Text(stringResource(each.title)) },
+            )
+          }
+        }
+      }
+    },
+    modifier = Modifier.imePadding(),
+  ) { padding ->
+    val scroll = rememberScrollState()
+    // A new tab starts at its top. Carrying the last tab's scroll position into a shorter page
+    // lands somebody in the middle of it, or past the end of it.
+    LaunchedEffect(tab) { scroll.scrollTo(0) }
+
+    Column(
+      modifier =
+        Modifier.fillMaxSize()
+          .padding(padding)
+          .padding(horizontal = 20.dp)
+          .verticalScroll(scroll),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      // Exhaustive on the enum, with no else: adding a group to the list below without giving
+      // it anything to show is then a compile error rather than an empty tab.
+      when (tab) {
+        SettingsTab.MODELS -> ModelsTab(state, viewModel)
+        SettingsTab.SERVER -> ServerTab(state, viewModel)
+        SettingsTab.VOICE -> VoiceTab(state, viewModel)
+        SettingsTab.PHONE -> PhoneTab(state, viewModel)
+        SettingsTab.DATA ->
+          DataTab(state, viewModel, onOpenMemory, onOpenDocuments, onOpenTraining, onOpenBackup)
+      }
+      // The last section of any tab should not sit against the navigation bar.
+      Spacer(modifier = Modifier.height(24.dp))
+    }
+  }
+}
+
+/**
+ * The groups, in the order they are shown.
+ *
+ * An enum rather than a list of labels so that the tabs and what each one shows cannot drift
+ * apart: the `when` that draws them has no else, so a group added here without content does
+ * not compile.
+ *
+ * The order is roughly "what answers" to "what it keeps", which is also the order somebody
+ * sets Lin up in: a model first, because nothing works without one.
+ */
+private enum class SettingsTab(@param:StringRes val title: Int) {
+  MODELS(R.string.settings_tab_models),
+  SERVER(R.string.settings_tab_server),
+  VOICE(R.string.settings_tab_voice),
+  PHONE(R.string.settings_tab_phone),
+  DATA(R.string.settings_tab_data),
+}
+
+/**
+ * What answers, and how hard it thinks.
+ *
+ * Reasoning sits with the models rather than on its own: it is a property of the model doing
+ * the answering, and it is the thing somebody reaches for straight after choosing one.
+ */
+@Composable
+private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewModel) {
+  Text(
+    stringResource(R.string.settings_models_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_device, state.memoryGb, state.socModel.ifEmpty { "?" }),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  for (line in state.models) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+      Column(
+        modifier = Modifier.padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+      ) {
+        Text(line.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+          line.detail,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // Only for what is actually here. Offering to use something not downloaded would
+        // be a button that cannot work.
+        if (line.present && line.model.role == ModelRole.CHAT) {
+          if (state.chatModel == line.name) {
+            TextButton(onClick = { viewModel.useChatModel(line.name) }) {
+              Text(stringResource(R.string.model_chosen))
+            }
+          } else {
+            OutlinedButton(onClick = { viewModel.useChatModel(line.name) }) {
+              Text(stringResource(R.string.model_use))
+            }
+          }
+        }
+        when (val download = line.download) {
+          DownloadState.Waiting ->
+            // Indeterminate, because nothing is moving yet. Showing a bar stuck at zero is
+            // how a queued download gets mistaken for a broken one.
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+              LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Text(
+                  stringResource(R.string.download_waiting),
+                  style = MaterialTheme.typography.bodySmall,
+                )
+                TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
+                  Text(stringResource(R.string.download_stop))
+                }
+              }
+            }
+          is DownloadState.Running -> {
+            // Determinate where the total is known, which it is from the catalogue. A
+            // spinner for a twenty-minute transfer tells the user nothing.
+            LinearProgressIndicator(
+              progress = { download.percent / 100f },
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Text(
+                stringResource(
+                  R.string.download_progress,
+                  download.percent,
+                  "%.1f".format(download.receivedBytes / 1_000_000_000.0),
+                  "%.1f".format(download.totalBytes / 1_000_000_000.0),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+              )
+              TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
+                Text(stringResource(R.string.download_stop))
+              }
+            }
+          }
+          is DownloadState.Failed ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+              Text(
+                download.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+              )
+              // Resuming, not restarting: whatever arrived is still on disk.
+              Button(onClick = { viewModel.download(line.model) }) {
+                Text(stringResource(R.string.download_retry))
+              }
+            }
+          else ->
+            if (line.present) {
+              Text(
+                stringResource(R.string.download_ready),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+              )
+            } else {
+              Button(onClick = { viewModel.download(line.model) }) {
+                Text(stringResource(R.string.download_start))
+              }
+            }
+        }
+      }
+    }
+  }
+  // Still shown now that downloading works, because copying a file in is the one way to
+  // avoid spending two and a half gigabytes of somebody's allowance twice.
+  Text(
+    stringResource(R.string.settings_models_where),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Text(
+    state.modelsDirectory,
+    style = MaterialTheme.typography.bodySmall,
+    fontFamily = FontFamily.Monospace,
+    modifier = Modifier.padding(bottom = 32.dp),
+  )
+
+  Text(
+    stringResource(R.string.settings_reasoning_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_reasoning_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Column {
+      // Radio rows rather than a slider: there are three of them and each one needs a
+      // sentence saying what it costs, which a slider has nowhere to put.
+      ReasoningChoice(
+        level = Reasoning.OFF,
+        label = R.string.settings_reasoning_off,
+        detail = R.string.settings_reasoning_off_detail,
+        selected = state.reasoning,
+        onPick = viewModel::setReasoning,
+      )
+      ReasoningChoice(
+        level = Reasoning.BRIEF,
+        label = R.string.settings_reasoning_brief,
+        detail = R.string.settings_reasoning_brief_detail,
+        selected = state.reasoning,
+        onPick = viewModel::setReasoning,
+      )
+      ReasoningChoice(
+        level = Reasoning.THOROUGH,
+        label = R.string.settings_reasoning_thorough,
+        detail = R.string.settings_reasoning_thorough_detail,
+        selected = state.reasoning,
+        onPick = viewModel::setReasoning,
+      )
+    }
+  }
+  // Said plainly, because the levels mean something different depending on which model is
+  // answering and a setting that silently means two things is worse than one that explains.
+  if (state.answerOnServer) {
+    Text(
+      stringResource(R.string.settings_reasoning_unavailable),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+}
+
+/**
+ * The machine at the other end: where it is, what it is, and which of its models to use.
+ *
+ * The address is a single free-text URL rather than a host and a port, because it has to accept
+ * both ways this server gets reached: a LAN address at home, and a Cloudflare tunnel hostname
+ * from outside. Those differ in scheme, port and host shape.
+ *
+ * The header field is here from the start rather than added later, and it is worth saying why: a
+ * tunnel puts the server on the public internet, and Ollama has no authentication of its own.
+ * Without something in front of it, anyone who learns the hostname can use the GPU and read the
+ * prompts. This is where a Cloudflare Access service token or a bearer token goes.
+ */
+@Composable
+private fun ColumnScope.ServerTab(state: SettingsState, viewModel: SettingsViewModel) {
+  Text(
+    stringResource(R.string.settings_server_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 16.dp),
+  )
+  Text(
+    stringResource(R.string.settings_server_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  // Which kind, before the address, because it decides what a correct address looks like
+  // and what the key field is for.
+  Row(
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    ServerKind.entries.forEach { kind ->
+      FilterChip(
+        selected = state.serverKind == kind,
+        onClick = { viewModel.setServerKind(kind) },
+        label = { Text(serverKindLabel(kind)) },
+      )
+    }
+  }
+  Text(
+    stringResource(serverKindDetail(state.serverKind)),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+
+  OutlinedTextField(
+    value = state.ollamaUrl,
+    onValueChange = viewModel::onUrlChanged,
+    label = { Text(stringResource(R.string.settings_server_url)) },
+    placeholder = { Text(serverKindPlaceholder(state.serverKind)) },
+    singleLine = true,
+    modifier = Modifier.fillMaxWidth(),
+  )
+  OutlinedTextField(
+    value = state.ollamaAuthHeader,
+    onValueChange = viewModel::onAuthHeaderChanged,
+    label = { Text(stringResource(R.string.settings_server_header)) },
+    placeholder = { Text("Authorization: Bearer ...") },
+    // Not single-line, because a Cloudflare Access service token is two headers and this
+    // field exists for exactly that case.
+    singleLine = false,
+    minLines = 1,
+    maxLines = 4,
+    modifier = Modifier.fillMaxWidth(),
+  )
+  Text(
+    stringResource(R.string.settings_server_header_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Button(onClick = viewModel::save) { Text(stringResource(R.string.settings_save)) }
+    if (state.saved) {
+      Text(
+        stringResource(R.string.settings_saved),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 14.dp),
+      )
+    }
+  }
+
+  Text(
+    stringResource(R.string.settings_server_models_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_server_models_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  ServerModels(
+    state = state.serverModels,
+    picked = state.serverModel,
+    typed = state.serverModelTyped,
+    onCheck = viewModel::checkServer,
+    onPick = viewModel::pickServerModel,
+    onType = viewModel::typeServerModel,
+  )
+
+  Text(
+    stringResource(R.string.settings_answer_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_answer_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+      ChoiceRow(
+        title = stringResource(R.string.settings_answer_phone),
+        detail = stringResource(R.string.settings_answer_phone_detail),
+        selected = !state.answerOnServer,
+        onPick = { viewModel.setAnswerOnServer(false) },
+      )
+      ChoiceRow(
+        title = stringResource(R.string.settings_answer_server),
+        detail = stringResource(R.string.settings_answer_server_detail),
+        selected = state.answerOnServer,
+        onPick = { viewModel.setAnswerOnServer(true) },
+      )
+    }
+  }
+}
+
+/**
+ * Being spoken to and answering out loud, and the two permissions that decide whether either
+ * works at all - see linIsTheAssistant and canAppearOverOtherApps.
+ */
+@Composable
+private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewModel) {
   // Two things the phone grants and this screen only reports: whether Lin is the assistant, and
   // whether it may open a window from the background. Both are set in the phone's own settings,
   // so both are stale the moment somebody goes there and comes back - hence read again on every
-  // return to the front rather than once. They are declared here, above every section that uses
-  // them, because the wake word reads the second one and comes first on screen.
+  // return to the front rather than once.
   val systemContext = LocalContext.current
   var isAssistant by remember { mutableStateOf(linIsTheAssistant(systemContext)) }
   var mayAppearOverOtherApps by remember { mutableStateOf(canAppearOverOtherApps(systemContext)) }
@@ -130,722 +530,430 @@ fun SettingsScreen(
     onDispose { systemLifecycle.lifecycle.removeObserver(observer) }
   }
 
-  Scaffold(
-    topBar = {
-      TopAppBar(
-        title = { Text(stringResource(R.string.settings_title)) },
-        navigationIcon = {
-          IconButton(onClick = onBack) {
-            Icon(
-              Icons.AutoMirrored.Filled.ArrowBack,
-              contentDescription = stringResource(R.string.back),
-            )
-          }
-        },
-      )
+  Text(
+    stringResource(R.string.settings_voice_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_voice_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          stringResource(R.string.settings_spoken_replies),
+          style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+          stringResource(R.string.settings_spoken_replies_detail),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      Switch(checked = state.spokenReplies, onCheckedChange = viewModel::setSpokenReplies)
+    }
+  }
+  val context = LocalContext.current
+
+  // Whether Lin is actually the assistant, read again every time this screen comes back to
+  // the front - because the only way to change it is to leave for the system's settings and
+  // come back, so a value read once is stale exactly when somebody is looking at it.
+
+  // Said before the button rather than after it, because this is the answer to the question
+  // somebody opens this section with: the power button does nothing, is Lin even set? Three
+  // states and not two - null is the phone declining to say, and guessing "no" there would
+  // be a made-up fact on the one screen meant to clear this up.
+  var noAssistantScreen by remember { mutableStateOf(false) }
+  Text(
+    stringResource(
+      when (isAssistant) {
+        true -> R.string.settings_assistant_is_lin
+        false -> R.string.settings_assistant_is_other
+        null -> R.string.settings_assistant_unknown
+      }
+    ),
+    style = MaterialTheme.typography.bodyMedium,
+    color =
+      if (isAssistant == true) MaterialTheme.colorScheme.onSurface
+      else MaterialTheme.colorScheme.error,
+  )
+  OutlinedButton(
+    // Android gives no way to request the assistant role directly - it is the user's
+    // choice to make in their own settings, which is correct. This only takes them there,
+    // to whichever of those screens the phone actually has: starting one it does not
+    // throws, and this button used to swallow that and look broken.
+    onClick = { noAssistantScreen = !openAssistantSettings(context) },
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Text(stringResource(R.string.settings_set_assistant))
+  }
+  Text(
+    stringResource(
+      if (noAssistantScreen) R.string.settings_assistant_no_screen
+      else R.string.settings_assistant_detail
+    ),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+
+  // The panel, from inside the app. Half a feature and half a diagnosis: it is the only way
+  // to see the thing without a working summon, and whether it appears from here says which
+  // half is broken - Lin, or the phone's idea of which app it should be asking.
+  OutlinedButton(
+    onClick = {
+      runCatching {
+        context.startActivity(
+          Intent(context, AssistActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+      }
     },
-    modifier = Modifier.imePadding(),
-  ) { padding ->
-    Column(
-      modifier =
-        Modifier.fillMaxSize()
-          .padding(padding)
-          .padding(horizontal = 20.dp)
-          .verticalScroll(rememberScrollState()),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Text(stringResource(R.string.settings_try_panel))
+  }
+  Text(
+    stringResource(R.string.settings_try_panel_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+
+  Text(
+    stringResource(R.string.settings_wake_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_wake_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  val wakeContext = LocalContext.current
+  val wakePermission =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      viewModel.setWakeWord(on = true, granted = granted)
+      if (granted) WakeService.start(wakeContext)
+    }
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically,
     ) {
       Text(
-        stringResource(R.string.settings_server_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 16.dp),
+        stringResource(R.string.settings_wake),
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier.weight(1f),
       )
-      Text(
-        stringResource(R.string.settings_server_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      // Which kind, before the address, because it decides what a correct address looks like
-      // and what the key field is for.
-      Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        ServerKind.entries.forEach { kind ->
-          FilterChip(
-            selected = state.serverKind == kind,
-            onClick = { viewModel.setServerKind(kind) },
-            label = { Text(serverKindLabel(kind)) },
-          )
-        }
-      }
-      Text(
-        stringResource(serverKindDetail(state.serverKind)),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-
-      OutlinedTextField(
-        value = state.ollamaUrl,
-        onValueChange = viewModel::onUrlChanged,
-        label = { Text(stringResource(R.string.settings_server_url)) },
-        placeholder = { Text(serverKindPlaceholder(state.serverKind)) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-      )
-      OutlinedTextField(
-        value = state.ollamaAuthHeader,
-        onValueChange = viewModel::onAuthHeaderChanged,
-        label = { Text(stringResource(R.string.settings_server_header)) },
-        placeholder = { Text("Authorization: Bearer ...") },
-        // Not single-line, because a Cloudflare Access service token is two headers and this
-        // field exists for exactly that case.
-        singleLine = false,
-        minLines = 1,
-        maxLines = 4,
-        modifier = Modifier.fillMaxWidth(),
-      )
-      Text(
-        stringResource(R.string.settings_server_header_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Button(onClick = viewModel::save) { Text(stringResource(R.string.settings_save)) }
-        if (state.saved) {
-          Text(
-            stringResource(R.string.settings_saved),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 14.dp),
-          )
-        }
-      }
-
-      Text(
-        stringResource(R.string.settings_messages_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_messages_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      val messagesContext = LocalContext.current
-      OutlinedButton(
-        onClick = {
-          // Notification access cannot be requested - only granted by the user in their own
-          // settings, which for this capability is right.
-          runCatching {
-            messagesContext.startActivity(
-              Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
+      Switch(
+        checked = state.wakeWord,
+        onCheckedChange = { wanted ->
+          if (wanted) {
+            wakePermission.launch(Manifest.permission.RECORD_AUDIO)
+          } else {
+            viewModel.setWakeWord(on = false, granted = false)
+            WakeService.stop(wakeContext)
           }
         },
+      )
+    }
+  }
+
+  // The second half of a working wake word, and the half nobody would guess at. Shown only
+  // while the wake word is on: it is not a permission to ask for otherwise.
+  if (state.wakeWord) {
+    Text(
+      stringResource(
+        if (mayAppearOverOtherApps) R.string.settings_overlay_granted
+        else R.string.settings_overlay_missing
+      ),
+      style = MaterialTheme.typography.bodySmall,
+      color =
+        if (mayAppearOverOtherApps) MaterialTheme.colorScheme.onSurfaceVariant
+        else MaterialTheme.colorScheme.error,
+    )
+    if (!mayAppearOverOtherApps) {
+      OutlinedButton(
+        onClick = { openAppearOverOtherApps(wakeContext) },
         modifier = Modifier.fillMaxWidth(),
       ) {
-        Text(stringResource(R.string.settings_notification_access))
+        Text(stringResource(R.string.settings_overlay_button))
       }
+    }
+  }
+}
 
-      Text(
-        stringResource(R.string.settings_wake_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_wake_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      val wakeContext = LocalContext.current
-      val wakePermission =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-          viewModel.setWakeWord(on = true, granted = granted)
-          if (granted) WakeService.start(wakeContext)
-        }
-      Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-          horizontalArrangement = Arrangement.spacedBy(12.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            stringResource(R.string.settings_wake),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-          )
-          Switch(
-            checked = state.wakeWord,
-            onCheckedChange = { wanted ->
-              if (wanted) {
-                wakePermission.launch(Manifest.permission.RECORD_AUDIO)
-              } else {
-                viewModel.setWakeWord(on = false, granted = false)
-                WakeService.stop(wakeContext)
-              }
-            },
-          )
-        }
-      }
-
-      // The second half of a working wake word, and the half nobody would guess at. Shown only
-      // while the wake word is on: it is not a permission to ask for otherwise.
-      if (state.wakeWord) {
+/** What Lin may touch on the phone itself: calls, messages, the calendar, photos, music. */
+@Composable
+private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewModel) {
+  Text(
+    stringResource(R.string.settings_phone_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  // The permission is asked for as the switch goes on, and a refusal leaves it off - a
+  // stored "yes" the permission does not back would make the setting lie about what Lin
+  // can do, and the policy requires both regardless.
+  val callPermission =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      viewModel.setAllowDirectCalls(allow = granted, granted = granted)
+    }
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          stringResource(R.string.settings_direct_calls),
+          style = MaterialTheme.typography.bodyLarge,
+        )
         Text(
           stringResource(
-            if (mayAppearOverOtherApps) R.string.settings_overlay_granted
-            else R.string.settings_overlay_missing
+            if (state.allowDirectCalls) R.string.settings_direct_calls_on
+            else R.string.settings_direct_calls_off
           ),
           style = MaterialTheme.typography.bodySmall,
           color =
-            if (mayAppearOverOtherApps) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.error,
-        )
-        if (!mayAppearOverOtherApps) {
-          OutlinedButton(
-            onClick = { openAppearOverOtherApps(wakeContext) },
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Text(stringResource(R.string.settings_overlay_button))
-          }
-        }
-      }
-
-      Text(
-        stringResource(R.string.settings_calendar_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_calendar_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      val calendarPermission =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-          viewModel.refreshCalendarAccess(granted)
-        }
-      if (state.calendarPermitted) {
-        Text(
-          stringResource(R.string.settings_calendar_granted),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      } else {
-        OutlinedButton(
-          onClick = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) },
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          Text(stringResource(R.string.settings_calendar_allow))
-        }
-      }
-
-      Text(
-        stringResource(R.string.settings_reasoning_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_reasoning_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Card(modifier = Modifier.fillMaxWidth()) {
-        Column {
-          // Radio rows rather than a slider: there are three of them and each one needs a
-          // sentence saying what it costs, which a slider has nowhere to put.
-          ReasoningChoice(
-            level = Reasoning.OFF,
-            label = R.string.settings_reasoning_off,
-            detail = R.string.settings_reasoning_off_detail,
-            selected = state.reasoning,
-            onPick = viewModel::setReasoning,
-          )
-          ReasoningChoice(
-            level = Reasoning.BRIEF,
-            label = R.string.settings_reasoning_brief,
-            detail = R.string.settings_reasoning_brief_detail,
-            selected = state.reasoning,
-            onPick = viewModel::setReasoning,
-          )
-          ReasoningChoice(
-            level = Reasoning.THOROUGH,
-            label = R.string.settings_reasoning_thorough,
-            detail = R.string.settings_reasoning_thorough_detail,
-            selected = state.reasoning,
-            onPick = viewModel::setReasoning,
-          )
-        }
-      }
-      // Said plainly, because the levels mean something different depending on which model is
-      // answering and a setting that silently means two things is worse than one that explains.
-      if (state.answerOnServer) {
-        Text(
-          stringResource(R.string.settings_reasoning_unavailable),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (state.allowDirectCalls) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
-
-      Text(
-        stringResource(R.string.settings_memory_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-          horizontalArrangement = Arrangement.spacedBy(12.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              stringResource(R.string.settings_digest),
-              style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-              stringResource(R.string.settings_digest_detail),
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
-          Switch(
-            checked = state.digestConversations,
-            onCheckedChange = viewModel::setDigestConversations,
-          )
-        }
-      }
-
-      OutlinedButton(onClick = onOpenDocuments, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.documents_title))
-      }
-
-      OutlinedButton(onClick = onOpenTraining, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.training_title))
-      }
-
-      OutlinedButton(onClick = onOpenBackup, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.backup_title))
-      }
-
-      OutlinedButton(
-        onClick = onOpenMemory,
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-      ) {
-        Text(stringResource(R.string.settings_open_memory))
-      }
-
-      Text(
-        stringResource(R.string.settings_voice_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_voice_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-          horizontalArrangement = Arrangement.spacedBy(12.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              stringResource(R.string.settings_spoken_replies),
-              style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-              stringResource(R.string.settings_spoken_replies_detail),
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
-          Switch(checked = state.spokenReplies, onCheckedChange = viewModel::setSpokenReplies)
-        }
-      }
-      val context = LocalContext.current
-
-      // Whether Lin is actually the assistant, read again every time this screen comes back to
-      // the front - because the only way to change it is to leave for the system's settings and
-      // come back, so a value read once is stale exactly when somebody is looking at it.
-
-      // Said before the button rather than after it, because this is the answer to the question
-      // somebody opens this section with: the power button does nothing, is Lin even set? Three
-      // states and not two - null is the phone declining to say, and guessing "no" there would
-      // be a made-up fact on the one screen meant to clear this up.
-      var noAssistantScreen by remember { mutableStateOf(false) }
-      Text(
-        stringResource(
-          when (isAssistant) {
-            true -> R.string.settings_assistant_is_lin
-            false -> R.string.settings_assistant_is_other
-            null -> R.string.settings_assistant_unknown
-          }
-        ),
-        style = MaterialTheme.typography.bodyMedium,
-        color =
-          if (isAssistant == true) MaterialTheme.colorScheme.onSurface
-          else MaterialTheme.colorScheme.error,
-      )
-      OutlinedButton(
-        // Android gives no way to request the assistant role directly - it is the user's
-        // choice to make in their own settings, which is correct. This only takes them there,
-        // to whichever of those screens the phone actually has: starting one it does not
-        // throws, and this button used to swallow that and look broken.
-        onClick = { noAssistantScreen = !openAssistantSettings(context) },
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Text(stringResource(R.string.settings_set_assistant))
-      }
-      Text(
-        stringResource(
-          if (noAssistantScreen) R.string.settings_assistant_no_screen
-          else R.string.settings_assistant_detail
-        ),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-
-      // The panel, from inside the app. Half a feature and half a diagnosis: it is the only way
-      // to see the thing without a working summon, and whether it appears from here says which
-      // half is broken - Lin, or the phone's idea of which app it should be asking.
-      OutlinedButton(
-        onClick = {
-          runCatching {
-            context.startActivity(
-              Intent(context, AssistActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-          }
+      Switch(
+        checked = state.allowDirectCalls,
+        onCheckedChange = { wanted ->
+          if (wanted) callPermission.launch(Manifest.permission.CALL_PHONE)
+          else viewModel.setAllowDirectCalls(allow = false, granted = false)
         },
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Text(stringResource(R.string.settings_try_panel))
-      }
-      Text(
-        stringResource(R.string.settings_try_panel_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-
-      Text(
-        stringResource(R.string.settings_photos_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_photos_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      val photoPermission =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-          viewModel.indexPhotos(granted)
-        }
-      when (val indexing = state.photoIndex) {
-        is IndexState.Running ->
-          Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (indexing.total > 0) {
-              LinearProgressIndicator(
-                progress = { indexing.done.toFloat() / indexing.total },
-                modifier = Modifier.fillMaxWidth(),
-              )
-            } else {
-              LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-              Text(
-                if (indexing.total > 0) {
-                  stringResource(
-                    R.string.settings_photos_progress,
-                    indexing.done,
-                    indexing.total,
-                  )
-                } else stringResource(R.string.settings_photos_preparing),
-                style = MaterialTheme.typography.bodySmall,
-              )
-              TextButton(onClick = viewModel::stopIndexing) {
-                Text(stringResource(R.string.settings_photos_stop))
-              }
-            }
-          }
-        is IndexState.Failed ->
-          Text(
-            indexing.message,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-          )
-        else -> Unit
-      }
-      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedButton(
-          onClick = { photoPermission.launch(photoPermissionName()) },
-          enabled = state.photoIndex !is IndexState.Running,
-        ) {
-          Text(
-            stringResource(
-              if (state.photosIndexed > 0) R.string.settings_photos_continue
-              else R.string.settings_photos_start
-            )
-          )
-        }
-        if (state.photosIndexed > 0) {
-          TextButton(onClick = viewModel::clearPhotoIndex) {
-            Text(stringResource(R.string.settings_photos_clear))
-          }
-        }
-      }
-      Text(
-        if (state.photosIndexed > 0) {
-          stringResource(R.string.settings_photos_indexed, state.photosIndexed)
-        } else stringResource(R.string.settings_photos_none),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-
-      Text(
-        stringResource(R.string.settings_phone_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      // The permission is asked for as the switch goes on, and a refusal leaves it off - a
-      // stored "yes" the permission does not back would make the setting lie about what Lin
-      // can do, and the policy requires both regardless.
-      val callPermission =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-          viewModel.setAllowDirectCalls(allow = granted, granted = granted)
-        }
-      Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-          horizontalArrangement = Arrangement.spacedBy(12.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              stringResource(R.string.settings_direct_calls),
-              style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-              stringResource(
-                if (state.allowDirectCalls) R.string.settings_direct_calls_on
-                else R.string.settings_direct_calls_off
-              ),
-              style = MaterialTheme.typography.bodySmall,
-              color =
-                if (state.allowDirectCalls) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
-          Switch(
-            checked = state.allowDirectCalls,
-            onCheckedChange = { wanted ->
-              if (wanted) callPermission.launch(Manifest.permission.CALL_PHONE)
-              else viewModel.setAllowDirectCalls(allow = false, granted = false)
-            },
-          )
-        }
-      }
-
-      Text(
-        stringResource(R.string.settings_answer_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_answer_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-          ChoiceRow(
-            title = stringResource(R.string.settings_answer_phone),
-            detail = stringResource(R.string.settings_answer_phone_detail),
-            selected = !state.answerOnServer,
-            onPick = { viewModel.setAnswerOnServer(false) },
-          )
-          ChoiceRow(
-            title = stringResource(R.string.settings_answer_server),
-            detail = stringResource(R.string.settings_answer_server_detail),
-            selected = state.answerOnServer,
-            onPick = { viewModel.setAnswerOnServer(true) },
-          )
-        }
-      }
-
-      Text(
-        stringResource(R.string.settings_server_models_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_server_models_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      ServerModels(
-        state = state.serverModels,
-        picked = state.serverModel,
-        typed = state.serverModelTyped,
-        onCheck = viewModel::checkServer,
-        onPick = viewModel::pickServerModel,
-        onType = viewModel::typeServerModel,
-      )
-
-      Text(
-        stringResource(R.string.settings_music_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_music_detail),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      if (state.musicApps.isEmpty()) {
-        Text(
-          stringResource(R.string.settings_music_none),
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-      for (app in state.musicApps) {
-        ChoiceRow(
-          title = app.label,
-          detail = app.packageName,
-          selected = state.musicApp == app.packageName,
-          onPick = { viewModel.useMusicApp(app.packageName) },
-        )
-      }
-
-      Text(
-        stringResource(R.string.settings_models_heading),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp),
-      )
-      Text(
-        stringResource(R.string.settings_device, state.memoryGb, state.socModel.ifEmpty { "?" }),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      for (line in state.models) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-          Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-          ) {
-            Text(line.name, style = MaterialTheme.typography.bodyLarge)
-            Text(
-              line.detail,
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            // Only for what is actually here. Offering to use something not downloaded would
-            // be a button that cannot work.
-            if (line.present && line.model.role == ModelRole.CHAT) {
-              if (state.chatModel == line.name) {
-                TextButton(onClick = { viewModel.useChatModel(line.name) }) {
-                  Text(stringResource(R.string.model_chosen))
-                }
-              } else {
-                OutlinedButton(onClick = { viewModel.useChatModel(line.name) }) {
-                  Text(stringResource(R.string.model_use))
-                }
-              }
-            }
-            when (val download = line.download) {
-              DownloadState.Waiting ->
-                // Indeterminate, because nothing is moving yet. Showing a bar stuck at zero is
-                // how a queued download gets mistaken for a broken one.
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                  LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                  Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                  ) {
-                    Text(
-                      stringResource(R.string.download_waiting),
-                      style = MaterialTheme.typography.bodySmall,
-                    )
-                    TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
-                      Text(stringResource(R.string.download_stop))
-                    }
-                  }
-                }
-              is DownloadState.Running -> {
-                // Determinate where the total is known, which it is from the catalogue. A
-                // spinner for a twenty-minute transfer tells the user nothing.
-                LinearProgressIndicator(
-                  progress = { download.percent / 100f },
-                  modifier = Modifier.fillMaxWidth(),
-                )
-                Row(
-                  modifier = Modifier.fillMaxWidth(),
-                  horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                  Text(
-                    stringResource(
-                      R.string.download_progress,
-                      download.percent,
-                      "%.1f".format(download.receivedBytes / 1_000_000_000.0),
-                      "%.1f".format(download.totalBytes / 1_000_000_000.0),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                  )
-                  TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
-                    Text(stringResource(R.string.download_stop))
-                  }
-                }
-              }
-              is DownloadState.Failed ->
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                  Text(
-                    download.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                  )
-                  // Resuming, not restarting: whatever arrived is still on disk.
-                  Button(onClick = { viewModel.download(line.model) }) {
-                    Text(stringResource(R.string.download_retry))
-                  }
-                }
-              else ->
-                if (line.present) {
-                  Text(
-                    stringResource(R.string.download_ready),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                  )
-                } else {
-                  Button(onClick = { viewModel.download(line.model) }) {
-                    Text(stringResource(R.string.download_start))
-                  }
-                }
-            }
-          }
-        }
-      }
-      // Still shown now that downloading works, because copying a file in is the one way to
-      // avoid spending two and a half gigabytes of somebody's allowance twice.
-      Text(
-        stringResource(R.string.settings_models_where),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Text(
-        state.modelsDirectory,
-        style = MaterialTheme.typography.bodySmall,
-        fontFamily = FontFamily.Monospace,
-        modifier = Modifier.padding(bottom = 32.dp),
       )
     }
+  }
+
+  Text(
+    stringResource(R.string.settings_messages_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_messages_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  val messagesContext = LocalContext.current
+  OutlinedButton(
+    onClick = {
+      // Notification access cannot be requested - only granted by the user in their own
+      // settings, which for this capability is right.
+      runCatching {
+        messagesContext.startActivity(
+          Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+      }
+    },
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Text(stringResource(R.string.settings_notification_access))
+  }
+
+  Text(
+    stringResource(R.string.settings_calendar_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_calendar_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  val calendarPermission =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      viewModel.refreshCalendarAccess(granted)
+    }
+  if (state.calendarPermitted) {
+    Text(
+      stringResource(R.string.settings_calendar_granted),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  } else {
+    OutlinedButton(
+      onClick = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) },
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Text(stringResource(R.string.settings_calendar_allow))
+    }
+  }
+
+  Text(
+    stringResource(R.string.settings_music_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_music_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  if (state.musicApps.isEmpty()) {
+    Text(
+      stringResource(R.string.settings_music_none),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+  for (app in state.musicApps) {
+    ChoiceRow(
+      title = app.label,
+      detail = app.packageName,
+      selected = state.musicApp == app.packageName,
+      onPick = { viewModel.useMusicApp(app.packageName) },
+    )
+  }
+
+  Text(
+    stringResource(R.string.settings_photos_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_photos_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  val photoPermission =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      viewModel.indexPhotos(granted)
+    }
+  when (val indexing = state.photoIndex) {
+    is IndexState.Running ->
+      Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (indexing.total > 0) {
+          LinearProgressIndicator(
+            progress = { indexing.done.toFloat() / indexing.total },
+            modifier = Modifier.fillMaxWidth(),
+          )
+        } else {
+          LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+          Text(
+            if (indexing.total > 0) {
+              stringResource(
+                R.string.settings_photos_progress,
+                indexing.done,
+                indexing.total,
+              )
+            } else stringResource(R.string.settings_photos_preparing),
+            style = MaterialTheme.typography.bodySmall,
+          )
+          TextButton(onClick = viewModel::stopIndexing) {
+            Text(stringResource(R.string.settings_photos_stop))
+          }
+        }
+      }
+    is IndexState.Failed ->
+      Text(
+        indexing.message,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+      )
+    else -> Unit
+  }
+  Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    OutlinedButton(
+      onClick = { photoPermission.launch(photoPermissionName()) },
+      enabled = state.photoIndex !is IndexState.Running,
+    ) {
+      Text(
+        stringResource(
+          if (state.photosIndexed > 0) R.string.settings_photos_continue
+          else R.string.settings_photos_start
+        )
+      )
+    }
+    if (state.photosIndexed > 0) {
+      TextButton(onClick = viewModel::clearPhotoIndex) {
+        Text(stringResource(R.string.settings_photos_clear))
+      }
+    }
+  }
+  Text(
+    if (state.photosIndexed > 0) {
+      stringResource(R.string.settings_photos_indexed, state.photosIndexed)
+    } else stringResource(R.string.settings_photos_none),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+}
+
+/** What Lin keeps: memories, documents, the training copies, and a way out of all of it. */
+@Composable
+private fun ColumnScope.DataTab(
+  state: SettingsState,
+  viewModel: SettingsViewModel,
+  onOpenMemory: () -> Unit,
+  onOpenDocuments: () -> Unit,
+  onOpenTraining: () -> Unit,
+  onOpenBackup: () -> Unit,
+) {
+  Text(
+    stringResource(R.string.settings_memory_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          stringResource(R.string.settings_digest),
+          style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+          stringResource(R.string.settings_digest_detail),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      Switch(
+        checked = state.digestConversations,
+        onCheckedChange = viewModel::setDigestConversations,
+      )
+    }
+  }
+
+  OutlinedButton(onClick = onOpenDocuments, modifier = Modifier.fillMaxWidth()) {
+    Text(stringResource(R.string.documents_title))
+  }
+
+  OutlinedButton(onClick = onOpenTraining, modifier = Modifier.fillMaxWidth()) {
+    Text(stringResource(R.string.training_title))
+  }
+
+  OutlinedButton(onClick = onOpenBackup, modifier = Modifier.fillMaxWidth()) {
+    Text(stringResource(R.string.backup_title))
+  }
+
+  OutlinedButton(
+    onClick = onOpenMemory,
+    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+  ) {
+    Text(stringResource(R.string.settings_open_memory))
   }
 }
 
