@@ -26,12 +26,14 @@ import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.core.calendar.DEFAULT_DAYS_AHEAD
 import com.lin.agent.core.calendar.Timed
 import com.lin.agent.core.calendar.clockTime
+import com.lin.agent.core.calendar.dayFromWords
 import com.lin.agent.core.calendar.describeEvents
 import com.lin.agent.core.calendar.endOfDaysAhead
 import com.lin.agent.core.calendar.mayActWithoutConfirming
 import com.lin.agent.core.calendar.startOfEvent
 import com.lin.agent.core.calendar.startOfToday
 import com.lin.agent.core.calendar.timerMinutes
+import com.lin.agent.core.tools.LaunchGuard
 import com.lin.agent.engine.AgentRole
 import com.lin.agent.engine.AgentTool
 import com.lin.agent.engine.ParamType
@@ -90,7 +92,10 @@ class CalendarTool(private val calendars: Calendars) : AgentTool {
  * misreads a date cannot put anything in somebody's week - the worst it can do is open an
  * editor showing the wrong day, which is visible before it is saved.
  */
-class AddToCalendarTool(private val context: Context) : AgentTool {
+class AddToCalendarTool(
+  private val context: Context,
+  private val guard: LaunchGuard,
+) : AgentTool {
 
   override val name = "add_to_calendar"
 
@@ -101,6 +106,13 @@ class AddToCalendarTool(private val context: Context) : AgentTool {
   override val parameters =
     listOf(
       ToolParameter(name = "title", type = ParamType.STRING, description = "What the event is."),
+      ToolParameter(
+        name = "when",
+        type = ParamType.STRING,
+        description =
+          "Preferred. One of: today, tomorrow, a weekday name, or \"in 3 days\". Use this " +
+            "rather than working the date out yourself.",
+      ),
       ToolParameter(name = "year", type = ParamType.INTEGER, description = "Four digits."),
       ToolParameter(name = "month", type = ParamType.INTEGER, description = "1 to 12."),
       ToolParameter(name = "day", type = ParamType.INTEGER, description = "Day of the month."),
@@ -120,18 +132,29 @@ class AddToCalendarTool(private val context: Context) : AgentTool {
     val title = (arguments["title"] as? String)?.trim().orEmpty()
     if (title.isEmpty()) return ToolResult.Failed("The event needs a name. Ask what it is for.")
 
+    // A named day is worked out from the clock here, rather than trusting the model's
+    // arithmetic - which was observed landing a fortnight out while being told today's date.
+    // Numbers are still accepted, for anything the words cannot name.
+    val named = (arguments["when"] as? String)?.let { dayFromWords(it, System.currentTimeMillis()) }
     val start =
       startOfEvent(
-        year = (arguments["year"] as? Number)?.toInt(),
-        month = (arguments["month"] as? Number)?.toInt(),
-        day = (arguments["day"] as? Number)?.toInt(),
+        year = named?.year ?: (arguments["year"] as? Number)?.toInt(),
+        month = named?.month ?: (arguments["month"] as? Number)?.toInt(),
+        day = named?.day ?: (arguments["day"] as? Number)?.toInt(),
         hour = (arguments["hour"] as? Number)?.toInt(),
         minute = (arguments["minute"] as? Number)?.toInt(),
       )
         ?: return ToolResult.Failed(
-          "That is not a date and time this can use. Give year, month and day as numbers, and " +
-            "the hour as 0 to 23. Today's date is in your instructions."
+          "That is not a date this can use. Say when as \"today\", \"tomorrow\", a weekday " +
+            "name or \"in 3 days\" - do not work the date out yourself."
         )
+
+    if (!guard.allow(name, System.currentTimeMillis())) {
+      return ToolResult.Failed(
+        "The calendar was just opened with this. It is on screen waiting for the user - do not " +
+          "open it again. Tell them it is ready and stop."
+      )
+    }
 
     val minutes = ((arguments["minutes_long"] as? Number)?.toInt() ?: DEFAULT_MINUTES).coerceIn(0, MAX_MINUTES)
 
@@ -148,9 +171,12 @@ class AddToCalendarTool(private val context: Context) : AgentTool {
 
     return try {
       context.startActivity(intent)
+      // "Done" first, deliberately. The honest part - that it is unsaved - has to be said,
+      // and a small model reads a result beginning with "not saved" as a failure and calls the
+      // tool again. That loop is what the guard above catches; this is what avoids provoking it.
       ToolResult.Ok(
-        "The calendar is open with \"$title\" filled in. It is not saved - the user saves it. " +
-          "Say it is ready for them rather than saying it is in their calendar."
+        "Done: the calendar is open with \"$title\" filled in, waiting for the user to save it. " +
+          "Nothing more to do. Tell them it is ready - not that it is in their calendar."
       )
     } catch (e: ActivityNotFoundException) {
       ToolResult.Failed("There is no calendar app on this phone to open.")
@@ -173,7 +199,7 @@ class AddToCalendarTool(private val context: Context) : AgentTool {
  * hours later - often in the night - and a misheard "seven" for "eleven" is found out by being
  * woken by it.
  */
-class AlarmTool(private val context: Context) : AgentTool {
+class AlarmTool(private val context: Context, private val guard: LaunchGuard) : AgentTool {
 
   override val name = "set_timer_or_alarm"
 
@@ -203,6 +229,12 @@ class AlarmTool(private val context: Context) : AgentTool {
     val label = (arguments["label"] as? String)?.trim().orEmpty()
     val minutes = timerMinutes((arguments["minutes"] as? Number)?.toInt())
 
+    if (!guard.allow(name, System.currentTimeMillis())) {
+      return ToolResult.Failed(
+        "That was just done. Do not do it again - tell the user what is already set."
+      )
+    }
+
     if (minutes != null) {
       val intent =
         Intent(AlarmClock.ACTION_SET_TIMER)
@@ -230,8 +262,9 @@ class AlarmTool(private val context: Context) : AgentTool {
 
     return start(
       intent,
-      "The clock is open with an alarm for %02d:%02d filled in. The user confirms it - say it is "
-        .format(time.hour, time.minute) + "ready rather than saying it is set.",
+      "Done: the clock is open with an alarm for %02d:%02d, waiting for the user to confirm it. "
+        .format(time.hour, time.minute) +
+        "Nothing more to do. Say it is ready rather than saying it is set.",
     )
   }
 

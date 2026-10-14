@@ -192,6 +192,82 @@ class CalendarTest {
     assertEquals(at(2026, 10, 14, 0, 0, jerusalem), startOfEvent(2026, 10, 14, null, null, jerusalem))
   }
 
+  // ---- the date, worked out here rather than by the model ----
+
+  /**
+   * The bug this exists for.
+   *
+   * The model was told today's date and still said one a fortnight earlier, which is what
+   * small models do with dates: training-data habit beats an instruction. Having been wrong
+   * about today it is wrong about tomorrow too, and an event lands two weeks out with nothing
+   * on screen to suggest it.
+   */
+  @Test
+  fun todayAndTomorrowComeFromTheClock() {
+    val now = at(2026, 10, 14, 19, 0, jerusalem)
+    assertEquals(OnDay(2026, 10, 14), dayFromWords("today", now, jerusalem))
+    assertEquals(OnDay(2026, 10, 15), dayFromWords("tomorrow", now, jerusalem))
+    assertEquals(OnDay(2026, 10, 16), dayFromWords("the day after tomorrow", now, jerusalem))
+  }
+
+  @Test
+  fun aWeekdayMeansTheNextOne() {
+    // The 14th of October 2026 is a Wednesday.
+    val now = at(2026, 10, 14, 9, 0, jerusalem)
+    assertEquals(OnDay(2026, 10, 15), dayFromWords("thursday", now, jerusalem))
+    assertEquals(OnDay(2026, 10, 19), dayFromWords("monday", now, jerusalem))
+  }
+
+  /** "Wednesday" said on a Wednesday means the one coming; today would have been "today". */
+  @Test
+  fun theSameWeekdayMeansNextWeekRatherThanTodayHalfOver() {
+    val now = at(2026, 10, 14, 9, 0, jerusalem)
+    assertEquals(OnDay(2026, 10, 21), dayFromWords("wednesday", now, jerusalem))
+  }
+
+  @Test
+  fun aCountOfDaysWorks() {
+    val now = at(2026, 10, 14, 9, 0, jerusalem)
+    assertEquals(OnDay(2026, 10, 17), dayFromWords("in 3 days", now, jerusalem))
+    assertEquals(OnDay(2026, 10, 17), dayFromWords("+3", now, jerusalem))
+  }
+
+  /** Crossing a month and a year is where off-by-one arithmetic shows up. */
+  @Test
+  fun crossingAMonthAndAYearIsHandledByTheCalendarRatherThanByHand() {
+    assertEquals(
+      OnDay(2026, 11, 1),
+      dayFromWords("tomorrow", at(2026, 10, 31, 23, 0, jerusalem), jerusalem),
+    )
+    assertEquals(
+      OnDay(2027, 1, 1),
+      dayFromWords("tomorrow", at(2026, 12, 31, 23, 0, jerusalem), jerusalem),
+    )
+  }
+
+  @Test
+  fun fillerAroundTheWordIsIgnored() {
+    val now = at(2026, 10, 14, 9, 0, jerusalem)
+    assertEquals(OnDay(2026, 10, 15), dayFromWords("  on Thursday ", now, jerusalem))
+    assertEquals(OnDay(2026, 10, 19), dayFromWords("next monday", now, jerusalem))
+  }
+
+  @Test
+  fun somethingThatNamesNoDayIsRefusedRatherThanGuessed() {
+    val now = at(2026, 10, 14, 9, 0, jerusalem)
+    assertNull(dayFromWords("", now, jerusalem))
+    assertNull(dayFromWords("soon", now, jerusalem))
+    assertNull(dayFromWords("whenever", now, jerusalem))
+  }
+
+  /** A year out is a mistake, not a plan somebody is making through an assistant. */
+  @Test
+  fun anAbsurdOffsetIsRefused() {
+    val now = at(2026, 10, 14, 9, 0, jerusalem)
+    assertNull(dayFromWords("+100000", now, jerusalem))
+    assertNull(dayFromWords("-1", now, jerusalem))
+  }
+
   // ---- what may happen without being shown first ----
 
   /**

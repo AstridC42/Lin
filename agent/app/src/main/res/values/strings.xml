@@ -142,6 +142,21 @@
   <string name="settings_server_type_use">Use this name</string>
   <string name="settings_server_type_using">Using %1$s</string>
 
+  <string name="backup_title">Backup</string>
+  <string name="backup_explain">A copy of what cannot be got back if this phone is lost: what Lin
+    remembers, your training files, and your settings. Keep it somewhere other than this
+    phone.</string>
+  <string name="backup_holds">%1$d memories · %2$d training file(s)</string>
+  <string name="backup_not_included">Models are not included — they are gigabytes and download
+    again. Nor is the photo index, which rebuilds from photos still on the phone. The backup does
+    contain your server address and any API key you entered.</string>
+  <string name="backup_save">Make a backup</string>
+  <string name="backup_send">Save or send the backup</string>
+  <string name="backup_restore">Restore from a backup</string>
+  <string name="backup_restore_detail">Restoring adds to what is here and never deletes — a memory
+    already held is skipped. Settings are replaced.</string>
+  <string name="backup_refresh">Refresh</string>
+
   <string name="training_title">Training data</string>
   <string name="training_explain">Lin keeps a copy of every conversation and packs them into a
     .jsonl file every %1$d. One conversation per line, in the messages format a trainer reads

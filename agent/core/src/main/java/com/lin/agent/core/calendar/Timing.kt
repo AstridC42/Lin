@@ -82,6 +82,77 @@ fun startOfEvent(
   }
 }
 
+/** A day on the calendar, as the parts an event needs. */
+data class OnDay(val year: Int, val month: Int, val day: Int)
+
+/**
+ * The day [words] names, worked out from the real clock rather than by the model.
+ *
+ * This exists because the model got the date wrong by a fortnight while being told it, which
+ * is a thing small models do: a date is exactly the sort of fact where training-data habit
+ * beats an instruction. Having been wrong about today, it is wrong about tomorrow too, and an
+ * event lands two weeks out with nothing on screen to suggest it.
+ *
+ * So the arithmetic moves here, where there is a clock. The model says "tomorrow" - which is a
+ * translation of what it heard, and the thing it is reliable at - and this turns that into a
+ * date. Absolute numbers still work for anything this cannot name.
+ */
+fun dayFromWords(words: String, now: Long, zone: TimeZone = TimeZone.getDefault()): OnDay? {
+  val said = words.trim().lowercase().removePrefix("on ").removePrefix("next ").trim()
+  if (said.isEmpty()) return null
+
+  val offset =
+    when {
+      said == "today" || said == "tonight" || said == "this evening" -> 0
+      said == "tomorrow" -> 1
+      said == "the day after tomorrow" || said == "day after tomorrow" -> 2
+      said.startsWith("+") -> said.drop(1).trim().toIntOrNull()
+      said.startsWith("in ") ->
+        said.removePrefix("in ").trim().removeSuffix("s").removeSuffix(" day").trim().toIntOrNull()
+      else -> weekdayOffset(said, now, zone)
+    } ?: return null
+
+  if (offset !in 0..MAX_AHEAD_DAYS) return null
+
+  val calendar = Calendar.getInstance(zone)
+  calendar.timeInMillis = now
+  calendar.add(Calendar.DAY_OF_MONTH, offset)
+  return OnDay(
+    calendar.get(Calendar.YEAR),
+    calendar.get(Calendar.MONTH) + 1,
+    calendar.get(Calendar.DAY_OF_MONTH),
+  )
+}
+
+/**
+ * How many days until the next [name]day, or null if that is not a weekday.
+ *
+ * Never zero: "Tuesday" said on a Tuesday means the one coming, not the one half over. A
+ * person who meant today would have said today.
+ */
+private fun weekdayOffset(name: String, now: Long, zone: TimeZone): Int? {
+  val wanted = WEEKDAYS[name] ?: return null
+  val calendar = Calendar.getInstance(zone)
+  calendar.timeInMillis = now
+  val today = calendar.get(Calendar.DAY_OF_WEEK)
+  val ahead = (wanted - today + 7) % 7
+  return if (ahead == 0) 7 else ahead
+}
+
+private val WEEKDAYS =
+  mapOf(
+    "sunday" to Calendar.SUNDAY,
+    "monday" to Calendar.MONDAY,
+    "tuesday" to Calendar.TUESDAY,
+    "wednesday" to Calendar.WEDNESDAY,
+    "thursday" to Calendar.THURSDAY,
+    "friday" to Calendar.FRIDAY,
+    "saturday" to Calendar.SATURDAY,
+  )
+
+/** A year out is a mistake, not a plan somebody is making through an assistant. */
+private const val MAX_AHEAD_DAYS = 366
+
 /**
  * How today should be described to the model, at day resolution.
  *

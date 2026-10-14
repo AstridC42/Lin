@@ -208,6 +208,20 @@ class MemoryStore(context: Context) {
         .getOrDefault(0)
     }
 
+  /**
+   * Everything held, with the vectors, for a backup.
+   *
+   * The vectors come too. Without them a restored memory exists but cannot be found by
+   * meaning until something re-embeds it - which needs the embedding model downloaded and a
+   * pass over the whole store, on a phone that has just been set up.
+   */
+  suspend fun exportAll(): List<Pair<Memory, FloatArray>> =
+    withContext(Dispatchers.IO) {
+      runCatching { load(MemorySource.entries.toSet()) }
+        .onFailure { Log.w(TAG, "Could not export memories", it) }
+        .getOrDefault(emptyList())
+    }
+
   private fun load(sources: Set<MemorySource>): List<Pair<Memory, FloatArray>> {
     val placeholders = sources.joinToString(",") { "?" }
     return helper.readableDatabase
