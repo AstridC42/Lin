@@ -48,7 +48,7 @@ import kotlinx.coroutines.flow.toList
  */
 class DelegateTool(private val subAgent: suspend () -> LlmBackend?) : AgentTool {
 
-  override val name = "delegate"
+  override val name = NAME
 
   override val description =
     "Hand one self-contained task to a larger model on the user's own server, and get its " +
@@ -151,11 +151,18 @@ class DelegateTool(private val subAgent: suspend () -> LlmBackend?) : AgentTool 
       else -> emptyList()
     }
 
-  private companion object {
-    const val TAG = "LinDelegateTool"
+  companion object {
+    /**
+     * Named here rather than only on the instance, because the turn loop withholds this tool
+     * by name when there is no server - see ConversationViewModel - and a string typed twice
+     * is a string that gets changed once.
+     */
+    const val NAME = "delegate"
+
+    private const val TAG = "LinDelegateTool"
 
     /** Short on purpose: a sub-agent with one task does not need steering, it needs the task. */
-    const val SUB_AGENT_PROMPT =
+    private const val SUB_AGENT_PROMPT =
       "You are given one task by another assistant. Do exactly it. The conditions listed are " +
         "binding - an answer that breaks one is wrong however good it otherwise is. Reply with " +
         "the answer only: no preamble, no restating the task, no offers of further help."

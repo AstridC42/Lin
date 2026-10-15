@@ -378,7 +378,7 @@ class OnDeviceBackend(
   ): Flow<TurnEvent> {
     return callbackFlow {
       val accumulated = StringBuilder()
-      val requested = mutableSetOf<String>()
+      val requested = FreshToolCalls()
       val callback =
         object : MessageCallback {
           override fun onMessage(message: LiteRtMessage) {
@@ -408,9 +408,7 @@ class OnDeviceBackend(
             // and running a tool twice for one request is worse than missing a duplicate.
             val calls = runCatching { message.toolCalls }.getOrNull().orEmpty()
             val fresh =
-              calls
-                .map { ToolInvocation(it.name, it.arguments) }
-                .filter { requested.add("${'$'}{it.name}(${'$'}{it.arguments})") }
+              requested.fresh(calls.map { ToolInvocation(it.name, it.arguments) })
             if (fresh.isNotEmpty()) trySend(TurnEvent.ToolCalls(fresh))
           }
 

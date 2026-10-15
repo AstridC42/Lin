@@ -41,6 +41,8 @@ import com.lin.agent.core.voice.speakWhenNamed
 import com.lin.agent.core.voice.shouldListenAgain
 import com.lin.agent.core.voice.shouldSpeak
 import com.lin.agent.model.DelegateTool
+import com.lin.agent.model.ReadScreenTool
+import com.lin.agent.model.SendMessageTool
 import com.lin.agent.voice.Dictation
 import com.lin.agent.voice.Heard
 import com.lin.agent.voice.Speaker
@@ -56,6 +58,9 @@ import com.lin.agent.core.documents.DocumentLibrary
 import com.lin.agent.core.documents.Documents
 import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.calendar.Calendars
+import com.lin.agent.core.diag.describeFault
+import com.lin.agent.core.phone.permissionNeededBy
+import android.content.pm.PackageManager
 import com.lin.agent.core.calendar.todayLine
 import com.lin.agent.core.memory.Digest
 import com.lin.agent.core.tools.LaunchGuard
@@ -163,6 +168,15 @@ data class ConversationState(
   val listening: Boolean = false,
   /** Words recognised so far, so speaking does not look like nothing happening. */
   val heard: String = "",
+  /**
+   * A runtime permission a tool just failed for, so the screen can offer the one button.
+   *
+   * Here rather than left to the tool's own failure message, because a tool has no window and
+   * so cannot ask for anything: the weather tool could only say "it is in settings", which a
+   * 2B model relayed as "you can check the weather in your settings". The screen asks instead,
+   * and only when the permission really is missing. Empty the rest of the time.
+   */
+  val needsPermission: String = "",
 )
 
 /**
@@ -197,6 +211,7 @@ constructor(
   private val launchGuard: LaunchGuard,
   private val attachments: com.lin.agent.model.Attachments,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
+  private val privileged: com.lin.agent.privileged.Privileged,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
@@ -223,7 +238,12 @@ constructor(
         MediaTool(appContext),
         WeatherTool(appContext),
         PlayMusicTool(appContext, settings, launchGuard),
-        PhoneSettingTool(appContext, launchGuard),
+        PhoneSettingTool(appContext, launchGuard, privileged),
+        // The two that need Lin's screen access. Both are offered whether or not it has been
+        // granted: a tool that disappeared when a permission was off would leave the model
+        // saying "I cannot send messages" rather than "that needs one switch, here it is".
+        SendMessageTool(appContext, settings, launchGuard, lastSaid = ::lastSaid),
+        ReadScreenTool(appContext),
         OpenAppTool(appContext, launchGuard),
         AddToCalendarTool(appContext, launchGuard),
         AlarmTool(appContext, launchGuard),
@@ -443,112 +463,196 @@ constructor(
     persist(outgoing)
 
     viewModelScope.launch {
-      val readiness = backends.readiness()
-      val backend =
-        (readiness as? ChatReadiness.Ready)?.backend
-          ?: run {
-            _state.update {
-              it.copy(
-                inProgress = false,
-                missingModel = (readiness as? ChatReadiness.NoModel)?.suggested,
-                error = "There is no model to answer with yet.",
-              )
-            }
-            return@launch
-          }
-      // A model with no vision, handed a picture, answers about the question alone and sounds
-      // entirely confident. Nothing on screen would suggest it never saw the thing.
-      val unseen = picturesNotSeen(carried, backend.capabilities.supportsImages)
-      _state.update {
-        val notice = (readiness as ChatReadiness.Ready).notice
-        it.copy(notice = listOf(notice, unseen).filter { line -> line.isNotBlank() }.joinToString(" "))
-      }
-
-      val builder = StringBuilder()
-      // Read per turn rather than held, so changing the level applies to the next question
-      // instead of the next launch.
-      val thinkingBuilder = StringBuilder()
-      TurnLoop(
-          backend = backend,
-          registry = registry,
-          role = AgentRole.ORCHESTRATOR,
-          systemPrompt = promptForToday(),
-          reasoning = reasoningNamed(settings.reasoning.first()),
-        )
-        .run(outgoing)
-        .collect { event ->
-          when (event) {
-            is LoopEvent.Token -> {
-              builder.append(event.text)
-              _state.update { it.copy(streaming = builder.toString()) }
-            }
-            // Shown as it arrives, for the same reason tool activity is: thinking is paid for
-            // in silence before the first word, and silence is indistinguishable from a hang.
-            is LoopEvent.Thought -> {
-              thinkingBuilder.append(event.text)
-              _state.update { it.copy(thinking = thinkingBuilder.toString()) }
-            }
-            // Shown while it runs. A delegated task can take a minute on a big model, and
-            // silence for a minute is indistinguishable from the app having given up.
-            is LoopEvent.ToolStarted ->
-              _state.update { it.copy(toolRuns = it.toolRuns + ToolRun(event.name, ToolState.RUNNING)) }
-            is LoopEvent.ToolFinished ->
+      try {
+        val readiness = backends.readiness()
+        val backend =
+          (readiness as? ChatReadiness.Ready)?.backend
+            ?: run {
               _state.update {
                 it.copy(
-                  // The last running one of that name becomes what it became. Matched by name
-                  // rather than by position, because a turn can run two tools at once.
-                  toolRuns = it.toolRuns.settle(event.name, event.ok),
-                  shows = it.shows + event.shows,
-                )
-              }
-            is LoopEvent.Done -> {
-              val complete = outgoing + Message(Message.Role.ASSISTANT, event.text)
-              _state.update {
-                // backendId again: it only names the accelerator once the engine has settled on
-                // one, which happens during the first turn rather than when readiness was read.
-                it.copy(
-                  messages = complete,
-                  streaming = "",
-                  thinking = "",
                   inProgress = false,
-                  backendId = backend.id,
+                  missingModel = (readiness as? ChatReadiness.NoModel)?.suggested,
+                  error = "There is no model to answer with yet.",
                 )
               }
-              persist(complete)
-              // In a car a spoken question gets a spoken answer whatever the switch says -
-              // an answer only on screen is no answer to somebody driving.
-              val speaking =
-                shouldSpeak(speakWhenNamed(settings.speakWhen.first()), asked, inCar(appContext))
-              val carryOn =
-                shouldListenAgain(settings.voiceChat.first(), asked, spoke = speaking)
-              if (speaking) {
-                // The microphone reopens from the engine's own "finished" callback rather
-                // than after a guessed delay: opened a moment too early it hears Lin, and a
-                // delay long enough to be safe is long enough to feel broken.
-                speaker.say(event.text, whenDone = { if (carryOn) startListening() })
-              }
+              return@launch
             }
-            is LoopEvent.Failed -> {
-              val shown =
-                if (event.detail.isBlank() || event.detail.trim() == event.message.trim()) {
-                  event.message
-                } else {
-                  "${event.message}\n\n${event.detail}"
-                }
-              _state.update {
-                it.copy(
-                  streaming = "",
-                  thinking = "",
-                  inProgress = false,
-                  error = shown,
-                  backendId = backend.id,
-                )
-              }
-            }
-          }
+        // A model with no vision, handed a picture, answers about the question alone and sounds
+        // entirely confident. Nothing on screen would suggest it never saw the thing.
+        val unseen = picturesNotSeen(carried, backend.capabilities.supportsImages)
+        _state.update {
+          val notice = (readiness as ChatReadiness.Ready).notice
+          it.copy(notice = listOf(notice, unseen).filter { line -> line.isNotBlank() }.joinToString(" "))
         }
+
+        val builder = StringBuilder()
+        // Read per turn rather than held, so changing the level applies to the next question
+        // instead of the next launch.
+        val thinkingBuilder = StringBuilder()
+        TurnLoop(
+            backend = backend,
+            registry = registry,
+            role = AgentRole.ORCHESTRATOR,
+            systemPrompt = promptForToday(),
+            reasoning = reasoningNamed(settings.reasoning.first()),
+            // Nothing to hand work to means `delegate` is not offered at all. Left in the
+            // list it costs a whole exchange on questions a 2B model was always going to
+            // answer itself - it writes a brief, is told there is no server, and then writes
+            // the answer - which is twice the wait and a failed tool card for nothing.
+            withhold = if (backends.hasServerModel()) emptySet() else setOf(DelegateTool.NAME),
+          )
+          .run(outgoing)
+          .collect { event ->
+            when (event) {
+              is LoopEvent.Token -> {
+                builder.append(event.text)
+                _state.update { it.copy(streaming = builder.toString()) }
+              }
+              // Shown as it arrives, for the same reason tool activity is: thinking is paid for
+              // in silence before the first word, and silence is indistinguishable from a hang.
+              is LoopEvent.Thought -> {
+                thinkingBuilder.append(event.text)
+                _state.update { it.copy(thinking = thinkingBuilder.toString()) }
+              }
+              // Shown while it runs. A delegated task can take a minute on a big model, and
+              // silence for a minute is indistinguishable from the app having given up.
+              is LoopEvent.ToolStarted ->
+                _state.update { it.copy(toolRuns = it.toolRuns + ToolRun(event.name, ToolState.RUNNING)) }
+              is LoopEvent.ToolFinished ->
+                _state.update {
+                  it.copy(
+                    // The last running one of that name becomes what it became. Matched by name
+                    // rather than by position, because a turn can run two tools at once.
+                    toolRuns = it.toolRuns.settle(event.name, event.ok),
+                    shows = it.shows + event.shows,
+                    // A failure that is only a missing permission is worth one button rather
+                    // than a sentence relayed through the model. Kept once set: two tools
+                    // failing for the same grant must not clear the offer.
+                    needsPermission =
+                      it.needsPermission.ifEmpty {
+                        if (event.ok) "" else missingGrantFor(event.name)
+                      },
+                  )
+                }
+              is LoopEvent.Done -> {
+                val complete = outgoing + Message(Message.Role.ASSISTANT, event.text)
+                _state.update {
+                  // backendId again: it only names the accelerator once the engine has settled on
+                  // one, which happens during the first turn rather than when readiness was read.
+                  it.copy(
+                    messages = complete,
+                    streaming = "",
+                    thinking = "",
+                    inProgress = false,
+                    backendId = backend.id,
+                  )
+                }
+                persist(complete)
+                // In a car a spoken question gets a spoken answer whatever the switch says -
+                // an answer only on screen is no answer to somebody driving.
+                val speaking =
+                  shouldSpeak(speakWhenNamed(settings.speakWhen.first()), asked, inCar(appContext))
+                val carryOn =
+                  shouldListenAgain(settings.voiceChat.first(), asked, spoke = speaking)
+                if (speaking) {
+                  // The microphone reopens from the engine's own "finished" callback rather
+                  // than after a guessed delay: opened a moment too early it hears Lin, and a
+                  // delay long enough to be safe is long enough to feel broken.
+                  speaker.say(event.text, whenDone = { if (carryOn) startListening() })
+                }
+              }
+              is LoopEvent.Failed -> {
+                val shown =
+                  if (event.detail.isBlank() || event.detail.trim() == event.message.trim()) {
+                    event.message
+                  } else {
+                    "${event.message}\n\n${event.detail}"
+                  }
+                _state.update {
+                  it.copy(
+                    streaming = "",
+                    thinking = "",
+                    inProgress = false,
+                    error = shown,
+                    backendId = backend.id,
+                  )
+                }
+              }
+            }
+          }
+      } catch (stopped: kotlinx.coroutines.CancellationException) {
+        throw stopped
+      } catch (failure: Throwable) {
+        // A turn must not be able to close the app, and until this one line it could. Every
+        // part of answering runs inside this coroutine - reading which backend is ready, the
+        // engine itself, every tool the model calls, the speech engine at the end - and an
+        // exception from any of them went straight past the ViewModel to the uncaught handler.
+        // From the outside that is "the app crashes when I tap that card": no error, no
+        // answer, nothing in the conversation, and nothing the person can tell us afterwards.
+        //
+        // Throwable rather than Exception on purpose. The failure most likely to arrive here
+        // is an OutOfMemoryError from loading a model into a phone that has no room for it,
+        // and that is an Error - caught nowhere by a `catch (e: Exception)`.
+        //
+        // Reported, not swallowed. The text goes where errors already go on screen, and a
+        // copy goes into the report the recovery screen shows, so the next one of these is
+        // something somebody can read back to us rather than a disappearance.
+        android.util.Log.e("LinConversation", "The turn failed", failure)
+        runCatching {
+          com.lin.agent.core.diag.CrashReport.note(
+            appContext,
+            "turn",
+            failure.stackTraceToString(),
+          )
+        }
+        _state.update {
+          it.copy(
+            streaming = "",
+            thinking = "",
+            inProgress = false,
+            error =
+              "Something went wrong part-way through answering: " +
+                describe(failure) +
+                ". Nothing was lost - ask again.",
+          )
+        }
+      }
     }
   }
+
+  /**
+   * The permission [toolName] needed and did not have, or empty.
+   *
+   * Checked here rather than trusted from the failure, because a tool fails for many reasons
+   * and only one of them is fixable by a button. Offering "Allow location" for a weather
+   * service that was simply unreachable would be a button that changes nothing.
+   */
+  private fun missingGrantFor(toolName: String): String {
+    val permission = permissionNeededBy(toolName) ?: return ""
+    val granted =
+      runCatching { appContext.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED }
+        .getOrDefault(true)
+    return if (granted) "" else permission
+  }
+
+  /** Called once the dialog has been answered, whichever way. */
+  fun permissionAnswered() = _state.update { it.copy(needsPermission = "") }
+
+  /**
+   * The last thing the person themselves said.
+   *
+   * Read for one decision and one only: whether sending a message was asked for, as opposed
+   * to writing one. That has to come from their words rather than from the model's reading of
+   * them - a 2B model asked "did they want it sent?" says yes, because that is the helpful
+   * answer, and sending cannot be undone. See
+   * [com.lin.agent.core.screen.soundsLikeSendIt].
+   */
+  private fun lastSaid(): String =
+    _state.value.messages.lastOrNull { it.role == Message.Role.USER }?.text.orEmpty()
+
+  /** What to show for a fault nobody designed for. See [describeFault]. */
+  private fun describe(failure: Throwable) =
+    describeFault(failure::class.simpleName, failure.message)
 
   fun dismissError() = _state.update { it.copy(error = "") }
 

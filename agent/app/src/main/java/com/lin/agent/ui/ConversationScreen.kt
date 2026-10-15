@@ -435,6 +435,43 @@ private fun ColumnScope.ConversationBody(
       }
     }
 
+    // One button for a grant a tool just failed without. A tool has no window and so cannot
+    // ask for anything itself; left to say "it is in settings", the sentence reaches the
+    // person through a 2B model and arrives as a guess. See ConversationState.needsPermission.
+    if (state.needsPermission.isNotEmpty()) {
+      item {
+        val asking =
+          rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // Cleared whichever way it was answered. A refusal that left the card up would
+            // put the same button in front of somebody who has just said no.
+            viewModel.permissionAnswered()
+          }
+        Card(
+          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+          shape = RoundedCornerShape(22.dp),
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+          ) {
+            Text(
+              stringResource(R.string.permission_location_why),
+              style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              Button(onClick = { asking.launch(state.needsPermission) }) {
+                Text(stringResource(R.string.permission_allow))
+              }
+              TextButton(onClick = { viewModel.permissionAnswered() }) {
+                Text(stringResource(R.string.permission_not_now))
+              }
+            }
+          }
+        }
+      }
+    }
+
     if (state.error.isNotEmpty()) {
       item {
         Card(
