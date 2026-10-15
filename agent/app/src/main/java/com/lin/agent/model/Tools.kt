@@ -77,6 +77,7 @@ constructor(
   private val launchGuard: LaunchGuard,
   private val privileged: Privileged,
   private val lastSaid: LastSaid,
+  private val web: com.lin.agent.web.Web,
 ) {
 
   /**
@@ -102,6 +103,13 @@ constructor(
       PhoneSettingTool(context, launchGuard, privileged),
       SendMessageTool(context, settings, launchGuard, lastSaid = { lastSaid.text }),
       ReadScreenTool(context),
+      // The web. The single largest thing Lin could not do: an assistant with a calendar, a
+      // torch and no way to find out anything it was not trained on is a toy.
+      SearchWebTool(settings, web),
+      ReadPageTool(web),
+      ContactTool(context),
+      NavigateTool(context, launchGuard),
+      DeviceStatusTool(context),
       OpenAppTool(context, launchGuard),
       AddToCalendarTool(context, launchGuard),
       AlarmTool(context, launchGuard),

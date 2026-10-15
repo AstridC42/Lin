@@ -31,6 +31,8 @@ import com.lin.agent.core.privileged.ShizukuState
 import com.lin.agent.core.tools.disabledFrom
 import com.lin.agent.engine.mcp.McpServer
 import com.lin.agent.engine.mcp.hostOf
+import com.lin.agent.core.web.SearchProvider
+import com.lin.agent.core.web.searchProviderNamed
 import com.lin.agent.core.tools.storedFrom
 import com.lin.agent.core.tools.withTool
 import com.lin.agent.model.ToolListing
@@ -122,6 +124,10 @@ data class SettingsState(
   val dialPolicy: DialPolicy = DialPolicy.NEVER,
   /** Whether Lin may press send in another app. See [com.lin.agent.core.screen.TapPolicy]. */
   val tapSend: TapPolicy = TapPolicy.NEVER,
+  /** Where Lin searches the web, and what that provider needs. */
+  val searchProvider: SearchProvider = SearchProvider.NONE,
+  val searchUrl: String = "",
+  val searchKey: String = "",
   /** Every tool Lin has, for the screen that switches them off. */
   val toolListing: List<ToolListing> = emptyList(),
   /** The ones switched off. See [com.lin.agent.core.tools.disabledFrom]. */
@@ -212,6 +218,9 @@ constructor(
           allowDirectCalls = settings.allowDirectCalls.first(),
           dialPolicy = dialPolicyNamed(settings.dialPolicy.first()),
           tapSend = tapPolicyNamed(settings.tapSend.first()),
+          searchProvider = searchProviderNamed(settings.searchProvider.first()),
+          searchUrl = settings.searchUrl.first(),
+          searchKey = settings.searchKey.first(),
           toolListing = tools.listing(),
           disabledTools = disabledFrom(settings.disabledTools.first()),
           carNotification = settings.carNotification.first(),
@@ -600,6 +609,21 @@ constructor(
     _state.update {
       it.copy(toolListing = tools.listing(), disabledTools = disabledFrom(settings.disabledTools.first()))
     }
+  }
+
+  fun setSearchProvider(provider: SearchProvider) {
+    _state.update { it.copy(searchProvider = provider) }
+    viewModelScope.launch { settings.setSearchProvider(provider.name) }
+  }
+
+  fun onSearchUrlChanged(value: String) {
+    _state.update { it.copy(searchUrl = value) }
+    viewModelScope.launch { settings.setSearchUrl(value) }
+  }
+
+  fun onSearchKeyChanged(value: String) {
+    _state.update { it.copy(searchKey = value) }
+    viewModelScope.launch { settings.setSearchKey(value) }
   }
 
   fun setTapSend(policy: TapPolicy) {

@@ -1548,6 +1548,69 @@ say".
 Thinking already had a control and did not need another; it is on the Models
 tab and reaches both dialects.
 
+### Phase 16 — The web, the phone itself, and a model that would not stop
+
+**Looking things up.** The largest single thing Lin could not do. An assistant
+with a calendar, a torch and no way to find out anything it was not trained on
+is a toy, and the model behind this one is small and was trained a while ago.
+So: `search_web` and `read_page`.
+
+**Not scraped**, and that was tried first. Fetching a search engine's HTML and
+pulling the results out is the obvious shortcut; both of the obvious endpoints
+answered a plain request with a block page rather than results. Shipping that
+would mean a feature that works until it quietly does not, for reasons nobody
+holding the phone could diagnose. Lin talks to an interface somebody publishes
+on purpose - the user's own SearXNG, or Brave's documented API - and says
+plainly when neither is set up.
+
+Two traps, each now a test. **`Accept-Encoding` is never set**, although
+Brave's own examples send it: HttpURLConnection asks for gzip itself and
+decompresses transparently, but only while the caller has not set the header -
+setting it hands back compressed bytes that the JSON parser reads as nothing.
+And **SearXNG serves JSON only when it is switched on**, otherwise answering
+403 or a web page; the settings screen says so before the user hits it, and
+the tool recognises both shapes and explains them.
+
+`read_page` reduces a page to the words on it. The order of the steps is the
+design: script and style bodies go before tags are stripped, or the JavaScript
+survives as "text"; `&amp;` is decoded last, so a page showing example markup
+still shows it; the article is preferred when the page marks one, but only
+when it is at least an eighth of the page, because a site that wraps a
+breadcrumb in `<article>` would otherwise have Lin read the breadcrumb.
+
+**The phone itself.** `contact` (the address book, read-only and never
+cached), `navigate` (directions in whatever maps app is installed), and
+`device_status` (battery, storage, and whether the network actually reaches
+the internet, which is the question somebody asking "is the internet down"
+means).
+
+**A model that would not stop.** Watched on a phone: asked "play something",
+Gemma 4 12B wrote the same paragraph of reasoning over and over for as long as
+anybody looked. Two causes, both fixed.
+
+The immediate one is that `play_music` required a `what`, so "play something"
+named nothing the tool would accept and the model could neither satisfy it nor
+decide to stop. It is optional now, and nothing named means resume whatever
+was last playing - which is what somebody saying that to a phone with a paused
+album actually wants.
+
+The general one is that **nothing was counting**. A server generates until its
+own limit, and `num_predict` is unset by default because overriding a server's
+configuration is not this app's business. So the stream is watched:
+`looksLikeARut` finds the length of the repeating block from the text itself -
+taking the last few dozen characters and asking where they last appeared gives
+the size of the circle - and requires three copies **back to back at the end**.
+That precision is the whole difference between a useful guard and an
+infuriating one: merely counting how often a stretch appears flags numbered
+lists, tables and templated paragraphs, all of which are ordinary output. A
+rut has nothing between the repeats.
+
+Cut off, the model is told once to stop thinking and answer. Twice means it
+cannot answer this question, and the person is told that instead of watching a
+third attempt. Checked every couple of hundred characters rather than every
+token, because the search is over a window of thousands and a rut runs for far
+longer than that.
+
 ### Phase 11 — The design pass
 
 Four directions were drawn side by side on a canvas - a quiet page with no
