@@ -166,4 +166,26 @@ class VoicePolicyTest {
     assertEquals(SpeakWhen.NEVER, speakWhenNamed("NEVER"))
   }
 
+  @Test
+  fun `a spoken exchange carries on without tapping`() {
+    assertTrue(shouldListenAgain(voiceChat = true, asked = Asked.SPOKEN, spoke = true))
+  }
+
+  @Test
+  fun `typing one question does not leave the phone listening`() {
+    assertFalse(shouldListenAgain(voiceChat = true, asked = Asked.TYPED, spoke = true))
+  }
+
+  @Test
+  fun `a silent answer does not reopen the microphone`() {
+    // Otherwise somebody is left talking to a phone that said nothing and is now recording
+    // them, which is the worst version of this feature.
+    assertFalse(shouldListenAgain(voiceChat = true, asked = Asked.SPOKEN, spoke = false))
+  }
+
+  @Test
+  fun `off means off`() {
+    assertFalse(shouldListenAgain(voiceChat = false, asked = Asked.SPOKEN, spoke = true))
+  }
+
 }

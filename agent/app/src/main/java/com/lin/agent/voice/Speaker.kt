@@ -18,6 +18,7 @@ package com.lin.agent.voice
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import android.util.Log
 import com.lin.agent.core.settings.SettingsRepository
@@ -29,7 +30,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -53,24 +56,51 @@ constructor(
 
   @Volatile private var engine: TextToSpeech? = null
 
-  @Volatile private var ready = false
+  /**
+   * Completed when the engine has said whether it started.
+   *
+   * This is the whole bug this class had. A TextToSpeech reports readiness in a callback some
+   * way after its constructor returns, and every method here used to check a plain `ready`
+   * flag and give up when it was still false - which it always was on the first call. So the
+   * first spoken reply after each launch was silently dropped, every preview was silent, and
+   * the settings screen asked for the voice list once, got an empty one, and showed "no
+   * voices" for ever. One flag, three features that looked unbuilt.
+   */
+  private var starting: CompletableDeferred<Boolean>? = null
 
-  fun say(reply: String) {
+  /** Called when the engine finishes speaking, so a conversation can carry on by voice. */
+  @Volatile private var onFinished: (() -> Unit)? = null
+
+  /**
+   * Reads a reply out loud, and says when it has finished.
+   *
+   * [whenDone] is how voice chat works: the microphone may only reopen once Lin has stopped
+   * talking, or it hears Lin.
+   */
+  suspend fun say(reply: String, whenDone: (() -> Unit)? = null) {
     val text = forSpeaking(reply)
-    if (text.isBlank()) return
-
-    val live = engine ?: start()
-    if (live == null || !ready) {
-      // Not an error worth showing. The reply is already on screen; losing the audio is a
-      // smaller thing than an error card about a text-to-speech engine.
-      Log.i(TAG, "Nothing to speak with yet")
+    if (text.isBlank()) {
+      whenDone?.invoke()
       return
     }
+
+    val live = awaitEngine()
+    if (live == null) {
+      Log.i(TAG, "Nothing to speak with")
+      // The caller may be waiting to listen again; not speaking must not strand it.
+      whenDone?.invoke()
+      return
+    }
+    onFinished = whenDone
     runCatching {
         applyChoices(live)
         live.speak(text, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE)
       }
-      .onFailure { Log.w(TAG, "Could not speak", it) }
+      .onFailure {
+        Log.w(TAG, "Could not speak", it)
+        onFinished = null
+        whenDone?.invoke()
+      }
   }
 
   /**
@@ -79,9 +109,9 @@ constructor(
    * The settings screen needs this: a list of names like `en-gb-x-gbb-local` tells nobody
    * what they are picking, and a voice is the one setting that cannot be judged by reading.
    */
-  fun preview(voiceName: String, sample: String) {
-    val live = engine ?: start()
-    if (live == null || !ready) return
+  suspend fun preview(voiceName: String, sample: String) {
+    val live = awaitEngine() ?: return
+    onFinished = null
     runCatching {
       applyChoices(live, override = voiceName)
       live.speak(sample, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE)
@@ -89,12 +119,25 @@ constructor(
   }
 
   /** Every voice the current engine has, for the settings screen to offer. */
-  fun voices(): List<VoiceOption> {
-    val live = engine ?: start()
-    if (live == null || !ready) return emptyList()
+  suspend fun voices(): List<VoiceOption> {
+    val live = awaitEngine() ?: return emptyList()
     val all =
       runCatching { live.voices.orEmpty().map { it.asOption() } }.getOrDefault(emptyList())
     return usableVoices(all, Locale.getDefault().language)
+  }
+
+  /**
+   * The engine, once it has started, or null if it will not.
+   *
+   * Waits rather than gives up. The timeout is generous because a cold engine on a phone that
+   * has not spoken since boot genuinely takes a second or two, and the alternative to waiting
+   * is the silence this replaced.
+   */
+  private suspend fun awaitEngine(): TextToSpeech? {
+    val live = startEngine() ?: return null
+    val signal = starting ?: return null
+    val ok = withTimeoutOrNull(READY_MS) { signal.await() } ?: false
+    return if (ok) live else null
   }
 
   /**
@@ -146,6 +189,7 @@ constructor(
 
   /** Stops mid-sentence. Called when the user sends something else, or leaves. */
   fun stop() {
+    onFinished = null
     runCatching { engine?.stop() }
   }
 
@@ -155,25 +199,60 @@ constructor(
       engine?.shutdown()
     }
     engine = null
-    ready = false
+    starting = null
+    onFinished = null
   }
 
   @Synchronized
-  private fun start(): TextToSpeech? {
+  private fun startEngine(): TextToSpeech? {
     engine?.let {
       return it
     }
+    val signal = CompletableDeferred<Boolean>()
     return runCatching {
-        TextToSpeech(context) { status -> ready = status == TextToSpeech.SUCCESS }.also {
-          engine = it
-        }
+        TextToSpeech(context) { status ->
+            signal.complete(status == TextToSpeech.SUCCESS)
+          }
+          .also {
+            engine = it
+            starting = signal
+            // One listener for the life of the engine: whoever is speaking sets what should
+            // happen when it stops, and clears it afterwards.
+            runCatching { it.setOnUtteranceProgressListener(Finished()) }
+          }
       }
-      .onFailure { Log.w(TAG, "Could not start text to speech", it) }
+      .onFailure {
+        Log.w(TAG, "Could not start text to speech", it)
+        signal.complete(false)
+      }
       .getOrNull()
+  }
+
+  /** Tells whoever asked that Lin has stopped talking. */
+  private inner class Finished : UtteranceProgressListener() {
+    override fun onStart(utteranceId: String?) = Unit
+
+    override fun onDone(utteranceId: String?) {
+      val waiting = onFinished
+      onFinished = null
+      waiting?.invoke()
+    }
+
+    @Deprecated("Required by the base class", ReplaceWith(""))
+    override fun onError(utteranceId: String?) = onDone(utteranceId)
+
+    override fun onError(utteranceId: String?, errorCode: Int) = onDone(utteranceId)
+
+    // Stopped on purpose - the user sent something else, or left. Whoever was waiting is no
+    // longer waiting for anything, and reopening the microphone here would be a surprise.
+    override fun onStop(utteranceId: String?, interrupted: Boolean) {
+      onFinished = null
+    }
   }
 
   private companion object {
     const val TAG = "LinSpeaker"
+    const val READY_MS = 4_000L
     const val UTTERANCE = "lin-reply"
   }
 }

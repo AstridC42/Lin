@@ -113,6 +113,8 @@ data class SettingsState(
   val voiceName: String = "",
   val speechRate: Float = 1.0f,
   val speechPitch: Float = 1.0f,
+  /** Whether the microphone reopens after Lin has finished speaking. */
+  val voiceChat: Boolean = false,
   /** Whether Lin is listening for its name. Off by default; it holds the microphone. */
   val wakeWord: Boolean = false,
   /** The downloaded chat model the user picked, or empty to let the phone decide. */
@@ -182,6 +184,7 @@ constructor(
           voiceName = settings.voiceName.first(),
           speechRate = settings.speechRate.first(),
           speechPitch = settings.speechPitch.first(),
+          voiceChat = settings.voiceChat.first(),
           wakeWord = settings.wakeWord.first(),
           chatModel = settings.chatModelName.first(),
           musicApp = settings.musicApp.first(),
@@ -495,6 +498,11 @@ constructor(
       settings.setVoiceName(name)
       speaker.preview(name, sample)
     }
+  }
+
+  fun setVoiceChat(on: Boolean) {
+    _state.update { it.copy(voiceChat = on) }
+    viewModelScope.launch { settings.setVoiceChat(on) }
   }
 
   fun setSpeechRate(rate: Float) {

@@ -147,6 +147,17 @@ class SettingsRepository(private val context: Context) {
    * only durable reference is the name - and a name that no longer resolves falls back rather
    * than failing to speak.
    */
+  /**
+   * Whether the microphone reopens after Lin has finished speaking.
+   *
+   * Off. A phone that starts listening again on its own is exactly the behaviour people are
+   * right to be wary of, so it is asked for rather than assumed - and it only ever applies to
+   * an exchange that was spoken in the first place.
+   */
+  val voiceChat: Flow<Boolean> = read(VOICE_CHAT, false)
+
+  suspend fun setVoiceChat(value: Boolean) = write(VOICE_CHAT, value)
+
   val voiceName: Flow<String> = read(VOICE_NAME, "")
 
   suspend fun setVoiceName(value: String) = write(VOICE_NAME, value)
@@ -444,6 +455,7 @@ class SettingsRepository(private val context: Context) {
     val MUSIC_APP = stringPreferencesKey("music_app")
     val SPEAK_WHEN = stringPreferencesKey("speak_when")
     val VOICE_NAME = stringPreferencesKey("voice_name")
+    val VOICE_CHAT = booleanPreferencesKey("voice_chat")
     val SPEECH_RATE = floatPreferencesKey("speech_rate")
     val SPEECH_PITCH = floatPreferencesKey("speech_pitch")
     val DIAL_POLICY = stringPreferencesKey("dial_policy")

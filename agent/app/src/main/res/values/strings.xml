@@ -51,6 +51,10 @@
     writes</string>
   <string name="settings_speak_always">Always out loud</string>
   <string name="settings_speak_always_detail">Every reply, typed or spoken</string>
+  <string name="settings_voice_chat">Keep the conversation going</string>
+  <string name="settings_voice_chat_detail">After Lin answers out loud, the microphone opens
+    again so you can reply without tapping. Only for questions you asked out loud, and only
+    once Lin has stopped talking.</string>
   <string name="settings_voice_which">Voice</string>
   <string name="settings_voice_none">No voices yet — the phone\'s speech engine is still
     starting, or has none installed.</string>

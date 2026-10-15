@@ -749,6 +749,25 @@ a privacy choice rather than a performance one — the rest of this app keeps
 what is said on the phone unless the user pointed it at their own server, and
 a cloud recogniser would quietly undo that for every spoken word.
 
+**The bug underneath all of it.** The voice work shipped and then appeared
+not to exist, which was one mistake wearing three faces. A `TextToSpeech`
+reports readiness in a callback well after its constructor returns, and every
+method here checked a plain flag and gave up when it was still false - which
+it always was on the first call. So the first spoken reply after each launch
+was dropped in silence, every voice preview was silent, and the settings
+screen asked for the voice list once, got an empty one, and showed "no
+voices" for ever. The fix is to wait for the engine rather than to check on
+it, which is the difference between a feature and a feature-shaped hole.
+
+**Done: a conversation, not a series of questions.** With it turned on, the
+microphone reopens once Lin has finished answering, so a spoken exchange
+carries on without reaching for the phone. Three conditions, each ruling out
+a way of getting it wrong: only when asked for, only when the question was
+spoken, and only when Lin actually spoke - reopening after a silent answer
+would leave somebody talking to a phone that said nothing and is now
+recording them. It waits for the engine's own "finished" callback rather than
+a guessed delay, because a microphone opened a moment too early hears Lin.
+
 **Done: which voice, and when.** Speaking was one switch and one voice - the
 engine's default, whatever that happened to be.
 
