@@ -37,6 +37,7 @@ package com.lin.agent.core.phone
 fun permissionNeededBy(toolName: String): String? =
   when (toolName) {
     "weather" -> COARSE_LOCATION
+    "contact" -> READ_CONTACTS
     else -> null
   }
 
@@ -45,3 +46,5 @@ fun permissionNeededBy(toolName: String): String? =
  * the framework and the name is a stable string either way.
  */
 const val COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION"
+
+const val READ_CONTACTS = "android.permission.READ_CONTACTS"

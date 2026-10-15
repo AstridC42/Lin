@@ -236,6 +236,28 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setServerMaxTokens(value: String) = write(SERVER_MAX_TOKENS, value)
 
+  /**
+   * Where Lin searches the web, as the name of a provider. See
+   * [com.lin.agent.core.web.SearchProvider].
+   *
+   * Nothing by default, and the tool says so rather than guessing: searching means sending
+   * what somebody asked to a third party, and which third party is a choice they make once
+   * rather than one this app makes for them.
+   */
+  val searchProvider: Flow<String> = read(SEARCH_PROVIDER, "")
+
+  suspend fun setSearchProvider(value: String) = write(SEARCH_PROVIDER, value)
+
+  /** The SearXNG address, when that is the provider. */
+  val searchUrl: Flow<String> = read(SEARCH_URL, "")
+
+  suspend fun setSearchUrl(value: String) = write(SEARCH_URL, value)
+
+  /** The API key, when the provider needs one. */
+  val searchKey: Flow<String> = read(SEARCH_KEY, "")
+
+  suspend fun setSearchKey(value: String) = write(SEARCH_KEY, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -521,6 +543,9 @@ class SettingsRepository(private val context: Context) {
     val TAP_SEND = stringPreferencesKey("tap_send")
     val DISABLED_TOOLS = stringPreferencesKey("disabled_tools")
     val MCP_SERVERS = stringPreferencesKey("mcp_servers")
+    val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
+    val SEARCH_URL = stringPreferencesKey("search_url")
+    val SEARCH_KEY = stringPreferencesKey("search_key")
     val SERVER_TEMPERATURE = stringPreferencesKey("server_temperature")
     val SERVER_TOP_P = stringPreferencesKey("server_top_p")
     val SERVER_TOP_K = stringPreferencesKey("server_top_k")

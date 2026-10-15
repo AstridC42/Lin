@@ -19,6 +19,7 @@ package com.lin.agent.engine
 import android.util.Log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.takeWhile
 
 /** What the screen sees while a turn runs. Tool activity is shown, not hidden. */
 sealed interface LoopEvent {
@@ -93,6 +94,7 @@ class TurnLoop(
     val alreadyRun = mutableSetOf<String>()
     var toolCalls = 0
     var toolCallRetries = 0
+    var alreadyNudgedOutOfARut = false
     // Whether anything in this turn has produced an answer. Read when a tool fails - see
     // [toolFailureText] - because a failure arriving after a success must not become the reply.
     var somethingWorked = false
@@ -117,6 +119,15 @@ class TurnLoop(
           ) {
             toolCallRetries++
             messages.add(Message(Message.Role.USER, MALFORMED_TOOL_CALL_NUDGE))
+            continue
+          }
+          // The other failure the model can fix: it went round in circles and was cut off.
+          // Told to stop thinking and answer, it usually does. Once only - a model that
+          // loops twice is one that cannot answer this question, and the person should be
+          // told that rather than watching it try a third time.
+          if (outcome.message == STUCK && !alreadyNudgedOutOfARut) {
+            alreadyNudgedOutOfARut = true
+            messages.add(Message(Message.Role.USER, RUNAWAY_NUDGE))
             continue
           }
           emit(LoopEvent.Failed(outcome.message, outcome.detail))
@@ -214,6 +225,11 @@ class TurnLoop(
     val calls = mutableListOf<ToolInvocation>()
     var failure: Exchange.Failed? = null
     var done = false
+    // Thinking and speaking are watched together, because a model can go round in either and
+    // the one seen on a phone was the thinking channel - which does not even reach the reply.
+    val everything = StringBuilder()
+    var inARut = false
+    var sinceLastCheck = 0
 
     backend
       .converse(
@@ -227,6 +243,7 @@ class TurnLoop(
           reasoning = reasoning,
         )
       )
+      .takeWhile { !inARut }
       .collect { event ->
         when (event) {
           is TurnEvent.Token -> spoken.append(event.text)
@@ -243,11 +260,30 @@ class TurnLoop(
           }
           is TurnEvent.Failed -> failure = Exchange.Failed(event.message, event.detail)
         }
+        // Checked after every event rather than at the end, because the end is exactly what
+        // does not arrive: a model in a rut generates until the server's own limit, which on
+        // an unconfigured server is a very long way away.
+        if (event is TurnEvent.Token || event is TurnEvent.Thought) {
+          val text = if (event is TurnEvent.Token) event.text else (event as TurnEvent.Thought).text
+          everything.append(text)
+          // Not on every token. The check searches a window of several thousand characters,
+          // and a model streaming a word at a time would pay for that hundreds of times a
+          // second. A rut runs for thousands of characters, so looking every few hundred
+          // catches it just as surely and costs nothing noticeable.
+          sinceLastCheck += text.length
+          if (sinceLastCheck >= CHECK_EVERY) {
+            sinceLastCheck = 0
+            if (looksLikeARut(everything.toString())) inARut = true
+          }
+        }
       }
 
     failure?.let {
       return it
     }
+    // A rut is reported as its own failure so the loop can tell it apart from every other
+    // one and hand the model a note that tells it to stop deliberating - see RUNAWAY_NUDGE.
+    if (inARut) return Exchange.Failed(STUCK, "The model repeated itself and was stopped.")
     if (calls.isNotEmpty()) return Exchange.WantsTools(calls.toList(), spoken.toString())
     if (done || spoken.isNotEmpty()) return Exchange.Answered(spoken.toString())
     return Exchange.Failed("The model stopped without answering.")
@@ -285,5 +321,8 @@ class TurnLoop(
 
   private companion object {
     const val TAG = "LinTurnLoop"
+
+    /** How many characters may arrive between one check for a rut and the next. */
+    const val CHECK_EVERY = 200
   }
 }
