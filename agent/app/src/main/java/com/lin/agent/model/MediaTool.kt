@@ -95,7 +95,7 @@ class MediaTool(private val context: Context) : AgentTool {
         "previous", "back" -> MediaCommand.PREVIOUS
         else ->
           return ToolResult.Failed(
-            "\"$action\" is not something this can do. Use what, play, pause, next, previous, " +
+            "'$action' is not something this can do. Use what, play, pause, next, previous, " +
               "louder or quieter."
           )
       }

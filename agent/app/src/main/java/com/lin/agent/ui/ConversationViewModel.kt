@@ -719,9 +719,9 @@ constructor(
         "ready rather than saying it is in their calendar; work the date out from today's " +
         "date above and pass it as numbers. A timer is set straight away, but an alarm opens " +
         "the clock to be confirmed - do not say an alarm is set. " +
-        "Use media to see or change what is playing; check with action \"what\" before " +
+        "Use media to see or change what is playing; check with action 'what' before " +
         "saying what is on. play_music starts something new in the user\'s own music app - " +
-        "pass what they said, such as \"Stan by Eminem\"; read its result before answering, " +
+        "pass what they said, such as 'Stan by Eminem'; read its result before answering, " +
         "because it says whether the music actually started or only a search opened. " +
         "open_app opens an app by name. " +
         "phone_setting does the flashlight and Do Not Disturb outright; for wi-fi, bluetooth, " +

@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -138,7 +139,12 @@ fun ConversationScreen(
   Scaffold(
     topBar = {
       Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = 6.dp),
+        // statusBarsPadding, because this replaced a TopAppBar: that applied the inset
+        // itself, and a plain Row in the same slot draws under the clock.
+        modifier =
+          Modifier.fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
@@ -779,49 +785,67 @@ private fun ColumnScope.Composer(
         ),
     )
 
-    // One filled button, whose job changes with what there is to do: stop listening, start
-    // listening, or send. Three buttons in a row would make the common one harder to hit.
+    // Two buttons, not one that changes job. A single circle showing a microphone until
+    // something is typed reads as "there is no send button", which is how it was reported -
+    // and a send that appears only once you have typed is found by accident rather than
+    // looked for.
     val sendable = (draft.isNotBlank() || state.attached.isNotEmpty()) && !state.inProgress
+
     Surface(
       onClick = {
-        when {
-          state.listening -> viewModel.stopListening()
-          sendable -> {
-            viewModel.send(draft)
-            onSent()
-          }
-          else -> micPermission.launch(Manifest.permission.RECORD_AUDIO)
-        }
+        if (state.listening) viewModel.stopListening()
+        else micPermission.launch(Manifest.permission.RECORD_AUDIO)
       },
       shape = CircleShape,
       color =
-        if (state.listening) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        if (state.listening) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.surfaceContainer,
       contentColor =
         if (state.listening) MaterialTheme.colorScheme.onError
-        else MaterialTheme.colorScheme.onPrimary,
+        else MaterialTheme.colorScheme.onSurface,
       modifier = Modifier.size(48.dp),
     ) {
       Box(contentAlignment = Alignment.Center) {
-        when {
-          state.listening ->
-            Icon(
-              Icons.Filled.Close,
-              contentDescription = stringResource(R.string.stop_listening),
-              modifier = Modifier.size(20.dp),
-            )
-          sendable ->
-            Icon(
-              Icons.AutoMirrored.Filled.Send,
-              contentDescription = stringResource(R.string.send),
-              modifier = Modifier.size(20.dp),
-            )
-          else ->
-            Icon(
-              painterResource(R.drawable.ic_mic),
-              contentDescription = stringResource(R.string.speak),
-              modifier = Modifier.size(20.dp),
-            )
+        if (state.listening) {
+          Icon(
+            Icons.Filled.Close,
+            contentDescription = stringResource(R.string.stop_listening),
+            modifier = Modifier.size(20.dp),
+          )
+        } else {
+          Icon(
+            painterResource(R.drawable.ic_mic),
+            contentDescription = stringResource(R.string.speak),
+            modifier = Modifier.size(20.dp),
+          )
         }
+      }
+    }
+
+    Surface(
+      onClick = {
+        if (sendable) {
+          viewModel.send(draft)
+          onSent()
+        }
+      },
+      shape = CircleShape,
+      // Dimmed rather than hidden when there is nothing to send: a button that comes and
+      // goes is one somebody has to learn, and this one has to be obvious.
+      color =
+        if (sendable) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.surfaceContainer,
+      contentColor =
+        if (sendable) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.size(48.dp),
+    ) {
+      Box(contentAlignment = Alignment.Center) {
+        Icon(
+          Icons.AutoMirrored.Filled.Send,
+          contentDescription = stringResource(R.string.send),
+          modifier = Modifier.size(20.dp),
+        )
       }
     }
   }

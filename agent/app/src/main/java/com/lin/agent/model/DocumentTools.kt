@@ -96,7 +96,7 @@ class ReadDocumentTool(
     val found =
       library.find(asked)
         ?: return ToolResult.Failed(
-          "There is no document called \"$asked\". Use list_documents to see what there is, " +
+          "There is no document called '$asked'. Use list_documents to see what there is, " +
             "and tell the user they can add one in settings or by sharing a file to Lin."
         )
 
@@ -177,7 +177,7 @@ class WriteDocumentTool(
         )
       )
       ToolResult.Ok(
-        "Written as \"${target.name}\". It is in Lin's documents, not saved among the user's " +
+        "Written as '${target.name}'. It is in Lin's documents, not saved among the user's " +
           "own files yet - tell them it is on the Documents screen with a button to save or " +
           "send it."
       )

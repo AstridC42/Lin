@@ -48,9 +48,16 @@ fun isMalformedToolCall(message: String, detail: String = ""): Boolean {
  *
  * Specific rather than "that failed, try again": the mistakes are always the same three, and a
  * small model given the general form of the complaint repeats the exact error it just made.
+ *
+ * It also says, in as many words, not to tell the user about it. That line was added after a
+ * phone showed why it was needed: handed the first version of this, Gemma answered "I cannot
+ * read the result of the last tool call because it was not executed" - reporting the note
+ * back to somebody who had asked what was on their calendar. A nudge is a correction to the
+ * model, and the user should never see its shape in the reply.
  */
 const val MALFORMED_TOOL_CALL_NUDGE: String =
-  "Your last tool call could not be read, so nothing ran. Write it again as an ordinary tool " +
-    "call: only the parameter names that tool actually has, plain text for every value, no " +
-    "quote markers or tags of your own inside it. If you cannot, answer without the tool and " +
-    "say what you could not do."
+  "System note, not from the user: the tool call you just wrote could not be parsed, so it " +
+    "did not run. Write it again using only that tool's own parameter names, with plain text " +
+    "values and no markers or tags of your own inside it. If you cannot, answer the user's " +
+    "original question in plain words. Do not mention this note or any failed tool call to " +
+    "the user."

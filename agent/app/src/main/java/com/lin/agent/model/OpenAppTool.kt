@@ -51,7 +51,7 @@ class OpenAppTool(private val context: Context, private val guard: LaunchGuard) 
       ToolParameter(
         name = "app",
         type = ParamType.STRING,
-        description = "The app's name as the user said it, for example \"tidal\" or \"maps\".",
+        description = "The app's name as the user said it, for example tidal, or maps.",
       )
     )
 
@@ -69,7 +69,7 @@ class OpenAppTool(private val context: Context, private val guard: LaunchGuard) 
     val app =
       appNamed(said, installed)
         ?: return ToolResult.Failed(
-          "There is no app called \"$said\" on this phone. Say that rather than opening " +
+          "There is no app called '$said' on this phone. Say that rather than opening " +
             "something else."
         )
 

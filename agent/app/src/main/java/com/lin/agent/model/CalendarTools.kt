@@ -110,7 +110,7 @@ class AddToCalendarTool(
         name = "when",
         type = ParamType.STRING,
         description =
-          "Preferred. One of: today, tomorrow, a weekday name, or \"in 3 days\". Use this " +
+          "Preferred. One of: today, tomorrow, a weekday name, or 'in 3 days'. Use this " +
             "rather than working the date out yourself.",
       ),
       ToolParameter(name = "year", type = ParamType.INTEGER, description = "Four digits."),
@@ -145,8 +145,8 @@ class AddToCalendarTool(
         minute = (arguments["minute"] as? Number)?.toInt(),
       )
         ?: return ToolResult.Failed(
-          "That is not a date this can use. Say when as \"today\", \"tomorrow\", a weekday " +
-            "name or \"in 3 days\" - do not work the date out yourself."
+          "That is not a date this can use. Say when as 'today', 'tomorrow', a weekday " +
+            "name or 'in 3 days' - do not work the date out yourself."
         )
 
     if (!guard.allow(name, System.currentTimeMillis())) {
@@ -175,7 +175,7 @@ class AddToCalendarTool(
       // and a small model reads a result beginning with "not saved" as a failure and calls the
       // tool again. That loop is what the guard above catches; this is what avoids provoking it.
       ToolResult.Ok(
-        "Done: the calendar is open with \"$title\" filled in, waiting for the user to save it. " +
+        "Done: the calendar is open with '$title' filled in, waiting for the user to save it. " +
           "Nothing more to do. Tell them it is ready - not that it is in their calendar."
       )
     } catch (e: ActivityNotFoundException) {
