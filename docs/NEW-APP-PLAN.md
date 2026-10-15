@@ -1611,6 +1611,42 @@ third attempt. Checked every couple of hundred characters rather than every
 token, because the search is over a window of thousands and a rut runs for far
 longer than that.
 
+### Phase 17 — Thinking levels, which Ollama had and Lin was not using
+
+Reported from a phone: thinking "had not been added" for Ollama. It had, as a
+boolean - and that turned out to be two bugs wearing one coat.
+
+**Brief and Thorough were the same request.** Ollama's `think` takes a level -
+`low`, `medium`, `high`, `max` - as well as a boolean, and Lin sent `true`
+whatever was chosen. So picking the cheaper level changed nothing on a server,
+and somebody who asked for a little thinking got as much as the model felt
+like. Which, on the occasion that produced Phase 16's runaway guard, was the
+same paragraph forever.
+
+**Off did not turn thinking off.** The field was omitted entirely when no
+thinking was wanted, reasoning that an older Ollama rejects a field it does
+not know. But a model that reasons by default reasons when nothing is said, so
+"off" meant "off, unless the model feels otherwise". `false` is now sent
+explicitly. That is a deliberate trade and worth stating: a server too old to
+know the field answers 400, which is visible and fixable, where thinking that
+will not switch off is neither.
+
+A test asserted the old behaviour, with a comment explaining why it was
+right. It was not, and the comment is now the record of why.
+
+`medium` and `max` go unused on purpose: three choices on the screen map to
+three values, and a fourth nothing can pick is not a feature.
+
+The control stays on the Models tab rather than being duplicated onto the
+Server tab, because it is one setting that applies to both models - but the
+Server tab now says so, since that is where somebody configuring a server
+looks for it.
+
+The OpenAI dialect is unchanged: it carries `enable_thinking` through
+`chat_template_kwargs`, which is a switch and not a level, and inventing a
+`reasoning_effort` that vLLM may or may not accept would risk the whole
+request for a setting nobody asked for there.
+
 ### Phase 11 — The design pass
 
 Four directions were drawn side by side on a canvas - a quiet page with no

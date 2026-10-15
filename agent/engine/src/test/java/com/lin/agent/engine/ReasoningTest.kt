@@ -92,15 +92,23 @@ class ReasoningTest {
           ),
         )
       )
-    assertTrue(body.optBoolean("think"))
+    // A level now, not `true`. Ollama takes "low", "medium", "high" and "max" as well as a
+    // boolean, and sending `true` for every level meant Brief and Thorough were the same
+    // request - so choosing the cheaper one changed nothing. See [ollamaThink].
+    assertEquals("high", body.get("think"))
   }
 
   /**
-   * An older server rejects a request naming a field it does not know, so a turn that wants no
-   * thinking must not mention it at all rather than send `think: false`.
+   * A turn that wants no thinking says so, rather than staying silent.
+   *
+   * This test asserted the opposite until a phone showed why it was wrong. The reasoning was
+   * that an older Ollama rejects a field it does not know, so the safe thing was to omit it
+   * - but a model that reasons by default reasons when nothing is said, which made "off"
+   * mean "off, unless the model feels otherwise". A server too old to know the field now
+   * answers 400, which is visible and fixable; thinking that will not switch off is neither.
    */
   @Test
-  fun aTurnThatWantsNoThinkingDoesNotMentionItToTheServer() {
+  fun aTurnThatWantsNoThinkingSaysSo() {
     val body =
       JSONObject(
         chatRequestBody(
@@ -108,7 +116,7 @@ class ReasoningTest {
           TurnRequest(messages = listOf(Message(Message.Role.USER, "hi"))),
         )
       )
-    assertFalse(body.has("think"))
+    assertEquals(false, body.get("think"))
   }
 
   @Test
@@ -124,7 +132,7 @@ class ReasoningTest {
           ),
         )
       )
-    assertFalse(body.has("think"))
+    assertEquals(false, body.get("think"))
   }
 
   // ---- what comes back ----
