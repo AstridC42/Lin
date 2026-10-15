@@ -19,6 +19,7 @@ package com.lin.agent.core.media
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -144,4 +145,19 @@ class NowPlayingTest {
   fun aDeviceReportingNoRangeIsLeftAlone() {
     assertEquals(3, volumeAfterStep(3, max = 0, up = true))
   }
+  @Test
+  fun `the chosen session is one of the objects given, not a copy of one`() {
+    // The app looks the MediaController back up by this identity. It used to compare by
+    // value, and a Session carries the session's last position update - which moves while
+    // music plays - so "pause" failed precisely when something was playing.
+    val one = Session(app = "TIDAL", title = "Stan", artist = "Eminem", playing = true, activeAt = 20)
+    val two = Session(app = "Podcasts", title = "Ep. 12", playing = false, activeAt = 30)
+    val sessions = listOf(one, two)
+
+    val chosen = chooseSession(sessions)
+
+    assertTrue(sessions.any { it === chosen })
+    assertSame(one, chosen)
+  }
+
 }
