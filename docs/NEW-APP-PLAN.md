@@ -749,6 +749,25 @@ a privacy choice rather than a performance one — the rest of this app keeps
 what is said on the phone unless the user pointed it at their own server, and
 a cloud recogniser would quietly undo that for every spoken word.
 
+**The bug underneath all of it.** The voice work shipped and then appeared
+not to exist, which was one mistake wearing three faces. A `TextToSpeech`
+reports readiness in a callback well after its constructor returns, and every
+method here checked a plain flag and gave up when it was still false - which
+it always was on the first call. So the first spoken reply after each launch
+was dropped in silence, every voice preview was silent, and the settings
+screen asked for the voice list once, got an empty one, and showed "no
+voices" for ever. The fix is to wait for the engine rather than to check on
+it, which is the difference between a feature and a feature-shaped hole.
+
+**Done: a conversation, not a series of questions.** With it turned on, the
+microphone reopens once Lin has finished answering, so a spoken exchange
+carries on without reaching for the phone. Three conditions, each ruling out
+a way of getting it wrong: only when asked for, only when the question was
+spoken, and only when Lin actually spoke - reopening after a silent answer
+would leave somebody talking to a phone that said nothing and is now
+recording them. It waits for the engine's own "finished" callback rather than
+a guessed delay, because a microphone opened a moment too early hears Lin.
+
 **Done: which voice, and when.** Speaking was one switch and one voice - the
 engine's default, whatever that happened to be.
 
@@ -1222,6 +1241,52 @@ for it.
 nobody any way to say "that is finished"; the only way to begin again was to
 put the phone down and wait. The conversation being left is recorded for the
 corpus first, so starting a new one never loses the last.
+
+### Phase 12 — The Galaxy, swept properly
+
+Asked twice, and answered thinly the first time: three dead ends reported,
+nothing built. This is the whole surface, checked, with what came of each.
+
+**No, with sources.**
+
+- *Good Lock and Modes and Routines* have no third-party trigger API. Tasker
+  reaches Modes and Routines through hidden content providers that need a
+  privileged permission and change between One UI versions. Shipping that
+  would break on an update and look like Lin's fault.
+- *Edge panels*: Samsung's Edge SDK was retired on 5 December 2023 - it can no
+  longer be downloaded, and new panels can no longer be registered in the
+  Seller Portal. Third-party panels were never supported on folds anyway.
+- *Bixby, SmartThings Find, DeX control, Samsung Health's own SDK*: closed, or
+  partner-only.
+- *SmartThings*: possible but newly expensive - personal access tokens last 24
+  hours now, so it needs full OAuth, and free API access ends this month in
+  favour of a paid personal plan. A cloud dependency with a subscription,
+  against this project's grain. Home Assistant is the local answer, and is the
+  recommendation whenever home control is wanted.
+
+**Yes, and done.** What Modes and Routines *can* do is open an app, and
+Routines+ adds double-press and long-press of the volume and side keys as
+triggers. So Lin now has a second launcher entry - "Lin · Listen" - that opens
+the panel already listening. A routine can be pointed at it, which gives a
+hardware-button summon without Lin being the phone's assistant at all: the
+thing the assistant role kept failing to deliver. The same alias is what a
+home screen icon, a folder, an edge panel's app shortcuts and a Bixby "open
+Lin" all target, so one entry serves every route in. And because a routine
+opening an app is a visible, user-started launch, the microphone is allowed to
+start - which it is not when something tries this from the background.
+
+**Yes, and done: Flex mode.** Half open with the fold across the middle, the
+conversation takes the top half and everything you touch goes below the
+crease, where a hand resting on the table reaches. Read through Jetpack's
+`WindowInfoTracker` rather than Samsung's SDK: the same answer on every
+foldable, already on the classpath, and not tied to one manufacturer. Every
+other posture, and every phone that does not fold, is the single column it
+was.
+
+**Yes, and still to do.** Samsung Health reaches Health Connect once its own
+sync is turned on, which makes Health Connect the honest route to steps and
+sleep - Samsung's Health SDK is partner-only. That is the next Galaxy-shaped
+piece of work and it is not started.
 
 ### Phase 11 — The design pass
 

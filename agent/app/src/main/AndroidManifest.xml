@@ -300,6 +300,36 @@
             </intent-filter>
         </activity>
 
+        <!--
+          A second icon that opens Lin already listening.
+
+          This is the Galaxy integration that actually exists. Samsung's Modes and Routines
+          cannot send an intent to an app and has no third-party trigger API, but one of the
+          actions it does have is "open app" - and Routines+ adds double-press and long-press
+          of the volume and side keys as triggers. An app with a second launcher entry is
+          therefore reachable from a hardware button without Lin being the assistant at all,
+          which is the thing the assistant role kept failing to deliver.
+
+          It is also what the home screen, a folder, an edge panel's app shortcuts and a
+          Bixby "open" all target, so one alias serves every one of them.
+
+          An alias rather than another activity: it is the same panel, launched the same way.
+          And because a routine opening an app is a visible, user-started launch, the
+          microphone may start - which it may not when something tries this from the
+          background.
+        -->
+        <activity-alias
+            android:name=".ListenActivity"
+            android:targetActivity=".AssistActivity"
+            android:exported="true"
+            android:label="@string/listen_label"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- Listens for "Hey Lin". Started by the setting, and stopped with it. -->
         <service
             android:name=".voice.WakeService"

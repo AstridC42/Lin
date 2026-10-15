@@ -30,6 +30,24 @@ enum class Launch {
   ASSIST,
 }
 
+/**
+ * Whether the microphone opens again once Lin has finished answering.
+ *
+ * This is what makes it a conversation rather than a series of questions: ask out loud, hear
+ * the answer, reply - without reaching for the phone between each one.
+ *
+ * Three conditions, and each rules out a way of getting it wrong. Only when it was turned on,
+ * because a microphone that reopens by itself is the thing people are right to be wary of.
+ * Only when the question was spoken, so typing one question does not leave the phone
+ * listening. And only when Lin actually spoke, because reopening after a silent answer would
+ * leave somebody talking to a phone that said nothing and is now recording them.
+ *
+ * The caller must also wait until the speaking has finished. A microphone opened while Lin is
+ * still talking hears Lin.
+ */
+fun shouldListenAgain(voiceChat: Boolean, asked: Asked, spoke: Boolean): Boolean =
+  voiceChat && spoke && asked == Asked.SPOKEN
+
 /** How the current turn's question arrived. */
 enum class Asked {
   TYPED,

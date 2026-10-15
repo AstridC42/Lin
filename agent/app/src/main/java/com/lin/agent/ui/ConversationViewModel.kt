@@ -38,6 +38,7 @@ import com.lin.agent.core.voice.Launch
 import com.lin.agent.core.voice.Summon
 import com.lin.agent.core.voice.shouldListenOnLaunch
 import com.lin.agent.core.voice.speakWhenNamed
+import com.lin.agent.core.voice.shouldListenAgain
 import com.lin.agent.core.voice.shouldSpeak
 import com.lin.agent.model.DelegateTool
 import com.lin.agent.voice.Dictation
@@ -516,8 +517,15 @@ constructor(
               persist(complete)
               // In a car a spoken question gets a spoken answer whatever the switch says -
               // an answer only on screen is no answer to somebody driving.
-              if (shouldSpeak(speakWhenNamed(settings.speakWhen.first()), asked, inCar(appContext))) {
-                speaker.say(event.text)
+              val speaking =
+                shouldSpeak(speakWhenNamed(settings.speakWhen.first()), asked, inCar(appContext))
+              val carryOn =
+                shouldListenAgain(settings.voiceChat.first(), asked, spoke = speaking)
+              if (speaking) {
+                // The microphone reopens from the engine's own "finished" callback rather
+                // than after a guessed delay: opened a moment too early it hears Lin, and a
+                // delay long enough to be safe is long enough to feel broken.
+                speaker.say(event.text, whenDone = { if (carryOn) startListening() })
               }
             }
             is LoopEvent.Failed -> {
