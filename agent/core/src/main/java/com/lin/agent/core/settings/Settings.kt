@@ -116,6 +116,50 @@ class SettingsRepository(private val context: Context) {
    * worse, starts a free tier playing an advert - is not saving them anything. Lin says it
    * needs to be told rather than choosing.
    */
+  /**
+   * When Lin reads a reply out loud: never, when spoken to, or always. See
+   * [com.lin.agent.core.voice.SpeakWhen].
+   *
+   * Falls back to the old yes/no switch while nothing has been chosen here, so nobody loses
+   * the setting they had to a new one they have never seen.
+   */
+  val speakWhen: Flow<String> =
+    // Reading the old key directly rather than the property above it: property initialisers
+    // run in declaration order, and spokenReplies is declared further down - referring to it
+    // here would combine with a flow that does not exist yet.
+    kotlinx.coroutines.flow.combine(read(SPEAK_WHEN, ""), read(SPOKEN_REPLIES, true)) {
+      chosen,
+      oldSwitch ->
+      when {
+        chosen.isNotBlank() -> chosen
+        oldSwitch -> "WHEN_SPOKEN_TO"
+        else -> "NEVER"
+      }
+    }
+
+  suspend fun setSpeakWhen(value: String) = write(SPEAK_WHEN, value)
+
+  /**
+   * Which voice, by the engine's own name for it. Empty means whatever the engine opens with.
+   *
+   * Stored by name rather than by anything structural, for the same reason the server's model
+   * is: the list belongs to the engine and changes when one is installed or removed, so the
+   * only durable reference is the name - and a name that no longer resolves falls back rather
+   * than failing to speak.
+   */
+  val voiceName: Flow<String> = read(VOICE_NAME, "")
+
+  suspend fun setVoiceName(value: String) = write(VOICE_NAME, value)
+
+  /** How fast and how high, as the engine's own multipliers. 1.0 is the engine's normal. */
+  val speechRate: Flow<Float> = read(SPEECH_RATE, 1.0f)
+
+  suspend fun setSpeechRate(value: Float) = write(SPEECH_RATE, value)
+
+  val speechPitch: Flow<Float> = read(SPEECH_PITCH, 1.0f)
+
+  suspend fun setSpeechPitch(value: Float) = write(SPEECH_PITCH, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -398,6 +442,10 @@ class SettingsRepository(private val context: Context) {
     val SERVER_AUTH_HEADER = stringPreferencesKey("ollama_auth_header")
     val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
     val MUSIC_APP = stringPreferencesKey("music_app")
+    val SPEAK_WHEN = stringPreferencesKey("speak_when")
+    val VOICE_NAME = stringPreferencesKey("voice_name")
+    val SPEECH_RATE = floatPreferencesKey("speech_rate")
+    val SPEECH_PITCH = floatPreferencesKey("speech_pitch")
     val DIAL_POLICY = stringPreferencesKey("dial_policy")
     val SERVER_MODEL_NAME = stringPreferencesKey("server_model_name")
     val ANSWER_ON_SERVER = booleanPreferencesKey("answer_on_server")

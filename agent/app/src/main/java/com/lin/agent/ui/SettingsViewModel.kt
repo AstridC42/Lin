@@ -28,6 +28,9 @@ import com.lin.agent.car.CarNotification
 import com.lin.agent.core.car.DialPolicy
 import com.lin.agent.core.car.dialPolicyNamed
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.core.voice.SpeakWhen
+import com.lin.agent.core.voice.VoiceOption
+import com.lin.agent.core.voice.speakWhenNamed
 import com.lin.agent.model.installedMusicApps
 import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.engine.Reasoning
@@ -102,6 +105,14 @@ data class SettingsState(
   /** Whether the panel may appear over the lock screen, which a car needs. */
   val answerWhenLocked: Boolean = false,
   val spokenReplies: Boolean = true,
+  /** When Lin reads a reply out loud: never, when spoken to, or always. */
+  val speakWhen: SpeakWhen = SpeakWhen.WHEN_SPOKEN_TO,
+  /** The voices this phone can speak with, best first. Empty until the engine is up. */
+  val voices: List<VoiceOption> = emptyList(),
+  /** The chosen voice's engine name, or empty for whatever the engine opens with. */
+  val voiceName: String = "",
+  val speechRate: Float = 1.0f,
+  val speechPitch: Float = 1.0f,
   /** Whether Lin is listening for its name. Off by default; it holds the microphone. */
   val wakeWord: Boolean = false,
   /** The downloaded chat model the user picked, or empty to let the phone decide. */
@@ -133,6 +144,7 @@ constructor(
   private val calendars: Calendars,
   private val photos: PhotoIndex,
   private val memories: MemoryStore,
+  private val speaker: com.lin.agent.voice.Speaker,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
 
@@ -166,6 +178,10 @@ constructor(
           carNotification = settings.carNotification.first(),
           answerWhenLocked = settings.answerWhenLocked.first(),
           spokenReplies = settings.spokenReplies.first(),
+          speakWhen = speakWhenNamed(settings.speakWhen.first()),
+          voiceName = settings.voiceName.first(),
+          speechRate = settings.speechRate.first(),
+          speechPitch = settings.speechPitch.first(),
           wakeWord = settings.wakeWord.first(),
           chatModel = settings.chatModelName.first(),
           musicApp = settings.musicApp.first(),
@@ -451,6 +467,49 @@ constructor(
       // new setting falls back to, so a stale "true" there would resurrect ALWAYS.
       settings.setAllowDirectCalls(effective == DialPolicy.ALWAYS)
     }
+  }
+
+  /**
+   * The voices the engine has, asked for when the voice section is opened.
+   *
+   * Not at start-up: the text-to-speech engine takes a moment to come up, and asking it
+   * before it has would hand back an empty list that nothing would ever refresh.
+   */
+  fun loadVoices() {
+    viewModelScope.launch { _state.update { it.copy(voices = speaker.voices()) } }
+  }
+
+  fun setSpeakWhen(speak: SpeakWhen) {
+    _state.update { it.copy(speakWhen = speak, spokenReplies = speak != SpeakWhen.NEVER) }
+    viewModelScope.launch {
+      settings.setSpeakWhen(speak.name)
+      // The old switch is kept in step, because it is what the new setting falls back to.
+      settings.setSpokenReplies(speak != SpeakWhen.NEVER)
+    }
+  }
+
+  /** Picks a voice, and says something in it - a name is not something anybody can judge. */
+  fun useVoice(name: String, sample: String) {
+    _state.update { it.copy(voiceName = name) }
+    viewModelScope.launch {
+      settings.setVoiceName(name)
+      speaker.preview(name, sample)
+    }
+  }
+
+  fun setSpeechRate(rate: Float) {
+    _state.update { it.copy(speechRate = rate) }
+    viewModelScope.launch { settings.setSpeechRate(rate) }
+  }
+
+  fun setSpeechPitch(pitch: Float) {
+    _state.update { it.copy(speechPitch = pitch) }
+    viewModelScope.launch { settings.setSpeechPitch(pitch) }
+  }
+
+  /** Says the sample in whatever is currently chosen, after a speed or pitch change. */
+  fun previewVoice(sample: String) {
+    viewModelScope.launch { speaker.preview(_state.value.voiceName, sample) }
   }
 
   fun setCarNotification(on: Boolean) {

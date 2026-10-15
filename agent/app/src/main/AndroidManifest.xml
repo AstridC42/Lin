@@ -79,6 +79,17 @@
       cannot put anything in somebody's week - the worst it can do is open an editor showing
       the wrong day, which is visible before it is saved.
     -->
+    <!--
+      Where to look the weather up, and nothing else.
+
+      Coarse rather than fine: a forecast is the same across a town, and the coordinates are
+      rounded to about a kilometre again before they leave the phone. Lin asks for this only
+      when somebody asks about the weather, and the only thing it is ever used for is that
+      lookup - there is no background location, no history kept, and no other request this
+      permission reaches.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <uses-permission android:name="android.permission.READ_CALENDAR" />
 
     <!-- Setting a timer outright. An alarm still opens the clock app to be confirmed. -->

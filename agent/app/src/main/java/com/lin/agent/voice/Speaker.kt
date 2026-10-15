@@ -18,11 +18,19 @@ package com.lin.agent.voice
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
+import android.speech.tts.Voice
 import android.util.Log
+import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.core.voice.VoiceOption
+import com.lin.agent.core.voice.chosenVoice
 import com.lin.agent.core.voice.forSpeaking
+import com.lin.agent.core.voice.usableVoices
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 /**
  * Reads a reply out loud.
@@ -36,7 +44,12 @@ import javax.inject.Singleton
  * tested as one.
  */
 @Singleton
-class Speaker @Inject constructor(@ApplicationContext private val context: Context) {
+class Speaker
+@Inject
+constructor(
+  @ApplicationContext private val context: Context,
+  private val settings: SettingsRepository,
+) {
 
   @Volatile private var engine: TextToSpeech? = null
 
@@ -53,9 +66,83 @@ class Speaker @Inject constructor(@ApplicationContext private val context: Conte
       Log.i(TAG, "Nothing to speak with yet")
       return
     }
-    runCatching { live.speak(text, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE) }
+    runCatching {
+        applyChoices(live)
+        live.speak(text, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE)
+      }
       .onFailure { Log.w(TAG, "Could not speak", it) }
   }
+
+  /**
+   * Speaks a sample in the voice being chosen, without it being a reply.
+   *
+   * The settings screen needs this: a list of names like `en-gb-x-gbb-local` tells nobody
+   * what they are picking, and a voice is the one setting that cannot be judged by reading.
+   */
+  fun preview(voiceName: String, sample: String) {
+    val live = engine ?: start()
+    if (live == null || !ready) return
+    runCatching {
+      applyChoices(live, override = voiceName)
+      live.speak(sample, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE)
+    }
+  }
+
+  /** Every voice the current engine has, for the settings screen to offer. */
+  fun voices(): List<VoiceOption> {
+    val live = engine ?: start()
+    if (live == null || !ready) return emptyList()
+    val all =
+      runCatching { live.voices.orEmpty().map { it.asOption() } }.getOrDefault(emptyList())
+    return usableVoices(all, Locale.getDefault().language)
+  }
+
+  /**
+   * The chosen voice, speed and pitch, applied before speaking.
+   *
+   * Read here rather than held, because the settings screen changes them while this object
+   * lives: a value cached at start-up would mean the voice somebody just picked takes effect
+   * next time they open the app. Blocking on a DataStore read of three keys is microseconds,
+   * and this is already on the way to an engine that takes longer than that to say a word.
+   */
+  private fun applyChoices(live: TextToSpeech, override: String = "") {
+    val wanted =
+      runCatching {
+          runBlocking {
+            Choices(
+              voice = override.ifBlank { settings.voiceName.first() },
+              rate = settings.speechRate.first(),
+              pitch = settings.speechPitch.first(),
+            )
+          }
+        }
+        .getOrNull() ?: return
+
+    runCatching { live.setSpeechRate(wanted.rate) }
+    runCatching { live.setPitch(wanted.pitch) }
+
+    if (wanted.voice.isBlank()) return
+    val available = runCatching { live.voices.orEmpty().toList() }.getOrDefault(emptyList())
+    val options = available.map { it.asOption() }
+    // Falls back to the best available rather than going silent: engines get switched and
+    // language packs removed, and a stored name outliving its voice is ordinary.
+    val choice = chosenVoice(usableVoices(options, Locale.getDefault().language), wanted.voice)
+    val match = available.firstOrNull { it.name == choice?.name } ?: return
+    runCatching { live.voice = match }
+  }
+
+  private fun Voice.asOption() =
+    VoiceOption(
+      name = name.orEmpty(),
+      language = locale?.language.orEmpty(),
+      country = locale?.country.orEmpty(),
+      quality = quality,
+      needsNetwork = isNetworkConnectionRequired,
+      // The engine lists voices it has not downloaded, which speak as nothing at all.
+      installed = features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true,
+    )
+
+  private data class Choices(val voice: String, val rate: Float, val pitch: Float)
 
   /** Stops mid-sentence. Called when the user sends something else, or leaves. */
   fun stop() {
