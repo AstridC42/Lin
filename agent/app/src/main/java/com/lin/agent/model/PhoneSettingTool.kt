@@ -85,7 +85,7 @@ class PhoneSettingTool(private val context: Context, private val guard: LaunchGu
     val switch =
       switchNamed(saidSetting)
         ?: return ToolResult.Failed(
-          "Lin cannot reach \"$saidSetting\". It can do the flashlight, wi-fi, bluetooth, nfc, " +
+          "Lin cannot reach '$saidSetting'. It can do the flashlight, wi-fi, bluetooth, nfc, " +
             "do not disturb and airplane mode, and nothing else on the phone. Say so plainly."
         )
 
