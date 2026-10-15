@@ -171,6 +171,19 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setSpeechPitch(value: Float) = write(SPEECH_PITCH, value)
 
+  /**
+   * Whether Lin may press Send itself in another app, as the name of a policy. See
+   * [com.lin.agent.core.screen.TapPolicy].
+   *
+   * Never, by default, and for the same reason calls are staged in the dialer: a sent message
+   * cannot be unsent. The difference is that staging this one is nearly free - the words are
+   * in the real app's own box with the real send button under the person's thumb - so the
+   * default costs one tap and buys the guarantee that nothing Lin misheard ever left the phone.
+   */
+  val tapSend: Flow<String> = read(TAP_SEND, "")
+
+  suspend fun setTapSend(value: String) = write(TAP_SEND, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -453,6 +466,7 @@ class SettingsRepository(private val context: Context) {
     val SERVER_AUTH_HEADER = stringPreferencesKey("ollama_auth_header")
     val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
     val MUSIC_APP = stringPreferencesKey("music_app")
+    val TAP_SEND = stringPreferencesKey("tap_send")
     val SPEAK_WHEN = stringPreferencesKey("speak_when")
     val VOICE_NAME = stringPreferencesKey("voice_name")
     val VOICE_CHAT = booleanPreferencesKey("voice_chat")

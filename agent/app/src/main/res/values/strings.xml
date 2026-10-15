@@ -62,6 +62,55 @@
   <string name="settings_voice_speed">Speed %1$s</string>
   <string name="settings_voice_pitch">Pitch %1$s</string>
   <string name="settings_voice_more">Get more voices</string>
+
+  <!-- Lin's screen access, and the privileges it borrows. -->
+  <string name="accessibility_label">Lin</string>
+  <string name="accessibility_summary">Lets Lin type in other apps and read what is on
+    screen.</string>
+  <string name="accessibility_description">Turning this on lets Lin write a message in
+    WhatsApp, Telegram, Signal or Messages — in the app\'s own message box, which no other
+    method on Android allows — and read out what is on the screen in front of you. Lin reads
+    the screen only when you ask it something; it keeps no record of what was there and
+    writes nothing to the phone. You can turn this off again here at any time.</string>
+
+  <string name="settings_screen_heading">Typing in other apps</string>
+  <string name="settings_screen_detail">Replying to a notification is all Android lets an app
+    do on its own, which is why Lin could never start a conversation. Screen access is the way
+    round it — the same one Tasker and AutoInput use. Lin can then type into an app\'s own
+    message box, and read out what is on the screen behind it.</string>
+  <string name="settings_screen_on">Screen access is on</string>
+  <string name="settings_screen_off">Screen access is off</string>
+  <string name="settings_screen_grant">Turn on screen access</string>
+  <string name="settings_screen_warning">This is the widest permission on the phone: while it
+    is on, Lin can see the contents of any screen you look at. Lin reads it only when you ask
+    and keeps nothing, but the permission itself is real — it is worth turning on only if you
+    want the messaging.</string>
+
+  <string name="settings_tap_send">When Lin may press send</string>
+  <string name="settings_tap_never">Never — type it and leave it to me</string>
+  <string name="settings_tap_asked">When I asked for it to be sent</string>
+  <string name="settings_tap_always">Always</string>
+  <string name="settings_tap_detail">A sent message cannot be unsent, so the default is that
+    Lin types it into the real app and the last tap is yours. The middle option reads your own
+    words rather than asking the model whether you meant it.</string>
+
+  <string name="settings_shell_heading">Really changing settings</string>
+  <string name="settings_shell_detail">Android took Wi-Fi away from apps in version 10,
+    Bluetooth in 13, and never gave NFC an API at all — so on its own Lin can only open the
+    panel for you to tap. It never took them away from the USB debugging shell. Shizuku is a
+    separate free app that lends Lin that shell\'s privileges, one app at a time, with no
+    root; with it, “turn the Wi-Fi off” turns the Wi-Fi off.</string>
+  <string name="settings_shell_ready">Lin can change these directly</string>
+  <string name="settings_shell_missing">Shizuku is not installed</string>
+  <string name="settings_shell_stopped">Shizuku is installed but not running</string>
+  <string name="settings_shell_unasked">Shizuku has not been asked about Lin</string>
+  <string name="settings_shell_refused">Shizuku was told not to ask about Lin</string>
+  <string name="settings_shell_get">Where to get Shizuku</string>
+  <string name="settings_shell_open">Open Shizuku</string>
+  <string name="settings_shell_ask">Ask Shizuku to allow Lin</string>
+  <string name="settings_shell_restart">Shizuku has to be started again after every restart of
+    the phone — that is how it works rather than a fault, and Lin falls back to opening the
+    panel while it is down.</string>
   <string name="settings_voice_more_detail">Voices belong to the phone\'s speech engine rather
     than to Lin, so this opens its settings. Google\'s and Samsung\'s engines download extra
     voices there; a neural engine installed from elsewhere — a Piper or Sherpa-ONNX one, which

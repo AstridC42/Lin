@@ -1264,6 +1264,23 @@ nothing built. This is the whole surface, checked, with what came of each.
   against this project's grain. Home Assistant is the local answer, and is the
   recommendation whenever home control is wanted.
 
+**A correction to the above.** This section was once summarised as "Samsung is
+a dead end", and that was wrong in two places and incomplete in a third. The
+list above is accurate about Samsung's *own* surfaces; it is not accurate about
+the features people mean when they name them.
+
+- *SmartThings is not closed.* Its OAuth API is real and documented, and is how
+  Home Assistant's SmartThings integration works. The constraint is the fee,
+  not the access.
+- *Quick Share is not closed either, and Lin already has it.* Quick Share is a
+  target in the ordinary share sheet - `ACTION_SEND` with a MIME type - and Lin
+  already declares a SEND filter, so it both receives shares and can offer
+  them. No private API is involved; that is what every other app is doing too.
+- *Two mechanisms were missing from the list entirely*, and they are the ones
+  other apps actually use for the things called impossible here: **Shizuku**,
+  for system calls at the ADB shell's privilege, and an **AccessibilityService**,
+  for driving another app's interface. Both are now built - see Phase 13.
+
 **Yes, and done.** What Modes and Routines *can* do is open an app, and
 Routines+ adds double-press and long-press of the volume and side keys as
 triggers. So Lin now has a second launcher entry - "Lin · Listen" - that opens
@@ -1287,6 +1304,100 @@ was.
 sync is turned on, which makes Health Connect the honest route to steps and
 sleep - Samsung's Health SDK is partner-only. That is the next Galaxy-shaped
 piece of work and it is not started.
+
+### Phase 13 — Borrowed privileges
+
+Two mechanisms, both heavy, both opt-in, both the honest answer to things the
+plan had previously written off. Neither is a trick: each is a documented way
+an app on an unrooted phone does something the SDK does not offer, and each is
+granted by the person, visibly, and revocable in two taps.
+
+**Shizuku, so a switch is really set.** Android took Wi-Fi from apps in 10,
+Bluetooth in 13, and never gave NFC an API; aeroplane mode never had one. It
+took none of them from the ADB shell, where `svc wifi disable` has worked since
+Android 4. Shizuku is a separate free app the user installs and pairs once over
+Wireless debugging; it runs a service under the `shell` user and lends that
+identity to apps the user allows, one at a time, with no root.
+
+Lin uses it through its own code, not through hidden system interfaces. The
+alternative - taking the Binder for `IWifiManager` and calling `setWifiEnabled`
+through a wrapper - works and breaks on the next Android version that changes
+the signature, silently, on somebody's phone rather than in a build. So
+`PrivilegedService` is Lin's class, started by Shizuku in a shell-privileged
+process, running the commands a person could type. `Shizuku#newProcess` is on
+its way out and is not used; this is the `UserService` route its changelog
+points at.
+
+What is decided lives in `core` with tests:
+
+- `shizukuState` - five situations, kept apart because from the outside they
+  all look the same (a switch that did not move) and "install it", "start it",
+  "allow Lin" and "allow Lin from inside Shizuku" are four different things to
+  do. The order of the checks is the content of the function: a stale
+  permission grant on a phone where Shizuku has been uninstalled must not read
+  as READY.
+- `commandsFor` - the command table, best first, a list rather than one
+  command because which form a given build accepts is not knowable from here.
+- `shellWorked` - whether it actually worked, which is **not** `exitCode == 0`:
+  `svc` answers a subcommand it does not have by printing its usage and exiting
+  zero, so a tool trusting the exit code would say "done" to a help message.
+  This is the honest-results rule in a single function.
+- `reachOf` gains a `privileged` flag, and the four taken-away switches become
+  `DIRECT` instead of `OPENS_IT`. Without Shizuku nothing changes: they still
+  open the phone's own panel, which is what they did before.
+
+Do Not Disturb deliberately does **not** go through the shell. It has a real
+API behind a grant the user gives once, and borrowing a privilege to avoid
+asking would be going round the person rather than asking them.
+
+**An accessibility service, so a message can be written.** Replying to a
+notification is all Android lets an app do unaided, which is why Lin could
+answer a message but never start one. An AccessibilityService is the way round
+it - the same one Tasker and AutoInput use - and it is the widest permission on
+the phone: while it is on, the service can read the contents of every screen
+the person looks at and act on their behalf.
+
+Two things keep it to what it needs:
+
+- **Nothing is remembered.** `onAccessibilityEvent` is empty, which is unusual
+  for such a service and is the point: the tree is read when a tool asks,
+  turned into plain data, and dropped. Nothing is written to disk and no index
+  of what crossed the screen exists. The config asks for window content and
+  view ids and nothing else - no key events, no touch exploration, no
+  fingerprint gestures.
+- **Nothing in the service decides what to press.** That is `core/screen`, with
+  tests, and the test that matters is this one: in WhatsApp, Telegram and
+  Signal alike the microphone button sits exactly where the send button sits
+  and swaps with it depending on whether the box has text in it. A rule that
+  found "the round button at the end of the composer" would, on a screen that
+  had not caught up with the typing, record audio and send somebody a voice
+  note. So `sendButton` applies a danger list *before* anything else, matched
+  on whole words - because "dynamic" contains "mic" and a substring match would
+  refuse perfectly good buttons.
+
+`composerField` returns null rather than a guess when two editable boxes are on
+screen and neither is identified. The other editable box on a messaging screen
+is the search field, and a message typed into search and sent with the button
+beside it goes to whoever search happened to select. One declined screen costs
+a sentence; one wrong guess costs somebody a message they did not write going
+to somebody they did not choose.
+
+Sending follows the same rule as calling: **typed, not sent**, unless the
+person has chosen otherwise. The middle setting - "when I asked for it to be
+sent" - reads their own words through `soundsLikeSendIt` rather than asking the
+model, because a 2B model asked whether sending was wanted says yes, that being
+the helpful answer, and this action has no undo. A sentence containing both a
+drafting word and a sending word reads as a draft.
+
+Where there is a documented deep link - `wa.me`, `t.me`, `smsto:` - Lin uses it,
+because it lands on the right conversation with the words already in the box
+and the step that could reach the wrong person never happens. Where there is
+not, Lin will only type into a conversation the person already has open, and
+says so.
+
+`read_screen` is the cheaper half of the same privilege, and the one that is
+asked for most: "what does this say", "read me that", "what's the code in that
+message".
 
 ### Phase 11 — The design pass
 

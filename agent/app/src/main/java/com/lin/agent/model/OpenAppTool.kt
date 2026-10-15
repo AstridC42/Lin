@@ -91,20 +91,5 @@ class OpenAppTool(private val context: Context, private val guard: LaunchGuard) 
       .getOrElse { ToolResult.Failed("${app.label} would not open.") }
   }
 
-  private fun installedApps(): List<InstalledApp> =
-    runCatching {
-        val launchable = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        context.packageManager
-          .queryIntentActivities(launchable, PackageManager.MATCH_DEFAULT_ONLY)
-          .map { resolved ->
-            InstalledApp(
-              label = resolved.loadLabel(context.packageManager).toString(),
-              packageName = resolved.activityInfo.packageName,
-            )
-          }
-          // One entry per app: a few apps publish several launcher icons, and a duplicate
-          // label makes the shortest-label tie-break meaningless.
-          .distinctBy { it.packageName }
-      }
-      .getOrDefault(emptyList())
+  private fun installedApps(): List<InstalledApp> = installedApps(context)
 }

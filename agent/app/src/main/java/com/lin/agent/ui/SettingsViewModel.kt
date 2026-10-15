@@ -27,6 +27,9 @@ import com.lin.agent.core.models.ModelStore
 import com.lin.agent.car.CarNotification
 import com.lin.agent.core.car.DialPolicy
 import com.lin.agent.core.car.dialPolicyNamed
+import com.lin.agent.core.privileged.ShizukuState
+import com.lin.agent.core.screen.TapPolicy
+import com.lin.agent.core.screen.tapPolicyNamed
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.core.voice.SpeakWhen
 import com.lin.agent.core.voice.VoiceOption
@@ -100,6 +103,8 @@ data class SettingsState(
   val allowDirectCalls: Boolean = false,
   /** Where Lin may ring somebody without a tap: nowhere, in the car, or anywhere. */
   val dialPolicy: DialPolicy = DialPolicy.NEVER,
+  /** Whether Lin may press send in another app. See [com.lin.agent.core.screen.TapPolicy]. */
+  val tapSend: TapPolicy = TapPolicy.NEVER,
   /** Whether the "listen in the car" notification is kept up. */
   val carNotification: Boolean = false,
   /** Whether the panel may appear over the lock screen, which a car needs. */
@@ -146,6 +151,7 @@ constructor(
   private val calendars: Calendars,
   private val photos: PhotoIndex,
   private val memories: MemoryStore,
+  private val privileged: com.lin.agent.privileged.Privileged,
   private val speaker: com.lin.agent.voice.Speaker,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
@@ -177,6 +183,7 @@ constructor(
           answerOnServer = settings.answerOnServer.first(),
           allowDirectCalls = settings.allowDirectCalls.first(),
           dialPolicy = dialPolicyNamed(settings.dialPolicy.first()),
+          tapSend = tapPolicyNamed(settings.tapSend.first()),
           carNotification = settings.carNotification.first(),
           answerWhenLocked = settings.answerWhenLocked.first(),
           spokenReplies = settings.spokenReplies.first(),
@@ -459,6 +466,26 @@ constructor(
    * does not back would have this screen claiming Lin can place calls it cannot, and the call
    * policy would stage them anyway. Better that the screen says what will happen.
    */
+  fun setTapSend(policy: TapPolicy) {
+    _state.update { it.copy(tapSend = policy) }
+    viewModelScope.launch { settings.setTapSend(policy.name) }
+  }
+
+  /**
+   * What Shizuku is doing, asked fresh each time.
+   *
+   * None of it is stable enough to hold: Shizuku stops when the phone restarts, and the
+   * permission is granted in Shizuku's own window rather than in this app - so the screen
+   * reads it again every time it comes back to the front.
+   */
+  fun shizukuState(): ShizukuState = privileged.state()
+
+  fun requestShizuku(): Boolean = privileged.request()
+
+  fun openShizuku(): Boolean = privileged.openShizuku()
+
+  fun openWhereToGetShizuku(): Boolean = privileged.openWhereToGetShizuku()
+
   fun setDialPolicy(policy: DialPolicy, granted: Boolean) {
     val effective = if (policy == DialPolicy.NEVER || granted) policy else DialPolicy.NEVER
     _state.update {
