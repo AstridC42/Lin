@@ -1168,13 +1168,42 @@ nobody any way to say "that is finished"; the only way to begin again was to
 put the phone down and wait. The conversation being left is recorded for the
 corpus first, so starting a new one never loses the last.
 
-### Phase 11 — A design pass, not yet taken
+### Phase 11 — The design pass
 
-Asked for in October 2026 and written down rather than started, because a
-redesign begun between two feature requests is a repaint.
+Four directions were drawn side by side on a canvas - a quiet page with no
+bubbles, an instrument with a status strip and mono tool rows, cards, and an
+answer-first layout where the reply is the page - and **cards** was chosen.
 
-**What the interface is now, honestly.** It grew a feature at a time and it
-shows. The conversation screen is Material defaults with bubbles; settings
+What follows is what that pass decided, and what it deliberately kept.
+
+**Done: a look of its own, rather than the wallpaper's.** Dynamic colour is
+gone. Taking the palette from the wallpaper is a good default for an app with
+no look of its own; this one now has one, and a wallpaper that turns Lin mint
+green undoes it. The cost is stated plainly: Lin no longer matches the rest of
+the phone. It is built from the dark side first, because that is where this
+app is read - at night, in a car, on a phone that is dark the rest of the
+time.
+
+**Done: the reply is laid out as what it meant.** Models write Markdown
+whether or not anybody asked, and the screen used to show the asterisks. The
+parser is in core and tested, and the rule it is built on is that it never
+loses a character: a marker that does not pair up stays on screen as text. Two
+bugs in it were found by its own tests before it ever rendered anything -
+`2 * 3 * 4` read as italics, and a closing `**` that reopened bold.
+
+**Done: the first screen.** An empty conversation was a title bar and a text
+box. It is now a greeting and four things Lin can actually do, sent as if they
+had been typed - a suggestion that produced "I cannot do that" would be worse
+than a blank screen.
+
+**Done: what a tool did.** Running, done and could-not are three different
+things, shown as three different cards, each carrying its own word rather than
+only a colour. The view model used to hold the running one in one field and
+the failed ones in another, which is how a tool that failed while another
+started showed as neither; it is one list now.
+
+**What the interface was before this, for the record.** It grew a feature at a
+time and it showed. The conversation screen is Material defaults with bubbles; settings
 was one scrolling page until it had fourteen sections and is now five tabs;
 the panel is new and is the only part designed as a shape rather than
 assembled from controls. Nothing has had a pass where someone asked what this
@@ -1182,17 +1211,11 @@ app should feel like to use rather than what it needs to contain. Four
 screens behind buttons on a settings page — memory, documents, training,
 backup — are there because they had to live somewhere.
 
-**What a pass would have to decide**, rather than what it should produce:
+**Still open after this pass:**
 
-- What Lin looks like when it has nothing to say yet. The empty conversation
-  is the first thing anybody sees and it is currently a title bar and a text
-  box.
 - Whether the panel and the full screen are two views of one conversation or
   two conversations. They are two today, and that is a layout decision
   standing in for a product one — see the note in Phase 6.
-- What a tool doing something looks like. Running, staged, failed and
-  "opened, you finish it" are four different states and three of them are
-  currently a line of small grey text.
 - What the big screen is for. On a Fold's inner screen the conversation is
   width-capped and the rest is empty; the plan has always said a two-pane
   layout arrives when there is tool activity worth showing beside the

@@ -6,6 +6,17 @@
   <string name="speak">Speak</string>
   <string name="stop_listening">Stop listening</string>
   <string name="close_panel">Close</string>
+  <string name="empty_greeting">What do you need?</string>
+  <string name="empty_today">What have I got on today?</string>
+  <string name="empty_music">Play something</string>
+  <string name="empty_flashlight">Turn the flashlight on</string>
+  <string name="empty_missed">What did I miss?</string>
+  <string name="empty_local">Everything runs on this phone, or on your own server.</string>
+  <string name="tool_running">Working</string>
+  <string name="tool_done">Done</string>
+  <string name="tool_failed_short">Could not</string>
+  <string name="reply_not_sent">NOT SENT YET</string>
+  <string name="photo_found">A photo Lin found</string>
   <string name="listening">Listening…</string>
   <string name="settings_messages_heading">Messages</string>
   <string name="settings_messages_detail">Let Lin see messages that can be replied to, so it can
@@ -161,8 +172,6 @@
   <string name="settings_device">This phone: %1$d GB of memory, %2$s</string>
   <string name="no_model">no model</string>
   <string name="running_tool">Working on the server — this can take a minute…</string>
-  <string name="tool_failed">%1$s did not work. Whatever Lin says above, that part did not
-    happen.</string>
   <string name="no_model_title">No model yet</string>
   <string name="no_model_body">Lin answers with a model running on this phone, and there is not
     one here yet. %1$s is about %2$s GB — worth starting on Wi-Fi.</string>
