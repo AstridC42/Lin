@@ -107,6 +107,19 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
    * server has gone, and a probe before every delegation would add a round trip to a path that
    * is about to make a much longer one anyway.
    */
+  /**
+   * Whether there is a server and a model to hand work to, from the settings alone.
+   *
+   * Asked before each turn so that `delegate` can be withheld when there is nothing behind it.
+   * Deliberately no network: this is on the path of every question, and the answer it needs -
+   * "has the user configured this at all" - is two reads from a DataStore. A server that is
+   * configured but unreachable still gets offered, and fails in the ordinary way with a
+   * message, which is right: that is a server problem to be told about, not a feature the
+   * phone does not have.
+   */
+  suspend fun hasServerModel(): Boolean =
+    settings.serverUrl.first().isNotBlank() && settings.serverModelName.first().isNotBlank()
+
   suspend fun serverSubAgent(): LlmBackend? {
     val url = settings.serverUrl.first()
     val model = settings.serverModelName.first()

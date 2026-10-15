@@ -452,6 +452,27 @@ preserved the binding constraint.
 **Gate: below 80%, stop and fix the schema or the decoding before building
 anything on top.** If it cannot be fixed, see *Kill criteria*.
 
+**A tool with nothing behind it is not offered.** Found on a phone: "tell me a
+short story" spent a whole exchange writing a delegation brief, was told
+there was no server configured, and then generated the story locally in a
+second exchange. Twice the wait and a red tool card, for a question a 2B
+model was always going to answer itself. A 2B model handed a tool named
+`delegate` reaches for it on anything that smells like work, and no amount of
+"not worth it for anything you can answer yourself" in the description fixes
+that. So the turn loop takes a set of names to withhold, and the conversation
+withholds `delegate` whenever no server and model are configured - from the
+list the model is given *and* from the lookup, because a model that saw the
+name earlier in the conversation will ask for it again.
+
+**A failure that follows a success must not become the answer.** Also found on
+a phone: "what have I got on today?" read the calendar successfully, failed on
+the weather, and answered "I cannot tell you the weather because I do not know
+your location" - with the calendar result sitting unused two messages above
+and its own card showing Done on screen. A small model reads the most recent
+message and answers from it. So a tool failure that arrives after something
+worked says so, in the failure text itself, which is where the mistake is
+made.
+
 ### Phase 4 — The phone
 
 Port `tools/`. The tool registry with role scoping. MobileActions-270M as an

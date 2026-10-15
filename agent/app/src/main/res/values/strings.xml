@@ -73,6 +73,12 @@
     the screen only when you ask it something; it keeps no record of what was there and
     writes nothing to the phone. You can turn this off again here at any time.</string>
 
+  <string name="permission_location_why">Lin needs your rough location to look up the
+    weather. It is used for that and nothing else, and it is rounded to about a kilometre
+    before it leaves the phone.</string>
+  <string name="permission_allow">Allow</string>
+  <string name="permission_not_now">Not now</string>
+
   <string name="settings_screen_heading">Typing in other apps</string>
   <string name="settings_screen_detail">Replying to a notification is all Android lets an app
     do on its own, which is why Lin could never start a conversation. Screen access is the way

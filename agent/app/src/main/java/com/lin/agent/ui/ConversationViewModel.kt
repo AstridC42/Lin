@@ -59,6 +59,8 @@ import com.lin.agent.core.documents.Documents
 import com.lin.agent.core.documents.PdfPages
 import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.core.diag.describeFault
+import com.lin.agent.core.phone.permissionNeededBy
+import android.content.pm.PackageManager
 import com.lin.agent.core.calendar.todayLine
 import com.lin.agent.core.memory.Digest
 import com.lin.agent.core.tools.LaunchGuard
@@ -166,6 +168,15 @@ data class ConversationState(
   val listening: Boolean = false,
   /** Words recognised so far, so speaking does not look like nothing happening. */
   val heard: String = "",
+  /**
+   * A runtime permission a tool just failed for, so the screen can offer the one button.
+   *
+   * Here rather than left to the tool's own failure message, because a tool has no window and
+   * so cannot ask for anything: the weather tool could only say "it is in settings", which a
+   * 2B model relayed as "you can check the weather in your settings". The screen asks instead,
+   * and only when the permission really is missing. Empty the rest of the time.
+   */
+  val needsPermission: String = "",
 )
 
 /**
@@ -484,6 +495,11 @@ constructor(
             role = AgentRole.ORCHESTRATOR,
             systemPrompt = promptForToday(),
             reasoning = reasoningNamed(settings.reasoning.first()),
+            // Nothing to hand work to means `delegate` is not offered at all. Left in the
+            // list it costs a whole exchange on questions a 2B model was always going to
+            // answer itself - it writes a brief, is told there is no server, and then writes
+            // the answer - which is twice the wait and a failed tool card for nothing.
+            withhold = if (backends.hasServerModel()) emptySet() else setOf(DelegateTool.NAME),
           )
           .run(outgoing)
           .collect { event ->
@@ -509,6 +525,13 @@ constructor(
                     // rather than by position, because a turn can run two tools at once.
                     toolRuns = it.toolRuns.settle(event.name, event.ok),
                     shows = it.shows + event.shows,
+                    // A failure that is only a missing permission is worth one button rather
+                    // than a sentence relayed through the model. Kept once set: two tools
+                    // failing for the same grant must not clear the offer.
+                    needsPermission =
+                      it.needsPermission.ifEmpty {
+                        if (event.ok) "" else missingGrantFor(event.name)
+                      },
                   )
                 }
               is LoopEvent.Done -> {
@@ -596,6 +619,24 @@ constructor(
       }
     }
   }
+
+  /**
+   * The permission [toolName] needed and did not have, or empty.
+   *
+   * Checked here rather than trusted from the failure, because a tool fails for many reasons
+   * and only one of them is fixable by a button. Offering "Allow location" for a weather
+   * service that was simply unreachable would be a button that changes nothing.
+   */
+  private fun missingGrantFor(toolName: String): String {
+    val permission = permissionNeededBy(toolName) ?: return ""
+    val granted =
+      runCatching { appContext.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED }
+        .getOrDefault(true)
+    return if (granted) "" else permission
+  }
+
+  /** Called once the dialog has been answered, whichever way. */
+  fun permissionAnswered() = _state.update { it.copy(needsPermission = "") }
 
   /**
    * The last thing the person themselves said.

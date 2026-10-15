@@ -61,3 +61,26 @@ const val MALFORMED_TOOL_CALL_NUDGE: String =
     "values and no markers or tags of your own inside it. If you cannot, answer the user's " +
     "original question in plain words. Do not mention this note or any failed tool call to " +
     "the user."
+
+/**
+ * What the model is told when a tool failed.
+ *
+ * The second argument is the whole reason this is a function. A turn that calls two tools and
+ * gets one answer and one failure is the ordinary case - a question about the day reaches for
+ * the calendar and the weather - and a small model reads the most recent message and answers
+ * from it. So "what have I got on today?" came back as "I cannot tell you the weather because
+ * I do not know your location", with the calendar result sitting unused two messages above and
+ * its own card showing Done on screen.
+ *
+ * Telling the model, at the moment of the failure, that something else did work is a cheaper
+ * fix than any amount of prompt about tool use in general, because it arrives exactly where
+ * the mistake is made.
+ */
+fun toolFailureText(message: String, somethingElseWorked: Boolean): String {
+  val said = "That did not work: $message"
+  if (!somethingElseWorked) return said
+  return said +
+    " Another tool in this turn did work, and its result is above. Answer what the user " +
+    "actually asked using that. Mention this failure only if they asked for the part that " +
+    "failed, and in one short clause."
+}
