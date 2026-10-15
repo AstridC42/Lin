@@ -6,6 +6,7 @@
   <string name="speak">Speak</string>
   <string name="stop_listening">Stop listening</string>
   <string name="close_panel">Close</string>
+  <string name="listen_label">Lin · Listen</string>
   <string name="empty_greeting">What do you need?</string>
   <string name="empty_today">What have I got on today?</string>
   <string name="empty_music">Play something</string>
