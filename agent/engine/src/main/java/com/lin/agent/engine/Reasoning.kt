@@ -88,3 +88,42 @@ internal fun thinkingFor(reasoning: Reasoning, structured: Boolean): ThinkingBud
 private const val BRIEF_TOKENS = 256
 
 private const val THOROUGH_TOKENS = 1024
+
+/**
+ * What Lin puts in Ollama's `think` field.
+ *
+ * Ollama takes a level - `"low"`, `"medium"`, `"high"`, `"max"` - as well as a boolean, and
+ * Lin was sending `true` and nothing else. Two things were wrong with that and both were
+ * reported from a phone.
+ *
+ * **Brief and Thorough did the same thing.** Picking the cheaper level changed nothing on a
+ * server, so somebody who asked for a little thinking got as much as the model felt like -
+ * which, on one occasion, was the same paragraph forever.
+ *
+ * **Off did not turn thinking off.** The field was omitted entirely when no thinking was
+ * wanted, on the reasoning that an older Ollama rejects a field it does not know. But a
+ * model that reasons by default reasons when nothing is said, so omitting it meant "off"
+ * only for models that were not going to think anyway. `false` is now sent explicitly, and
+ * that is the deliberate trade: a server too old to know the field answers 400, which is
+ * visible and diagnosable, where thinking that will not switch off is neither.
+ */
+enum class OllamaThink(val wire: Any) {
+  OFF(false),
+  LOW("low"),
+  HIGH("high"),
+}
+
+/**
+ * The level for a turn.
+ *
+ * `medium` and `max` are deliberately unused. Three choices on the screen map to three
+ * values here, and inventing a fourth that nothing offers would only be a value nobody can
+ * pick. A structured turn never thinks, for the reason given on [thinkingFor].
+ */
+fun ollamaThink(reasoning: Reasoning, structured: Boolean): OllamaThink =
+  when {
+    structured -> OllamaThink.OFF
+    reasoning == Reasoning.OFF -> OllamaThink.OFF
+    reasoning == Reasoning.BRIEF -> OllamaThink.LOW
+    else -> OllamaThink.HIGH
+  }
