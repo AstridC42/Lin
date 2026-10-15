@@ -99,6 +99,21 @@
     <uses-permission android:name="android.permission.CALL_PHONE" />
 
     <!--
+      Borrowing the ADB shell's privileges through Shizuku, which is what makes "turn the
+      wi-fi off" turn the wi-fi off instead of opening a panel for the user to tap.
+
+      Not a system permission: Shizuku is a separate app the user installs and pairs once over
+      Wireless debugging, and it lends its shell identity to apps the user allows one at a
+      time. Declaring this only means Lin may ask; Shizuku's own prompt decides. Everything
+      Lin does with it is in core/privileged, and all of it is a shell command a person could
+      type themselves - svc wifi disable and the like - rather than a hidden system interface.
+
+      Without Shizuku installed nothing here changes: the switches fall back to opening the
+      phone's own panel, which is what they did before.
+    -->
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+    <!--
       Needed to see that a dialer or a messaging app exists at all. Package visibility is
       restricted from API 30, and these are the two intents this app ever starts.
     -->
@@ -329,6 +344,49 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+
+        <!--
+          How Shizuku finds this app.
+
+          Required by Shizuku rather than by Lin: its server looks this provider up to work out
+          which app is asking and to hand back the binder. It is protected by
+          INTERACT_ACROSS_USERS_FULL, which no ordinary app holds, so nothing but the system
+          and Shizuku itself can reach it.
+        -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!--
+          Lin's hands, and its eyes for what is on screen.
+
+          This is the heaviest privilege on Android and the manifest should say so plainly: a
+          bound accessibility service can read the contents of every screen the person looks
+          at and act on their behalf. It is what lets Lin write a message in WhatsApp's own
+          composer - which no public API allows at all - and read out what is on the screen
+          behind the panel.
+
+          It is granted by hand, behind the system's own warning screen, and revocable in two
+          taps. Lin asks for the narrowest form of it: window content, view ids, and nothing
+          else. See res/xml/accessibility_service.xml for what is and is not requested, and
+          LinAccessibility for why its event handler is deliberately empty.
+        -->
+        <service
+            android:name=".screen.LinAccessibility"
+            android:exported="true"
+            android:label="@string/accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service" />
+        </service>
 
         <!-- Listens for "Hey Lin". Started by the setting, and stopped with it. -->
         <service

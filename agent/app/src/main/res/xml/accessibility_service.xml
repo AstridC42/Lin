@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright 2026 The Lin Authors
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<!--
+  What Lin's accessibility service asks for, and nothing beyond it.
+
+  flagReportViewIds is the one that is not optional: without it every node arrives with no
+  viewIdResourceName, which is what the per-app composer recipes are matched on, and the whole
+  feature falls back to guessing from labels alone.
+
+  No flagRequestFilterKeyEvents, no flagRequestTouchExplorationMode, no
+  flagRequestFingerprintGestures, no flagRequestShortcutWarningDialogSpokenFeedback: Lin reads
+  the tree when asked and performs two actions on it. It does not need the key events or the
+  touch stream, so it does not ask for them.
+
+  notificationTimeout is high rather than zero. Events are not used at all - see
+  onAccessibilityEvent - so there is no reason to be woken often, and a service that asks to be
+  called on every content change in every app is a service costing battery for nothing.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="500"
+    android:description="@string/accessibility_description"
+    android:summary="@string/accessibility_summary" />

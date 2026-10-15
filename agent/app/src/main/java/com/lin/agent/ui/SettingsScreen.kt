@@ -87,6 +87,10 @@ import android.provider.Settings as AndroidSettings
 import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
 import com.lin.agent.core.car.DialPolicy
+import com.lin.agent.core.privileged.ShizukuState
+import com.lin.agent.core.screen.TapPolicy
+import com.lin.agent.screen.accessibilityGranted
+import com.lin.agent.screen.openAccessibilitySettings
 import com.lin.agent.core.voice.SpeakWhen
 import com.lin.agent.core.voice.voiceLabel
 import com.lin.agent.engine.Reasoning
@@ -1089,7 +1093,163 @@ private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewMo
     style = MaterialTheme.typography.bodySmall,
     color = MaterialTheme.colorScheme.onSurfaceVariant,
   )
+
+  ScreenAccess(state, viewModel)
+  BorrowedPrivileges(viewModel)
 }
+
+/**
+ * Lin's screen access, and the one setting that decides whether it may press send.
+ *
+ * Read from the phone's own list on every return to the front rather than held: it is granted
+ * in system settings, outside this app, so anything remembered here is stale the moment
+ * somebody goes and grants it.
+ */
+@Composable
+private fun ColumnScope.ScreenAccess(state: SettingsState, viewModel: SettingsViewModel) {
+  val context = LocalContext.current
+  var granted by remember { mutableStateOf(accessibilityGranted(context)) }
+  val lifecycle = LocalLifecycleOwner.current
+  DisposableEffect(lifecycle) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) granted = accessibilityGranted(context)
+    }
+    lifecycle.lifecycle.addObserver(observer)
+    onDispose { lifecycle.lifecycle.removeObserver(observer) }
+  }
+
+  Text(
+    stringResource(R.string.settings_screen_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 20.dp),
+  )
+  Text(
+    stringResource(R.string.settings_screen_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Text(
+    stringResource(if (granted) R.string.settings_screen_on else R.string.settings_screen_off),
+    style = MaterialTheme.typography.bodyLarge,
+    modifier = Modifier.padding(top = 8.dp),
+  )
+  // Said before the button rather than after it. What this grants is real, and somebody should
+  // read what it is while deciding rather than while undoing it.
+  Text(
+    stringResource(R.string.settings_screen_warning),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  OutlinedButton(onClick = { openAccessibilitySettings(context) }) {
+    Text(stringResource(R.string.settings_screen_grant))
+  }
+
+  Text(
+    stringResource(R.string.settings_tap_send),
+    style = MaterialTheme.typography.bodyLarge,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  for (policy in TapPolicy.entries) {
+    ChoiceRow(
+      title = stringResource(tapPolicyLabel(policy)),
+      detail = "",
+      selected = state.tapSend == policy,
+      onPick = { viewModel.setTapSend(policy) },
+    )
+  }
+  Text(
+    stringResource(R.string.settings_tap_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+}
+
+private fun tapPolicyLabel(policy: TapPolicy) =
+  when (policy) {
+    TapPolicy.NEVER -> R.string.settings_tap_never
+    TapPolicy.WHEN_ASKED -> R.string.settings_tap_asked
+    TapPolicy.ALWAYS -> R.string.settings_tap_always
+  }
+
+/**
+ * Shizuku: the shell's privileges, borrowed, so the radios are really set.
+ *
+ * Five states and a different button for each, because from the outside they all look the same
+ * - a switch that did not move - and "install it", "start it", "allow Lin" and "allow Lin from
+ * inside Shizuku" are four different things to do. See
+ * [com.lin.agent.core.privileged.shizukuState].
+ */
+@Composable
+private fun ColumnScope.BorrowedPrivileges(viewModel: SettingsViewModel) {
+  val lifecycle = LocalLifecycleOwner.current
+  var state by remember { mutableStateOf(viewModel.shizukuState()) }
+  DisposableEffect(lifecycle) {
+    val observer = LifecycleEventObserver { _, event ->
+      // Read again on every return, because the two likeliest ways this changes - Shizuku
+      // being started, and Lin being allowed in Shizuku's own window - both happen in
+      // another app while this screen is in the background.
+      if (event == Lifecycle.Event.ON_RESUME) state = viewModel.shizukuState()
+    }
+    lifecycle.lifecycle.addObserver(observer)
+    onDispose { lifecycle.lifecycle.removeObserver(observer) }
+  }
+
+  Text(
+    stringResource(R.string.settings_shell_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 20.dp),
+  )
+  Text(
+    stringResource(R.string.settings_shell_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Text(
+    stringResource(shellStateLabel(state)),
+    style = MaterialTheme.typography.bodyLarge,
+    modifier = Modifier.padding(top = 8.dp),
+  )
+  when (state) {
+    ShizukuState.READY -> Unit
+    ShizukuState.NOT_INSTALLED ->
+      OutlinedButton(onClick = { viewModel.openWhereToGetShizuku() }) {
+        Text(stringResource(R.string.settings_shell_get))
+      }
+    ShizukuState.NOT_RUNNING -> {
+      OutlinedButton(onClick = { viewModel.openShizuku() }) {
+        Text(stringResource(R.string.settings_shell_open))
+      }
+      Text(
+        stringResource(R.string.settings_shell_restart),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    ShizukuState.NOT_PERMITTED ->
+      OutlinedButton(
+        onClick = {
+          viewModel.requestShizuku()
+          // Not read back here: the answer arrives in Shizuku's own dialog, after this
+          // returns, and the ON_RESUME above is what notices it.
+        }
+      ) {
+        Text(stringResource(R.string.settings_shell_ask))
+      }
+    ShizukuState.REFUSED ->
+      OutlinedButton(onClick = { viewModel.openShizuku() }) {
+        Text(stringResource(R.string.settings_shell_open))
+      }
+  }
+}
+
+private fun shellStateLabel(state: ShizukuState) =
+  when (state) {
+    ShizukuState.READY -> R.string.settings_shell_ready
+    ShizukuState.NOT_INSTALLED -> R.string.settings_shell_missing
+    ShizukuState.NOT_RUNNING -> R.string.settings_shell_stopped
+    ShizukuState.NOT_PERMITTED -> R.string.settings_shell_unasked
+    ShizukuState.REFUSED -> R.string.settings_shell_refused
+  }
 
 /** What Lin keeps: memories, documents, the training copies, and a way out of all of it. */
 @Composable

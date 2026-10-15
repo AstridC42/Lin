@@ -71,14 +71,31 @@ class TurnLoop(
   private val systemPrompt: String = "",
   /** How much the model may think per exchange. The user's setting, passed straight through. */
   private val reasoning: Reasoning = Reasoning.OFF,
+  /**
+   * Tools that exist but must not be offered this turn, by name.
+   *
+   * For a tool whose availability is a property of the phone right now rather than of the
+   * role - `delegate` with no server configured being the one this was written for. Offering
+   * it anyway is not a cosmetic fault: a 2B model handed a tool called "delegate" reaches for
+   * it on anything that smells like work, so "tell me a short story" spent one whole exchange
+   * writing a brief, got "there is no server", and then generated the story locally in a
+   * second exchange. Twice the wait, and a red card on screen, for nothing.
+   *
+   * Withheld from the list *and* from the lookup, so a model that remembers the tool from
+   * earlier in the conversation cannot call it either.
+   */
+  private val withhold: Set<String> = emptySet(),
 ) {
 
   fun run(conversation: List<Message>): Flow<LoopEvent> = flow {
-    val tools = registry.forRole(role).map { it.spec() }
+    val tools = registry.forRole(role).filterNot { it.name in withhold }.map { it.spec() }
     val messages = conversation.toMutableList()
     val alreadyRun = mutableSetOf<String>()
     var toolCalls = 0
     var toolCallRetries = 0
+    // Whether anything in this turn has produced an answer. Read when a tool fails - see
+    // [toolFailureText] - because a failure arriving after a success must not become the reply.
+    var somethingWorked = false
 
     while (true) {
       val outcome = oneExchange(messages, tools) { emit(it) }
@@ -147,6 +164,7 @@ class TurnLoop(
                 shows = (result as? ToolResult.Ok)?.shows.orEmpty(),
               )
             )
+            if (result is ToolResult.Ok) somethingWorked = true
             val pictures = (result as? ToolResult.Ok)?.looksAt.orEmpty()
             val canSee = backend.capabilities.supportsImages
             messages.add(
@@ -161,7 +179,7 @@ class TurnLoop(
                       result.text + " This model cannot see pictures, so you have not been " +
                         "shown it - do not describe what is in it."
                     } else result.text
-                  is ToolResult.Failed -> "That did not work: ${result.message}"
+                  is ToolResult.Failed -> toolFailureText(result.message, somethingWorked)
                 },
                 toolName = call.name,
               )
@@ -237,7 +255,7 @@ class TurnLoop(
 
   private suspend fun runTool(call: ToolInvocation): ToolResult {
     val tool =
-      registry.find(role, call.name)
+      registry.find(role, call.name)?.takeIf { it.name !in withhold }
         // Named something it was never offered. Told plainly, because the alternative is the
         // model trying the same unavailable tool until the budget runs out.
         ?: return ToolResult.Failed(

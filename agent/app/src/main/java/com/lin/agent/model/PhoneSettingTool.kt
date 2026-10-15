@@ -23,6 +23,11 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.provider.Settings as AndroidSettings
 import android.util.Log
+import com.lin.agent.core.privileged.ShizukuState
+import com.lin.agent.core.privileged.commandsFor
+import com.lin.agent.core.privileged.shellWorked
+import com.lin.agent.core.privileged.whatToDoAbout
+import com.lin.agent.privileged.Privileged
 import com.lin.agent.core.phone.Reach
 import com.lin.agent.core.phone.Switch
 import com.lin.agent.core.phone.reachOf
@@ -54,7 +59,18 @@ import kotlinx.coroutines.withTimeoutOrNull
  * through as the state on a small model, and reading that as an instruction turns the torch on
  * in somebody's pocket - so a question gets the state back and changes nothing.
  */
-class PhoneSettingTool(private val context: Context, private val guard: LaunchGuard) : AgentTool {
+class PhoneSettingTool(
+  private val context: Context,
+  private val guard: LaunchGuard,
+  /**
+   * The ADB shell's privileges, if the user has lent them to Lin through Shizuku.
+   *
+   * This is what turns three of the four "open the panel" answers into "done". What Android
+   * took away from apps it never took away from the shell: `svc wifi disable` works now and
+   * always has. See [com.lin.agent.core.privileged.commandsFor] and [Privileged].
+   */
+  private val privileged: Privileged,
+) : AgentTool {
 
   override val name = "phone_setting"
 
@@ -92,7 +108,7 @@ class PhoneSettingTool(private val context: Context, private val guard: LaunchGu
     val wanted = wantedOn((arguments["state"] as? String).orEmpty())
     if (wanted == null) return state(switch)
 
-    return when (reachOf(switch, hasPolicyAccess = policyAccess())) {
+    return when (reachOf(switch, hasPolicyAccess = policyAccess(), privileged = privileged.isReady())) {
       Reach.DIRECT -> set(switch, wanted)
       Reach.NEEDS_PERMISSION -> askForPolicyAccess()
       Reach.OPENS_IT -> open(switch, wanted)
@@ -131,8 +147,28 @@ class PhoneSettingTool(private val context: Context, private val guard: LaunchGu
     when (switch) {
       Switch.FLASHLIGHT -> torch(on)
       Switch.DO_NOT_DISTURB -> doNotDisturb(on)
-      else -> open(switch, on)
+      else -> throughTheShell(switch, on)
     }
+
+  /**
+   * Sets a radio by running the command a person would type.
+   *
+   * Only reached when [reachOf] has already said the privilege is there. It can still fail -
+   * a build whose `svc` has lost a subcommand, a Shizuku service that died between the check
+   * and the call - and when it does this falls back to the panel rather than claiming
+   * success, because a tool that says "done" to a command that printed a help message is the
+   * exact failure the whole honest-results rule in this app exists to prevent.
+   */
+  private suspend fun throughTheShell(switch: Switch, on: Boolean): ToolResult {
+    val outcome = privileged.runFirstThatWorks(commandsFor(switch, on))
+    if (outcome != null && shellWorked(outcome.exitCode, outcome.output)) {
+      return ToolResult.Ok(
+        "Done - ${label(switch)} is ${if (on) "on" else "off"}. Lin set it directly."
+      )
+    }
+    Log.w(TAG, "The shell could not set ${switch.name}: ${outcome?.exitCode} ${outcome?.output?.take(160)}")
+    return open(switch, on)
+  }
 
   private fun torch(on: Boolean): ToolResult {
     val cameras = context.getSystemService(CameraManager::class.java)
@@ -195,7 +231,8 @@ class PhoneSettingTool(private val context: Context, private val guard: LaunchGu
       ToolResult.Ok(
         "Done - the phone's own ${label(switch)} panel is open, with the switch on it. Android " +
           "has not let an app turn ${label(switch)} $word by itself for several versions, so " +
-          "tell the user it is ready for them to tap, and do not say it is $word."
+          "tell the user it is ready for them to tap, and do not say it is $word." +
+          nextStep()
       )
     } else {
       ToolResult.Failed("Lin could not open the ${label(switch)} panel on this phone.")
@@ -242,6 +279,21 @@ class PhoneSettingTool(private val context: Context, private val guard: LaunchGu
     // has no wi-fi panel" is worse than an exception nobody sees.
     return runCatching { context.startActivity(intent) }.isSuccess
   }
+
+  /**
+   * One sentence about Shizuku, when there is something the user could do about it.
+   *
+   * Only for the two states where the answer is a step they are part-way through - it is
+   * installed and stopped, or running and unasked. Nothing when it is not installed at all:
+   * a phone that has never had Shizuku should not be told about it every time somebody asks
+   * for the wi-fi, and the settings screen is where that offer belongs.
+   */
+  private fun nextStep(): String =
+    when (val state = privileged.state()) {
+      ShizukuState.NOT_RUNNING,
+      ShizukuState.NOT_PERMITTED -> " Also mention, once: " + whatToDoAbout(state)
+      else -> ""
+    }
 
   private fun policyAccess(): Boolean =
     runCatching {

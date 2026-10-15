@@ -62,11 +62,28 @@ enum class Reach {
  * Do Not Disturb can be set, but only once the user has granted notification policy access -
  * which is a different grant from notification access and has to be asked for separately.
  */
-fun reachOf(switch: Switch, hasPolicyAccess: Boolean = false): Reach =
+fun reachOf(
+  switch: Switch,
+  hasPolicyAccess: Boolean = false,
+  /**
+   * Whether Lin has borrowed the ADB shell's privileges through Shizuku.
+   *
+   * This is the parameter that makes the paragraph above stop being the end of the story. What
+   * Android took away from *apps* it never took away from the shell: `svc wifi disable` works
+   * now and has since Android 4. Shizuku runs a service under that same shell identity and
+   * lends it to apps the user has allowed, so with it these four stop being a panel to open
+   * and become a thing Lin does.
+   *
+   * It is off unless the user has installed Shizuku, started it and allowed Lin - three
+   * deliberate steps - so this stays a capability somebody chose rather than a default.
+   */
+  privileged: Boolean = false,
+): Reach =
   when (switch) {
     Switch.FLASHLIGHT -> Reach.DIRECT
     Switch.DO_NOT_DISTURB -> if (hasPolicyAccess) Reach.DIRECT else Reach.NEEDS_PERMISSION
-    Switch.WIFI, Switch.BLUETOOTH, Switch.NFC, Switch.AIRPLANE_MODE -> Reach.OPENS_IT
+    Switch.WIFI, Switch.BLUETOOTH, Switch.NFC, Switch.AIRPLANE_MODE ->
+      if (privileged) Reach.DIRECT else Reach.OPENS_IT
   }
 
 /**

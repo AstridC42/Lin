@@ -103,7 +103,12 @@ android {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
-  buildFeatures { compose = true }
+  buildFeatures {
+    compose = true
+    // Off by default since AGP 8, and Lin has one interface: the privileged service Shizuku
+    // starts for us. Without this the .aidl is not compiled and IPrivileged does not exist.
+    aidl = true
+  }
 }
 
 kotlin {
@@ -137,6 +142,11 @@ dependencies {
   // and already on the classpath through material3-adaptive. Declared because Fold.kt reads
   // it directly, and a transitive dependency is not a promise.
   implementation(libs.androidx.window)
+  // Borrowing the ADB shell's privileges, with the user's consent, so that "turn wi-fi off"
+  // turns wi-fi off instead of opening the panel. `api` is the client; `provider` is the
+  // ContentProvider in the manifest that Shizuku uses to find this app.
+  implementation(libs.shizuku.api)
+  implementation(libs.shizuku.provider)
   implementation(libs.androidx.activity.compose)
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.ui)
