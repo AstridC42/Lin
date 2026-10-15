@@ -567,6 +567,30 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
     )
   }
 
+  // A conversation rather than a series of questions: ask out loud, hear the answer, reply,
+  // without reaching for the phone in between. Off by default, because a microphone that
+  // reopens by itself is the thing people are right to be wary of.
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          stringResource(R.string.settings_voice_chat),
+          style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+          stringResource(R.string.settings_voice_chat_detail),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      Switch(checked = state.voiceChat, onCheckedChange = viewModel::setVoiceChat)
+    }
+  }
+
   // The voice itself. Asked for when this group is opened rather than at start-up: the
   // engine takes a moment to come up, and asking it too early gives an empty list that
   // nothing would refresh.

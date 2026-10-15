@@ -133,6 +133,10 @@ dependencies {
   // whether the wake word may open the panel at all - see WakeRoute. Already on the classpath
   // through something else, and declared here because a transitive dependency is not a promise.
   implementation(libs.androidx.lifecycle.process)
+  // The hinge, through Jetpack rather than Samsung's SDK: the same answer on every foldable,
+  // and already on the classpath through material3-adaptive. Declared because Fold.kt reads
+  // it directly, and a transitive dependency is not a promise.
+  implementation(libs.androidx.window)
   implementation(libs.androidx.activity.compose)
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.ui)

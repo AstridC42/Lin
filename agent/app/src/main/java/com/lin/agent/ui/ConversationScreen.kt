@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -105,6 +106,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.R
+import com.lin.agent.core.fold.splitAcrossTheCrease
 import com.lin.agent.core.media.PhotoLibrary
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.engine.Message
@@ -180,6 +182,14 @@ fun ConversationScreen(
     },
     modifier = Modifier.imePadding(),
   ) { padding ->
+    // Flex mode, on the one device this app was written for. Half open with the fold across
+    // the middle, the top half is upright and the bottom half is flat on the table - so the
+    // conversation goes above the crease and everything you touch goes below it, rather than
+    // a reply being read around a corner. Every other posture, including every phone that
+    // does not fold, is the ordinary single column.
+    val posture by rememberPosture()
+    val split = splitAcrossTheCrease(posture)
+
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
       ConversationBody(
         launch = launch,
@@ -187,6 +197,9 @@ fun ConversationScreen(
         token = token,
         // Fills what the screen has, which is the difference between this frame and the panel.
         fillHeight = true,
+        // In Flex mode the conversation is given exactly the top half, so the composer lands
+        // on the flat part under your hands.
+        halfHeight = split,
         onGetModel = onGetModel,
         viewModel = viewModel,
       )
@@ -325,6 +338,8 @@ private fun ColumnScope.ConversationBody(
   spoken: String,
   token: String,
   fillHeight: Boolean,
+  /** Flex mode: the conversation takes the top half and nothing spans the crease. */
+  halfHeight: Boolean = false,
   onGetModel: () -> Unit,
   viewModel: ConversationViewModel,
 ) {
@@ -380,7 +395,10 @@ private fun ColumnScope.ConversationBody(
 
   LazyColumn(
     state = listState,
-    modifier = Modifier.weight(1f, fill = fillHeight).fillMaxWidth().padding(horizontal = 16.dp),
+    modifier =
+      (if (halfHeight) Modifier.fillMaxHeight(0.5f) else Modifier.weight(1f, fill = fillHeight))
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp),
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     // The first thing anybody sees, and until this redesign it was a title bar and a text
@@ -519,6 +537,10 @@ private fun ColumnScope.ConversationBody(
       }
     }
   }
+
+  // In Flex mode the controls sit at the bottom of the flat half rather than immediately
+  // under the crease, which is where a hand resting on the table reaches.
+  if (halfHeight) Spacer(modifier = Modifier.weight(1f))
 
   Composer(
     draft = draft,
