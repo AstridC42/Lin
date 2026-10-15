@@ -45,6 +45,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -517,6 +519,101 @@ private fun ColumnScope.ServerTab(state: SettingsState, viewModel: SettingsViewM
       )
     }
   }
+
+  Sampling(state, viewModel)
+}
+
+/**
+ * How the server model should generate.
+ *
+ * Blank means Lin sends nothing for that field and the server's own configuration decides,
+ * which is the default and usually the right answer: somebody who runs a model has already
+ * set it up. These are here because the person who owns that server asked to be able to
+ * change it from the phone.
+ *
+ * Only the server. The phone's own model runs under a different engine with different knobs,
+ * and one set of boxes pretending to drive both would be a lie on the screen.
+ */
+@Composable
+private fun ColumnScope.Sampling(state: SettingsState, viewModel: SettingsViewModel) {
+  Text(
+    stringResource(R.string.settings_sampling_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 24.dp),
+  )
+  Text(
+    stringResource(R.string.settings_sampling_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  // Said before the boxes, because it is the one consequence somebody cannot see coming: a
+  // model sampling at temperature while emitting an exact tool-call grammar writes calls that
+  // do not parse, and the symptom is Lin saying it could not do something it can.
+  Text(
+    stringResource(R.string.settings_sampling_warning),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+
+  NumberSetting(
+    value = state.serverTemperature,
+    onChange = viewModel::onTemperatureChanged,
+    label = R.string.settings_sampling_temperature,
+    hint = R.string.settings_sampling_temperature_hint,
+  )
+  NumberSetting(
+    value = state.serverTopP,
+    onChange = viewModel::onTopPChanged,
+    label = R.string.settings_sampling_top_p,
+    hint = R.string.settings_sampling_top_p_hint,
+  )
+  NumberSetting(
+    value = state.serverTopK,
+    onChange = viewModel::onTopKChanged,
+    label = R.string.settings_sampling_top_k,
+    hint = R.string.settings_sampling_top_k_hint,
+  )
+  NumberSetting(
+    value = state.serverContext,
+    onChange = viewModel::onServerContextChanged,
+    label = R.string.settings_sampling_context,
+    hint = R.string.settings_sampling_context_hint,
+  )
+  NumberSetting(
+    value = state.serverMaxTokens,
+    onChange = viewModel::onMaxTokensChanged,
+    label = R.string.settings_sampling_max_tokens,
+    hint = R.string.settings_sampling_max_tokens_hint,
+  )
+
+  TextButton(onClick = { viewModel.clearSampling() }) {
+    Text(stringResource(R.string.settings_sampling_clear))
+  }
+}
+
+/**
+ * One numeric setting, with what leaving it blank means written underneath.
+ *
+ * The keyboard is the decimal one rather than a plain number pad: two of these take a
+ * fraction, and a pad with no decimal point makes a temperature of 0.8 impossible to type.
+ */
+@Composable
+private fun NumberSetting(
+  value: String,
+  onChange: (String) -> Unit,
+  @StringRes label: Int,
+  @StringRes hint: Int,
+) {
+  OutlinedTextField(
+    value = value,
+    onValueChange = onChange,
+    label = { Text(stringResource(label)) },
+    supportingText = { Text(stringResource(hint)) },
+    placeholder = { Text(stringResource(R.string.settings_sampling_unset)) },
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+    singleLine = true,
+    modifier = Modifier.fillMaxWidth(),
+  )
 }
 
 /**
