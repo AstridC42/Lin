@@ -47,22 +47,44 @@ enum class Asked {
 fun shouldListenOnLaunch(launch: Launch, microphoneGranted: Boolean): Boolean =
   launch == Launch.ASSIST && microphoneGranted
 
+/** When Lin reads a reply out loud. */
+enum class SpeakWhen {
+  /** Never. The reply is on screen; that is enough.  */
+  NEVER,
+
+  /**
+   * When the question was spoken, which is the default and the one worth having.
+   *
+   * Speaking every reply because a switch is on means somebody who typed a question in a
+   * quiet room gets answered out loud. This way the conversation's mode follows how the
+   * person is actually using it rather than a switch they set last week.
+   */
+  WHEN_SPOKEN_TO,
+
+  /** Every reply, typed or spoken. For somebody who wants a voice assistant, not a chat. */
+  ALWAYS,
+}
+
+/** Reads the stored name, defaulting to the one that follows how Lin is being used. */
+fun speakWhenNamed(stored: String?): SpeakWhen =
+  SpeakWhen.entries.firstOrNull { it.name.equals(stored?.trim(), ignoreCase = true) }
+    ?: SpeakWhen.WHEN_SPOKEN_TO
+
 /**
  * Whether a reply is spoken aloud.
  *
- * Two conditions, and the second is the one worth having. Speaking every reply because the
- * setting is on means somebody who typed a question in a quiet room gets answered out loud -
- * so Lin speaks when it was spoken to, and otherwise writes. The conversation's mode follows
- * how the person is actually using it rather than a switch they set last week.
- *
- * [inCar] overrides the setting, but only for a question that was spoken. An answer that is
- * only on screen is no answer at all to somebody driving, and they asked out loud - so the
- * switch they set last week at a desk should not decide that. A typed question in a car is
- * still answered in writing: either the car is stationary, or somebody else is holding the
- * phone, and neither wants the phone talking.
+ * [inCar] overrides a NEVER, but only for a question that was spoken. An answer that is only
+ * on screen is no answer at all to somebody driving, and they asked out loud - so a switch
+ * set last week at a desk should not decide that. A typed question in a car is still answered
+ * in writing: either the car is stationary, or somebody else is holding the phone, and
+ * neither wants the phone talking.
  */
-fun shouldSpeak(spokenRepliesOn: Boolean, asked: Asked, inCar: Boolean = false): Boolean =
-  asked == Asked.SPOKEN && (spokenRepliesOn || inCar)
+fun shouldSpeak(speak: SpeakWhen, asked: Asked, inCar: Boolean = false): Boolean =
+  when (speak) {
+    SpeakWhen.ALWAYS -> true
+    SpeakWhen.WHEN_SPOKEN_TO -> asked == Asked.SPOKEN
+    SpeakWhen.NEVER -> inCar && asked == Asked.SPOKEN
+  }
 
 /**
  * What to read out of a reply.

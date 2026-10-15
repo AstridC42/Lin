@@ -37,6 +37,7 @@ import com.lin.agent.core.voice.Asked
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.core.voice.Summon
 import com.lin.agent.core.voice.shouldListenOnLaunch
+import com.lin.agent.core.voice.speakWhenNamed
 import com.lin.agent.core.voice.shouldSpeak
 import com.lin.agent.model.DelegateTool
 import com.lin.agent.voice.Dictation
@@ -69,6 +70,7 @@ import com.lin.agent.model.AlarmTool
 import com.lin.agent.model.CalendarTool
 import com.lin.agent.model.ListDocumentsTool
 import com.lin.agent.model.MediaTool
+import com.lin.agent.model.WeatherTool
 import com.lin.agent.model.OpenAppTool
 import com.lin.agent.model.PhoneSettingTool
 import com.lin.agent.model.PlayMusicTool
@@ -218,6 +220,7 @@ constructor(
         ReplyTool(relay),
         CalendarTool(calendars),
         MediaTool(appContext),
+        WeatherTool(appContext),
         PlayMusicTool(appContext, settings, launchGuard),
         PhoneSettingTool(appContext, launchGuard),
         OpenAppTool(appContext, launchGuard),
@@ -513,7 +516,7 @@ constructor(
               persist(complete)
               // In a car a spoken question gets a spoken answer whatever the switch says -
               // an answer only on screen is no answer to somebody driving.
-              if (shouldSpeak(settings.spokenReplies.first(), asked, inCar(appContext))) {
+              if (shouldSpeak(speakWhenNamed(settings.speakWhen.first()), asked, inCar(appContext))) {
                 speaker.say(event.text)
               }
             }
@@ -724,6 +727,8 @@ constructor(
         "phone_setting does the flashlight and Do Not Disturb outright; for wi-fi, bluetooth, " +
         "NFC and airplane mode Android allows no app to switch them, so it opens the phone\'s " +
         "own panel - say it is ready to tap and never say the setting was changed. " +
+        "weather answers what it is doing outside - never answer that from your own " +
+        "knowledge, which is months old and somewhere else. " +
         "These tools are everything Lin can do to the phone: if something is not on this " +
         "list, say you cannot do it rather than describing how the user could."
 

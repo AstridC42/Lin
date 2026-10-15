@@ -749,6 +749,39 @@ a privacy choice rather than a performance one — the rest of this app keeps
 what is said on the phone unless the user pointed it at their own server, and
 a cloud recogniser would quietly undo that for every spoken word.
 
+**Done: which voice, and when.** Speaking was one switch and one voice - the
+engine's default, whatever that happened to be.
+
+When is three ways now: never, when spoken to, or always. The middle one is
+still the default and still the one worth having, because a phone that answers
+a typed question out loud in a quiet room is why people turn these off; but
+somebody who wants a voice assistant rather than a chat can say so. "Never"
+keeps one exception, the car: a question asked out loud while driving is
+answered out loud, because an answer only on screen is no answer there.
+
+Which voice is a list, with a sample spoken the moment one is picked - a name
+like `en-gb-x-gbb-local` is not something anybody can judge by reading - plus
+speed and pitch, each previewed as it is let go of. The ordering is the part
+with a rule behind it: **offline voices come before better-sounding online
+ones**, which is the opposite of ranking by the engine's own quality score. A
+network voice means every spoken reply is sent to somebody's server to be read
+out, and that is the one thing this app does not do with anything else. They
+are still offered - it is the user's phone - but they are second and labelled.
+
+More voices are the system's to install rather than Lin's, so settings opens
+the phone's speech-engine screen and says what is there: Google's and
+Samsung's engines download extra voices, and a neural engine installed from
+elsewhere - a Piper or Sherpa-ONNX one, running on the phone and sounding far
+better than either - appears in Lin's list as soon as it is the chosen engine.
+That is the honest answer to "find a better voice online": the voice is a
+model, it belongs to an engine, and Lin's job is to use whichever one the
+phone has rather than to ship its own.
+
+*Still open:* speaking through the user's own server, which is where a
+generated or cloned voice would come from. Their stack already speaks an
+OpenAI-compatible API; a `/v1/audio/speech` call and a player is the work,
+and the trade is latency against a voice the phone cannot produce.
+
 **Done, with a caveat worth reading: "Hey Lin".** Off by default, and of all
 the defaults here that is the one least open to argument — it holds the
 microphone open indefinitely.
@@ -906,6 +939,28 @@ uneven and undocumented per app and there is no way to ask an app which it
 does, so afterwards Lin looks at what the phone is actually playing and
 reports that — "it is open on the search" when that is what happened, rather
 than "I played it" because an intent did not throw.
+
+**Done: the weather.** Asked for after a build where "what is it doing
+outside" had no answer at all - the model either declined or made one up from
+training data that is months old and somewhere else.
+
+Open-Meteo, because it needs no account and no key. Every other free weather
+service wants a sign-up, and an assistant that cannot say whether you need a
+coat until its owner has registered with somebody is not finished.
+
+**It is also the first thing in this app that sends anything about the user to
+a third party**, and that is worth stating rather than burying. What goes is a
+pair of coordinates rounded to about a kilometre - the same weather, a
+different street - and nothing else: no identifier, no question, no
+conversation. It happens only when somebody asks about the weather. The
+setting says exactly that, in those words, and the permission is coarse
+location, asked for there rather than at launch.
+
+The parsing is a tested function for the usual reason: a response cut short
+gives arrays of different lengths, and reading past the shortest is how a
+forecast gains a day with somebody else's temperature in it. A weather code
+Lin does not know stays unsaid rather than becoming "clear", which is the one
+answer somebody might walk out in.
 
 **Not MobileActions-270M.** The question came back with this work: would a
 small action model help? No, and the reason is the same as when it was parked.
