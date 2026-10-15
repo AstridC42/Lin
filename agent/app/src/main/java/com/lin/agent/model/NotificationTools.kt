@@ -102,7 +102,7 @@ class ReplyTool(private val relay: NotificationRelay) : AgentTool {
     val found =
       relay.findFrom(to)
         ?: return ToolResult.Failed(
-          "There is no message from \"$to\" that can be replied to. It may have been dismissed, " +
+          "There is no message from '$to' that can be replied to. It may have been dismissed, " +
             "or notification access may be off - the user can turn it on in settings."
         )
 

@@ -57,15 +57,15 @@ class FindPhotoTool(
       ToolParameter(
         name = "describe",
         type = ParamType.STRING,
-        description = "What is in the photo, in plain words: \"a dog on a beach\", " +
-          "\"a whiteboard with diagrams\".",
+        description = "What is in the photo, in plain words: 'a dog on a beach', " +
+          "'a whiteboard with diagrams'.",
       ),
       ToolParameter(
         name = "look",
         type = ParamType.BOOLEAN,
         description =
-          "True to look at the best match yourself - for \"what does the sign say\" rather " +
-            "than \"show me the beach photo\".",
+          "True to look at the best match yourself - for 'what does the sign say' rather " +
+            "than 'show me the beach photo'.",
       ),
     )
 

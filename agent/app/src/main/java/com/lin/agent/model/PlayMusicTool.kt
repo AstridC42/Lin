@@ -67,7 +67,7 @@ class PlayMusicTool(
       ToolParameter(
         name = "what",
         type = ParamType.STRING,
-        description = "What to play, as the user said it, for example \"Stan by Eminem\".",
+        description = "What to play, as the user said it, for example Stan by Eminem.",
       )
     )
 

@@ -76,7 +76,7 @@ class PhoneTool(
       ToolParameter(
         name = "action",
         type = ParamType.STRING,
-        description = "Either \"call\" or \"message\".",
+        description = "Either 'call' or 'message'.",
       ),
       ToolParameter(
         name = "who",
@@ -87,7 +87,7 @@ class PhoneTool(
       ToolParameter(
         name = "text",
         type = ParamType.STRING,
-        description = "What the message should say. Only for \"message\".",
+        description = "What the message should say. Only for 'message'.",
         required = false,
       ),
     )
