@@ -78,7 +78,13 @@ class MediaTool(private val context: Context) : AgentTool {
             "on in settings. Tell them rather than guessing."
         )
 
-    val sessions = controllers.map { it.asSession(context) }
+    // Paired once and kept paired. Reading a controller twice gives two Sessions that are
+    // equal only if nothing moved in between - and one of the fields is the session's last
+    // position update, which moves constantly while music plays. Looking the controller back
+    // up by value therefore failed exactly when something was playing, which is the only time
+    // anybody asks Lin to pause it: "whatever was playing has gone", with the music still on.
+    val paired = controllers.map { it to it.asSession(context) }
+    val sessions = paired.map { it.second }
     if (action == "what") return ToolResult.Ok(describeNowPlaying(sessions))
 
     val command =
@@ -97,8 +103,10 @@ class MediaTool(private val context: Context) : AgentTool {
     val chosen =
       chooseSession(sessions)
         ?: return ToolResult.Failed("Nothing is playing, and nothing is paused to start again.")
+    // By identity: chooseSession returns one of the objects it was given, so this is the
+    // controller that session was read from, whatever has changed since.
     val controller =
-      controllers.firstOrNull { it.asSession(context) == chosen }
+      paired.firstOrNull { it.second === chosen }?.first
         ?: return ToolResult.Failed("Whatever was playing has gone.")
 
     // Asked rather than attempted: a transport control that goes nowhere is silent, and the
