@@ -54,6 +54,7 @@ import androidx.work.NetworkType
 import com.lin.agent.R
 import com.lin.agent.core.diag.describeFault
 import com.lin.agent.core.tools.disabledFrom
+import com.lin.agent.engine.delegationIsWorthIt
 import com.lin.agent.core.phone.permissionNeededBy
 import android.content.pm.PackageManager
 import com.lin.agent.core.calendar.todayLine
@@ -609,17 +610,24 @@ constructor(
   /**
    * Tools that exist but must not be offered on this turn.
    *
-   * Two reasons, and they are different in kind. `delegate` is withheld because there is
-   * nothing behind it: offering it costs a whole exchange on questions the phone was always
-   * going to answer itself. The rest are withheld because the person switched them off, which
-   * is their decision and needs no justification from here.
+   * Two reasons, and they are different in kind. `delegate` is withheld whenever handing
+   * work over would buy nothing - see [delegationIsWorthIt], which covers both having no
+   * server at all and the server already being the one answering. The rest are withheld
+   * because the person switched them off, which is their decision and needs no
+   * justification from here.
    *
    * Read per turn rather than held, so a switch flipped in settings applies to the next
    * question rather than the next launch.
    */
   private suspend fun withheldThisTurn(): Set<String> {
     val off = disabledFrom(runCatching { settings.disabledTools.first() }.getOrNull())
-    return if (backends.hasServerModel()) off else off + DelegateTool.NAME
+    val worthIt =
+      delegationIsWorthIt(
+        hasServerModel = backends.hasServerModel(),
+        wantsServerToAnswer = backends.wantsServerToAnswer(),
+        serverIsAnswering = backends.serverIsAnswering(),
+      )
+    return if (worthIt) off else off + DelegateTool.NAME
   }
 
   /** What to show for a fault nobody designed for. See [describeFault]. */

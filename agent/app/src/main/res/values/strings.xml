@@ -177,6 +177,31 @@
   <string name="settings_tab_server">Server</string>
   <string name="settings_tab_voice">Voice</string>
   <string name="settings_tab_phone">Phone</string>
+  <string name="settings_sampling_heading">How the server model generates</string>
+  <string name="settings_sampling_detail">Leave a box empty and Lin sends nothing for it, so
+    your server\'s own setting for that model decides. Fill one in and Lin sends it with every
+    request.</string>
+  <string name="settings_sampling_warning">Worth knowing before you raise the temperature: a
+    model sampling while it writes a tool call writes calls that do not parse, and the symptom
+    is Lin saying it could not do something it can. Replies that have to match a fixed shape
+    are always generated greedily whatever is set here.</string>
+  <string name="settings_sampling_unset">The server decides</string>
+  <string name="settings_sampling_temperature">Temperature</string>
+  <string name="settings_sampling_temperature_hint">0 is always the likeliest word. Lin uses 0
+    unless you change it.</string>
+  <string name="settings_sampling_top_p">Top-p</string>
+  <string name="settings_sampling_top_p_hint">Consider only the likeliest words adding up to
+    this much probability. 0.95 is a common choice.</string>
+  <string name="settings_sampling_top_k">Top-k</string>
+  <string name="settings_sampling_top_k_hint">Consider only this many words. Ollama only — the
+    OpenAI-style servers reject it, so Lin does not send it to vLLM or Unsloth.</string>
+  <string name="settings_sampling_context">Context size</string>
+  <string name="settings_sampling_context_hint">How many tokens the model may hold. Lin also
+    trims the conversation to this, so it never sends more than it asked for.</string>
+  <string name="settings_sampling_max_tokens">Longest reply</string>
+  <string name="settings_sampling_max_tokens_hint">Tokens, at most, in one answer.</string>
+  <string name="settings_sampling_clear">Back to the server\'s own settings</string>
+
   <string name="settings_tab_tools">Tools</string>
   <string name="settings_tab_data">Data</string>
   <string name="settings_server_heading">Model server</string>

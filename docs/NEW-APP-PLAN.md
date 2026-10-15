@@ -1492,6 +1492,62 @@ Not built: resources, prompts, sampling, elicitation and roots. The last three
 are things a server would ask the phone to do, and none of them is something
 to hand a remote server on the strength of a capability flag.
 
+### Phase 15 — Controls for the server model, and not delegating to yourself
+
+**Delegating to the model already answering.** Found on a phone with a server
+model loaded: the orchestrator called `delegate`, which opened a second
+connection to the same server and asked the same model a restatement of the
+question it was already in the middle of. Slower than not delegating, with a
+tool card on screen saying a tool ran for nothing.
+
+The first version of the rule only asked whether a server was configured,
+which was never the right question. The point of delegation is the
+*difference* between two models — a small one on the phone holding the
+conversation and a bigger one on a server doing the heavy piece — so
+`delegationIsWorthIt` now rules out three cases: nothing configured, the
+server already answering, and the server having been asked to answer and not
+having (which only happens when it was unreachable, so a delegation to it
+would fail too, after a timeout the person waits through).
+
+Note the third flag is read from the backend that was actually chosen rather
+than from the `answerOnServer` switch, because the switch can say "use the
+server" on a turn where the phone took over.
+
+**Sampling.** temperature, top-p, top-k, context size and longest reply, set
+per server and sent with every request. The shape of the type is the design:
+every field is nullable and **null means do not send it**. A server owner has
+configured their model; a default invented here and sent on every request
+would quietly override that with a number nobody chose. So Lin sends only what
+the person actually set, and the boxes read "The server decides" when empty.
+
+Three decisions worth keeping:
+
+- **A schema-constrained reply is always greedy, whatever the sliders say.**
+  Not Lin overriding the user for its own convenience: a constrained decode
+  sampled at temperature produces output that fails the schema, so the setting
+  could only make that request worse. Nobody asking for a creative
+  conversation is asking for creative JSON.
+- **`top_k` is never sent to an OpenAI-dialect server.** It is not an OpenAI
+  field. vLLM accepts it and llama-server accepts it, but a faithful
+  implementation rejects the whole request over an unknown property — which
+  would turn a slider nobody needed into a server that stopped answering. The
+  settings screen says which servers it applies to rather than this silently
+  dropping it.
+- **`num_ctx` is now sent when set**, reversing the earlier decision not to
+  override the server's own configuration. The person who owns that server
+  asked to be able to, and a value they deliberately typed is not this app
+  second-guessing them. When it is set it also becomes what Lin trims the
+  conversation to, so the phone never sends more than the window it just asked
+  for.
+
+Stored as text rather than numbers, because the distinction that matters is
+set against not-set and no numeric type has a spare value for it: zero is a
+real temperature and means greedy, so it must not also mean "the user did not
+say".
+
+Thinking already had a control and did not need another; it is on the Models
+tab and reaches both dialects.
+
 ### Phase 11 — The design pass
 
 Four directions were drawn side by side on a canvas - a quiet page with no
