@@ -21,6 +21,8 @@ import com.lin.agent.core.models.ModelCatalog
 import com.lin.agent.core.models.ModelRole
 import com.lin.agent.core.models.ModelStore
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.engine.Sampling
+import com.lin.agent.engine.samplingFrom
 import com.lin.agent.engine.LlmBackend
 import com.lin.agent.engine.ServerBackend
 import com.lin.agent.engine.serverKindNamed
@@ -83,6 +85,17 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
   }
 
   /** Called when a download finishes or a setting changes, so the next turn re-decides. */
+  /**
+   * Whether the backend answering right now is the server's rather than the phone's.
+   *
+   * Asked by the conversation to decide whether delegation is worth anything. Read from the
+   * backend that was actually chosen, not from the switch: the switch can say "use the
+   * server" on a turn where the server was unreachable and the phone took over.
+   */
+  fun serverIsAnswering(): Boolean = (cached as? ChatReadiness.Ready)?.backend is ServerBackend
+
+  suspend fun wantsServerToAnswer(): Boolean = settings.answerOnServer.first()
+
   suspend fun refresh() {
     lock.withLock {
       (cached as? ChatReadiness.Ready)?.let { ready ->
@@ -120,6 +133,23 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
   suspend fun hasServerModel(): Boolean =
     settings.serverUrl.first().isNotBlank() && settings.serverModelName.first().isNotBlank()
 
+
+  /**
+   * How the user wants this server to generate.
+   *
+   * Read fresh each time a backend is built rather than held, so a slider moved in settings
+   * applies to the next question. Empty unless something was set, and empty leaves the
+   * server's own configuration alone.
+   */
+  private suspend fun sampling(): Sampling =
+    samplingFrom(
+      temperature = settings.serverTemperature.first(),
+      topP = settings.serverTopP.first(),
+      topK = settings.serverTopK.first(),
+      contextTokens = settings.serverContext.first(),
+      maxOutputTokens = settings.serverMaxTokens.first(),
+    )
+
   suspend fun serverSubAgent(): LlmBackend? {
     val url = settings.serverUrl.first()
     val model = settings.serverModelName.first()
@@ -130,6 +160,7 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
       modelName = model,
       kind = serverKindNamed(settings.serverKind.first()),
       assumeModelExists = settings.serverModelTyped.first(),
+      sampling = sampling(),
     )
   }
 
@@ -153,6 +184,7 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
         modelName = model,
         kind = serverKindNamed(settings.serverKind.first()),
         assumeModelExists = settings.serverModelTyped.first(),
+        sampling = sampling(),
       )
     // Asked once here rather than per turn. A turn against a server that has gone away still
     // fails with its own message; this is what lets the phone take over before that happens.

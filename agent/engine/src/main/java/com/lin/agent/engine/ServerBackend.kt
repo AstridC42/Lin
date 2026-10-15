@@ -57,6 +57,14 @@ class ServerBackend(
    * there is something to trust. See [reachable].
    */
   private val assumeModelExists: Boolean = false,
+  /**
+   * How this server should generate, as the user set it on the settings screen.
+   *
+   * A property of the server rather than of a turn, which is why it is here beside the model
+   * name rather than on [TurnRequest]. Empty by default, and empty means the server's own
+   * configuration is left alone.
+   */
+  private val sampling: Sampling = Sampling(),
   private val server: ModelServer = ModelServer(),
   private val openStream: (url: String, headers: Map<String, String>, body: String) -> Stream =
     ::httpStream,
@@ -84,9 +92,11 @@ class ServerBackend(
       supportsTools = true,
       supportsImages = false,
       supportsAudio = false,
-      // Zero means "the server's own setting". It is configured per model on the server, this
-      // app does not override it, and inventing a number here would only be wrong.
-      contextWindow = UNKNOWN_CONTEXT,
+      // Zero means "the server's own setting", which is the default: it is configured per
+      // model on the server, and inventing a number here would only be wrong. When the user
+      // has set one, that is the number Lin also trims the conversation to - otherwise the
+      // phone would keep sending more than the window it just asked the server for.
+      contextWindow = sampling.sane().contextTokens ?: UNKNOWN_CONTEXT,
     )
 
   /**
@@ -120,8 +130,8 @@ class ServerBackend(
         var understoodAnything = false
         try {
           val body =
-            if (kind.speaksOpenAi) openAiRequestBody(modelName, request)
-            else chatRequestBody(modelName, request)
+            if (kind.speaksOpenAi) openAiRequestBody(modelName, request, sampling)
+            else chatRequestBody(modelName, request, sampling)
           openStream(url, headersFrom(authHeader), body).use { s ->
             if (s.status != HTTP_OK) {
               emit(
@@ -287,10 +297,16 @@ internal fun readToolCalls(message: JSONObject): List<ToolInvocation> {
  * Built with JSONObject rather than string templates, because a conversation contains quotes and
  * newlines and an escaping mistake here would corrupt whatever the user actually typed.
  *
- * No `num_ctx`: the context window is the server's own configuration, per model, and this app
- * has no business overriding what its owner set.
+ * `num_ctx` is sent only when the user has set one. The context window is the server's own
+ * configuration per model and this app has no business overriding it by default - but the
+ * person who owns the server asked to be able to, and a setting they deliberately changed is
+ * not this app second-guessing them.
  */
-internal fun chatRequestBody(model: String, request: TurnRequest): String {
+internal fun chatRequestBody(
+  model: String,
+  request: TurnRequest,
+  sampling: Sampling = Sampling(),
+): String {
   val messages = JSONArray()
   if (request.systemPrompt.isNotBlank()) {
     messages.put(JSONObject().put("role", "system").put("content", request.systemPrompt))
@@ -315,10 +331,7 @@ internal fun chatRequestBody(model: String, request: TurnRequest): String {
       .put("model", model)
       .put("messages", messages)
       .put("stream", true)
-      .put(
-        "options",
-        JSONObject().put("temperature", request.temperature).put("top_k", request.topK),
-      )
+      .put("options", ollamaOptions(samplingFor(sampling, request, request.responseSchema != null)))
 
   if (request.tools.isNotEmpty()) {
     val tools = JSONArray()
@@ -366,7 +379,11 @@ private fun wireRole(role: Message.Role): String =
  * vLLM and Unsloth both speak this, which is why they share a backend. What differs between them
  * is what a person types, not what goes on the wire.
  */
-internal fun openAiRequestBody(model: String, request: TurnRequest): String {
+internal fun openAiRequestBody(
+  model: String,
+  request: TurnRequest,
+  sampling: Sampling = Sampling(),
+): String {
   val messages = JSONArray()
   if (request.systemPrompt.isNotBlank()) {
     messages.put(JSONObject().put("role", "system").put("content", request.systemPrompt))
@@ -409,11 +426,7 @@ internal fun openAiRequestBody(model: String, request: TurnRequest): String {
       .put("model", model)
       .put("messages", messages)
       .put("stream", true)
-      .put("temperature", request.temperature)
-      // top_k is not an OpenAI field. vLLM accepts it, an OpenAI-faithful server rejects an
-      // unknown one, and greedy is already expressed by temperature 0 - so it is left out
-      // rather than risking the whole request for a parameter that changes nothing here.
-      .put("top_p", 1.0)
+      .apply { openAiSampling(this, samplingFor(sampling, request, request.responseSchema != null)) }
 
   if (request.tools.isNotEmpty()) {
     val tools = JSONArray()

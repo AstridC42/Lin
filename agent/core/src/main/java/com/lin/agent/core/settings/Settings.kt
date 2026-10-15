@@ -207,6 +207,35 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setMcpServers(value: String) = write(MCP_SERVERS, value)
 
+  /**
+   * How the server model should generate, each stored as typed text.
+   *
+   * Text rather than numbers because the distinction that matters is "set" against "not
+   * set", and every numeric type has a value that would have to stand in for absent - zero
+   * is a real temperature and means greedy, so it must not also mean "the user did not say".
+   * Empty is unset, and unset means the server's own configuration is left alone. Parsed by
+   * [com.lin.agent.engine.samplingFrom].
+   */
+  val serverTemperature: Flow<String> = read(SERVER_TEMPERATURE, "")
+
+  suspend fun setServerTemperature(value: String) = write(SERVER_TEMPERATURE, value)
+
+  val serverTopP: Flow<String> = read(SERVER_TOP_P, "")
+
+  suspend fun setServerTopP(value: String) = write(SERVER_TOP_P, value)
+
+  val serverTopK: Flow<String> = read(SERVER_TOP_K, "")
+
+  suspend fun setServerTopK(value: String) = write(SERVER_TOP_K, value)
+
+  val serverContext: Flow<String> = read(SERVER_CONTEXT, "")
+
+  suspend fun setServerContext(value: String) = write(SERVER_CONTEXT, value)
+
+  val serverMaxTokens: Flow<String> = read(SERVER_MAX_TOKENS, "")
+
+  suspend fun setServerMaxTokens(value: String) = write(SERVER_MAX_TOKENS, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -492,6 +521,11 @@ class SettingsRepository(private val context: Context) {
     val TAP_SEND = stringPreferencesKey("tap_send")
     val DISABLED_TOOLS = stringPreferencesKey("disabled_tools")
     val MCP_SERVERS = stringPreferencesKey("mcp_servers")
+    val SERVER_TEMPERATURE = stringPreferencesKey("server_temperature")
+    val SERVER_TOP_P = stringPreferencesKey("server_top_p")
+    val SERVER_TOP_K = stringPreferencesKey("server_top_k")
+    val SERVER_CONTEXT = stringPreferencesKey("server_context")
+    val SERVER_MAX_TOKENS = stringPreferencesKey("server_max_tokens")
     val SPEAK_WHEN = stringPreferencesKey("speak_when")
     val VOICE_NAME = stringPreferencesKey("voice_name")
     val VOICE_CHAT = booleanPreferencesKey("voice_chat")

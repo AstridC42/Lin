@@ -94,6 +94,17 @@ data class MusicAppLine(val label: String, val packageName: String)
 
 data class SettingsState(
   val ollamaUrl: String = "",
+  /**
+   * How the server model should generate, as typed. Empty means the server decides.
+   *
+   * Strings rather than numbers all the way to the screen, because empty is a meaningful
+   * value here and no numeric type has one: zero is a real temperature and means greedy.
+   */
+  val serverTemperature: String = "",
+  val serverTopP: String = "",
+  val serverTopK: String = "",
+  val serverContext: String = "",
+  val serverMaxTokens: String = "",
   val ollamaAuthHeader: String = "",
   val memoryGb: Int = 0,
   val socModel: String = "",
@@ -189,6 +200,11 @@ constructor(
       _state.update {
         it.copy(
           ollamaUrl = settings.serverUrl.first(),
+          serverTemperature = settings.serverTemperature.first(),
+          serverTopP = settings.serverTopP.first(),
+          serverTopK = settings.serverTopK.first(),
+          serverContext = settings.serverContext.first(),
+          serverMaxTokens = settings.serverMaxTokens.first(),
           ollamaAuthHeader = settings.serverAuthHeader.first(),
           serverModel = settings.serverModelName.first(),
           serverModelTyped = settings.serverModelTyped.first(),
@@ -297,6 +313,59 @@ constructor(
     _state.update {
       it.copy(ollamaUrl = value, saved = false, serverModels = ServerModelsState.Unknown)
     }
+
+  /**
+   * The sampling fields, written as they are typed.
+   *
+   * Not behind the Save button the address and header share. Those three are validated
+   * together against a live server; these are five independent numbers that need no checking
+   * against anything, and making somebody press Save to change a temperature would be a
+   * worse surprise than a few small writes.
+   */
+  fun onTemperatureChanged(value: String) {
+    _state.update { it.copy(serverTemperature = value) }
+    viewModelScope.launch { settings.setServerTemperature(value) }
+  }
+
+  fun onTopPChanged(value: String) {
+    _state.update { it.copy(serverTopP = value) }
+    viewModelScope.launch { settings.setServerTopP(value) }
+  }
+
+  fun onTopKChanged(value: String) {
+    _state.update { it.copy(serverTopK = value) }
+    viewModelScope.launch { settings.setServerTopK(value) }
+  }
+
+  fun onServerContextChanged(value: String) {
+    _state.update { it.copy(serverContext = value) }
+    viewModelScope.launch { settings.setServerContext(value) }
+  }
+
+  fun onMaxTokensChanged(value: String) {
+    _state.update { it.copy(serverMaxTokens = value) }
+    viewModelScope.launch { settings.setServerMaxTokens(value) }
+  }
+
+  /** Back to sending nothing, so the server's own configuration decides again. */
+  fun clearSampling() {
+    _state.update {
+      it.copy(
+        serverTemperature = "",
+        serverTopP = "",
+        serverTopK = "",
+        serverContext = "",
+        serverMaxTokens = "",
+      )
+    }
+    viewModelScope.launch {
+      settings.setServerTemperature("")
+      settings.setServerTopP("")
+      settings.setServerTopK("")
+      settings.setServerContext("")
+      settings.setServerMaxTokens("")
+    }
+  }
 
   fun onAuthHeaderChanged(value: String) =
     _state.update {
