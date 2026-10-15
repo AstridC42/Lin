@@ -19,7 +19,9 @@ package com.lin.agent.model
 import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
+import android.media.session.MediaController
 import android.net.Uri
+import android.os.Bundle
 import android.provider.MediaStore
 import com.lin.agent.core.media.describeNowPlaying
 import com.lin.agent.core.media.musicRequest
@@ -95,18 +97,35 @@ class PlayMusicTool(
       return ToolResult.Ok("Done - $app is already starting that.")
     }
 
-    val asked = ask(chosen, request.query, request.title, request.artist)
-    if (!asked) return ToolResult.Failed("$app would not take the request.")
+    // The app's own session first, before any intent. This is how a car asks a music app to
+    // play something - the same call Android Auto makes - and it is the only one that
+    // actually starts playback rather than opening a search page. It also means nothing comes
+    // to the foreground: the music just starts, which is what was asked for.
+    val throughSession = playThroughSession(chosen, request.query, request.title, request.artist)
+    if (!throughSession) {
+      // No session to ask, or it would not take it. Open the app, which gives it one.
+      val asked = ask(chosen, request.query, request.title, request.artist)
+      if (!asked) return ToolResult.Failed("$app would not take the request.")
 
-    // A moment for the app to start, then what is really playing. Long enough for a local
-    // library, not long enough to be a wait: if a stream is still buffering the answer says
-    // it was asked for rather than claiming it is playing.
+      // Opening is not playing. Wait for the app to publish a session and ask it properly,
+      // because an app opened on a search page sits there until somebody taps.
+      waitForSession(chosen)?.let { late ->
+        runCatching {
+          late.transportControls.playFromSearch(request.query, searchExtras(request.title, request.artist))
+        }
+      }
+    }
+
+    // A moment to start, then what is really playing. Long enough for a local library, not
+    // long enough to be a wait: if a stream is still buffering the answer says it was asked
+    // for rather than claiming it is playing.
     delay(LOOK_AFTER_MS)
 
     val controllers = activeControllers(context)
       ?: return ToolResult.Ok(
         "$app was asked to play ${request.query}. Lin cannot see whether it started - that " +
-          "needs notification access. Say what was asked for, not that it is playing."
+          "needs notification access, which the user turns on in settings. Say what was asked " +
+          "for, not that it is playing."
       )
 
     val playing = controllers.map { it.asSession(context) }.firstOrNull { it.playing }
@@ -114,11 +133,62 @@ class PlayMusicTool(
       ToolResult.Ok("Done - ${describeNowPlaying(listOf(playing))}")
     } else {
       ToolResult.Ok(
-        "$app was opened with a search for ${request.query}, and nothing is playing yet. Tell " +
-          "the user it is open on the search rather than saying it is playing."
+        "$app was asked for ${request.query} and is open, but nothing is playing yet. Tell the " +
+          "user that rather than saying it is playing."
       )
     }
   }
+
+  /**
+   * Asks an app that is already running to search and play, through its media session.
+   *
+   * `playFromSearch` is the call a car makes: a media app that supports voice in a car
+   * implements it, and most streaming apps do, because Android Auto requires it of them. An
+   * app that does not implement it ignores the call silently - which is why the caller still
+   * checks afterwards what is actually playing rather than trusting this.
+   *
+   * False when there is nothing to ask: no notification access, or no session for that app.
+   */
+  private fun playThroughSession(
+    packageName: String,
+    query: String,
+    title: String,
+    artist: String,
+  ): Boolean {
+    val controller =
+      activeControllers(context)?.firstOrNull { it.packageName == packageName } ?: return false
+    return runCatching {
+        controller.transportControls.playFromSearch(query, searchExtras(title, artist))
+        true
+      }
+      .getOrDefault(false)
+  }
+
+  /** Waits briefly for a just-opened app to publish a session, or gives up. */
+  private suspend fun waitForSession(packageName: String): MediaController? {
+    repeat(WAIT_TRIES) {
+      delay(WAIT_STEP_MS)
+      activeControllers(context)?.firstOrNull { it.packageName == packageName }?.let {
+        return it
+      }
+    }
+    return null
+  }
+
+  /**
+   * The parts of the request, for an app that can use them.
+   *
+   * The same extras Android Auto passes, so an app that handles a car's "play Stan by Eminem"
+   * handles this identically. Only sent when the request actually said which was which.
+   */
+  private fun searchExtras(title: String, artist: String): Bundle =
+    Bundle().apply {
+      if (title.isNotBlank() && artist.isNotBlank()) {
+        putString(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/audio")
+        putString(MediaStore.EXTRA_MEDIA_TITLE, title)
+        putString(MediaStore.EXTRA_MEDIA_ARTIST, artist)
+      }
+    }
 
   /** The three ways in, in order of how well they work. Returns whether any of them started. */
   private fun ask(packageName: String, query: String, title: String, artist: String): Boolean {
@@ -169,5 +239,9 @@ class PlayMusicTool(
 
   private companion object {
     const val LOOK_AFTER_MS = 1_500L
+
+    /** Up to about three seconds for a cold app to publish a session. */
+    const val WAIT_TRIES = 6
+    const val WAIT_STEP_MS = 500L
   }
 }
