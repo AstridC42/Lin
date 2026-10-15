@@ -48,6 +48,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.CardDefaults
+import com.lin.agent.core.web.SearchProvider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
@@ -1365,10 +1366,12 @@ private fun shellStateLabel(state: ShizukuState) =
  */
 @Composable
 private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewModel) {
+  WebSearch(state, viewModel)
+
   Text(
     stringResource(R.string.settings_tools_heading),
     style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
+    modifier = Modifier.padding(top = 24.dp),
   )
   Text(
     stringResource(R.string.settings_tools_detail),
@@ -1415,6 +1418,84 @@ private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewMo
 
   McpServers(viewModel)
 }
+
+/**
+ * Where Lin searches.
+ *
+ * Nothing by default, and the search tool says so plainly rather than guessing: a search
+ * sends what somebody asked to a third party, and which third party is a choice they make
+ * once rather than one this app makes for them.
+ *
+ * Two providers, neither of them scraped. Fetching a search engine's HTML and pulling the
+ * results out was tried first and both of the obvious endpoints answered a plain request
+ * with a block page - a feature that works until it quietly does not, for reasons nobody
+ * holding the phone could diagnose.
+ */
+@Composable
+private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewModel) {
+  Text(
+    stringResource(R.string.settings_search_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_search_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+
+  for (provider in SearchProvider.entries) {
+    ChoiceRow(
+      title = stringResource(searchProviderLabel(provider)),
+      detail = stringResource(searchProviderDetail(provider)),
+      selected = state.searchProvider == provider,
+      onPick = { viewModel.setSearchProvider(provider) },
+    )
+  }
+
+  when (state.searchProvider) {
+    SearchProvider.NONE -> Unit
+    SearchProvider.SEARXNG -> {
+      OutlinedTextField(
+        value = state.searchUrl,
+        onValueChange = viewModel::onSearchUrlChanged,
+        label = { Text(stringResource(R.string.settings_search_url)) },
+        placeholder = { Text("https://searx.example.com") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      // The misconfiguration everybody hits, said before they hit it: SearXNG serves JSON
+      // only when it is switched on, and otherwise answers 403 or an HTML page.
+      Text(
+        stringResource(R.string.settings_search_searxng_note),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    SearchProvider.BRAVE ->
+      OutlinedTextField(
+        value = state.searchKey,
+        onValueChange = viewModel::onSearchKeyChanged,
+        label = { Text(stringResource(R.string.settings_search_key)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
+  }
+}
+
+private fun searchProviderLabel(provider: SearchProvider) =
+  when (provider) {
+    SearchProvider.NONE -> R.string.settings_search_none
+    SearchProvider.SEARXNG -> R.string.settings_search_searxng
+    SearchProvider.BRAVE -> R.string.settings_search_brave
+  }
+
+private fun searchProviderDetail(provider: SearchProvider) =
+  when (provider) {
+    SearchProvider.NONE -> R.string.settings_search_none_detail
+    SearchProvider.SEARXNG -> R.string.settings_search_searxng_detail
+    SearchProvider.BRAVE -> R.string.settings_search_brave_detail
+  }
 
 /**
  * The MCP servers the user has added, and what each is doing.

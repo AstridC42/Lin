@@ -67,16 +67,22 @@ class PlayMusicTool(
       ToolParameter(
         name = "what",
         type = ParamType.STRING,
-        description = "What to play, as the user said it, for example Stan by Eminem.",
+        description = "What to play, as the user said it, for example Stan by Eminem. Leave " +
+          "it out if they just said to play something, and the music app resumes.",
+        required = false,
       )
     )
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
-    val request =
-      musicRequest((arguments["what"] as? String).orEmpty())
-        ?: return ToolResult.Failed("Nothing was named to play.")
+    val said = (arguments["what"] as? String).orEmpty()
+    val request = musicRequest(said)
+    // "Play something" names nothing, and a tool that demanded a title for it is what sent a
+    // 12B model round in circles on a phone: it could not satisfy the parameter and could not
+    // decide to stop. Nothing named means resume whatever was last playing, which is what
+    // somebody saying "play something" to a phone that has a paused album actually wants.
+    if (request == null) return resume()
 
     val chosen = settings.musicApp.first()
     if (chosen.isBlank()) {
@@ -233,6 +239,27 @@ class PlayMusicTool(
    */
   private fun start(intent: Intent): Boolean =
     runCatching { context.startActivity(intent) }.isSuccess
+
+  /**
+   * Starts whatever was last playing, or says there is nothing to start.
+   *
+   * Through the media session rather than by opening the app, for the same reason the
+   * search path prefers it: it actually begins playback instead of putting a screen in
+   * front of somebody who asked for music.
+   */
+  private fun resume(): ToolResult {
+    val controller =
+      activeControllers(context).orEmpty().firstOrNull()
+        ?: return ToolResult.Failed(
+          "Nothing is loaded in any music app, so there is nothing to resume. Ask the user " +
+            "what they would like to hear."
+        )
+    return runCatching {
+        controller.transportControls.play()
+        ToolResult.Ok("Done - ${appLabel(context, controller.packageName)} is playing again.")
+      }
+      .getOrElse { ToolResult.Failed("The music app would not start playing.") }
+  }
 
   private fun isInstalled(packageName: String): Boolean =
     runCatching { context.packageManager.getApplicationInfo(packageName, 0) }.isSuccess
