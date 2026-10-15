@@ -63,6 +63,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -874,6 +875,41 @@ private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewMo
       selected = state.musicApp == app.packageName,
       onPick = { viewModel.useMusicApp(app.packageName) },
     )
+  }
+
+  Text(
+    stringResource(R.string.settings_weather_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_weather_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  val weatherContext = LocalContext.current
+  var weatherAllowed by remember {
+    mutableStateOf(
+      weatherContext.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
+    )
+  }
+  val weatherPermission =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      weatherAllowed = granted
+    }
+  if (weatherAllowed) {
+    Text(
+      stringResource(R.string.settings_weather_on),
+      style = MaterialTheme.typography.bodyMedium,
+    )
+  } else {
+    OutlinedButton(
+      onClick = { weatherPermission.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Text(stringResource(R.string.settings_weather_allow))
+    }
   }
 
   Text(

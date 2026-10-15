@@ -907,6 +907,28 @@ does, so afterwards Lin looks at what the phone is actually playing and
 reports that — "it is open on the search" when that is what happened, rather
 than "I played it" because an intent did not throw.
 
+**Done: the weather.** Asked for after a build where "what is it doing
+outside" had no answer at all - the model either declined or made one up from
+training data that is months old and somewhere else.
+
+Open-Meteo, because it needs no account and no key. Every other free weather
+service wants a sign-up, and an assistant that cannot say whether you need a
+coat until its owner has registered with somebody is not finished.
+
+**It is also the first thing in this app that sends anything about the user to
+a third party**, and that is worth stating rather than burying. What goes is a
+pair of coordinates rounded to about a kilometre - the same weather, a
+different street - and nothing else: no identifier, no question, no
+conversation. It happens only when somebody asks about the weather. The
+setting says exactly that, in those words, and the permission is coarse
+location, asked for there rather than at launch.
+
+The parsing is a tested function for the usual reason: a response cut short
+gives arrays of different lengths, and reading past the shortest is how a
+forecast gains a day with somebody else's temperature in it. A weather code
+Lin does not know stays unsaid rather than becoming "clear", which is the one
+answer somebody might walk out in.
+
 **Not MobileActions-270M.** The question came back with this work: would a
 small action model help? No, and the reason is the same as when it was parked.
 Nothing here was ever blocked on understanding "turn the flashlight on" — a 2B

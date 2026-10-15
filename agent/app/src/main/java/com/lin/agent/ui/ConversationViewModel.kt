@@ -69,6 +69,7 @@ import com.lin.agent.model.AlarmTool
 import com.lin.agent.model.CalendarTool
 import com.lin.agent.model.ListDocumentsTool
 import com.lin.agent.model.MediaTool
+import com.lin.agent.model.WeatherTool
 import com.lin.agent.model.OpenAppTool
 import com.lin.agent.model.PhoneSettingTool
 import com.lin.agent.model.PlayMusicTool
@@ -218,6 +219,7 @@ constructor(
         ReplyTool(relay),
         CalendarTool(calendars),
         MediaTool(appContext),
+        WeatherTool(appContext),
         PlayMusicTool(appContext, settings, launchGuard),
         PhoneSettingTool(appContext, launchGuard),
         OpenAppTool(appContext, launchGuard),
@@ -724,6 +726,8 @@ constructor(
         "phone_setting does the flashlight and Do Not Disturb outright; for wi-fi, bluetooth, " +
         "NFC and airplane mode Android allows no app to switch them, so it opens the phone\'s " +
         "own panel - say it is ready to tap and never say the setting was changed. " +
+        "weather answers what it is doing outside - never answer that from your own " +
+        "knowledge, which is months old and somewhere else. " +
         "These tools are everything Lin can do to the phone: if something is not on this " +
         "list, say you cannot do it rather than describing how the user could."
 
