@@ -141,6 +141,7 @@ constructor(
       ToolListing(
         name = tool.name,
         description = tool.description,
+        fromServer = (tool as? com.lin.agent.mcp.McpTool)?.serverName.orEmpty(),
       )
     }
 }

@@ -44,6 +44,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
@@ -1289,6 +1291,7 @@ private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewMo
 
   for (tool in state.toolListing) {
     val on = tool.name !in state.disabledTools
+    val from = tool.fromServer
     Row(
       modifier =
         Modifier.fillMaxWidth()
@@ -1300,12 +1303,145 @@ private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewMo
       Column(modifier = Modifier.weight(1f)) {
         Text(tool.name, style = MaterialTheme.typography.bodyLarge)
         Text(
-          tool.description,
+          // Said on the row rather than left to the prefix in the name: a tool that goes over
+          // the network to somebody else's server is a different thing from one that runs on
+          // the phone, and the person switching it should be able to see which it is.
+          if (from.isEmpty()) tool.description
+          else stringResource(R.string.settings_tools_remote, from, tool.description),
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
       Switch(checked = on, onCheckedChange = { viewModel.setToolEnabled(tool.name, it) })
+    }
+  }
+
+  McpServers(viewModel)
+}
+
+/**
+ * The MCP servers the user has added, and what each is doing.
+ *
+ * A server is a URL the model's tool calls are sent to, so the screen says that plainly. The
+ * tools it provides appear in the list above with the server's name on them, and can be
+ * switched off one at a time like any other.
+ *
+ * Status is shown per server rather than as one line, because the useful case is the mixed
+ * one: a remote server working while a laptop at home is asleep. One being unreachable does
+ * not cost the others their tools.
+ */
+@Composable
+private fun ColumnScope.McpServers(viewModel: SettingsViewModel) {
+  val servers by viewModel.mcpStatus.collectAsStateWithLifecycle()
+  var adding by rememberSaveable { mutableStateOf(false) }
+  var name by rememberSaveable { mutableStateOf("") }
+  var url by rememberSaveable { mutableStateOf("") }
+  var header by rememberSaveable { mutableStateOf("") }
+
+  Text(
+    stringResource(R.string.settings_mcp_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 24.dp),
+  )
+  Text(
+    stringResource(R.string.settings_mcp_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Text(
+    stringResource(R.string.settings_mcp_warning),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+
+  if (servers.isEmpty()) {
+    Text(
+      stringResource(R.string.settings_mcp_none),
+      style = MaterialTheme.typography.bodyMedium,
+      modifier = Modifier.padding(vertical = 4.dp),
+    )
+  }
+
+  for (each in servers) {
+    Card(
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+      shape = RoundedCornerShape(18.dp),
+      modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+      Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(each.server.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+          each.server.url,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+          when {
+            each.checking -> stringResource(R.string.settings_mcp_checking)
+            each.trouble.isNotEmpty() -> each.trouble
+            else -> stringResource(R.string.settings_mcp_tools, each.toolCount)
+          },
+          style = MaterialTheme.typography.bodySmall,
+          color =
+            if (each.trouble.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.error,
+        )
+        TextButton(onClick = { viewModel.removeMcpServer(each.server.url) }) {
+          Text(stringResource(R.string.settings_mcp_remove))
+        }
+      }
+    }
+  }
+
+  if (adding) {
+    OutlinedTextField(
+      value = url,
+      onValueChange = { url = it },
+      label = { Text(stringResource(R.string.settings_mcp_url)) },
+      placeholder = { Text("https://example.com/mcp") },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+      value = name,
+      onValueChange = { name = it },
+      label = { Text(stringResource(R.string.settings_mcp_name)) },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+      value = header,
+      onValueChange = { header = it },
+      label = { Text(stringResource(R.string.settings_mcp_header)) },
+      placeholder = { Text("Authorization: Bearer …") },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      Button(
+        onClick = {
+          viewModel.addMcpServer(name, url, header)
+          name = ""
+          url = ""
+          header = ""
+          adding = false
+        },
+        enabled = url.isNotBlank(),
+      ) {
+        Text(stringResource(R.string.settings_mcp_save))
+      }
+      TextButton(onClick = { adding = false }) { Text(stringResource(R.string.settings_mcp_cancel)) }
+    }
+  } else {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      OutlinedButton(onClick = { adding = true }) {
+        Text(stringResource(R.string.settings_mcp_add))
+      }
+      if (servers.isNotEmpty()) {
+        TextButton(onClick = { viewModel.refreshMcp() }) {
+          Text(stringResource(R.string.settings_mcp_refresh))
+        }
+      }
     }
   }
 }

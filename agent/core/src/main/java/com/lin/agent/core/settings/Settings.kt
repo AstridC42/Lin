@@ -196,6 +196,17 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setDisabledTools(value: String) = write(DISABLED_TOOLS, value)
 
+  /**
+   * The MCP servers the user has added, as a JSON array. See
+   * [com.lin.agent.engine.mcp.serversFrom].
+   *
+   * JSON rather than a line-based format because an auth header can contain anything,
+   * including whatever separator a simpler format would need.
+   */
+  val mcpServers: Flow<String> = read(MCP_SERVERS, "")
+
+  suspend fun setMcpServers(value: String) = write(MCP_SERVERS, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -480,6 +491,7 @@ class SettingsRepository(private val context: Context) {
     val MUSIC_APP = stringPreferencesKey("music_app")
     val TAP_SEND = stringPreferencesKey("tap_send")
     val DISABLED_TOOLS = stringPreferencesKey("disabled_tools")
+    val MCP_SERVERS = stringPreferencesKey("mcp_servers")
     val SPEAK_WHEN = stringPreferencesKey("speak_when")
     val VOICE_NAME = stringPreferencesKey("voice_name")
     val VOICE_CHAT = booleanPreferencesKey("voice_chat")

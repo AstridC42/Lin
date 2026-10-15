@@ -179,6 +179,7 @@ constructor(
   private val attachments: com.lin.agent.model.Attachments,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
   private val tools: com.lin.agent.model.Tools,
+  private val mcp: com.lin.agent.mcp.McpConnections,
   private val lastSaidHolder: com.lin.agent.model.LastSaid,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
@@ -288,6 +289,10 @@ constructor(
 
   init {
     refreshReadiness()
+    // Asked once, in the background, so a server's tools are in the list by the time anybody
+    // types. Failures are reported on the settings screen rather than here: a server that is
+    // asleep should cost its own tools and nothing else, least of all the first screen.
+    viewModelScope.launch { runCatching { mcp.refresh() } }
   }
 
   /**
