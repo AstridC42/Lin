@@ -44,6 +44,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
@@ -183,6 +185,7 @@ fun SettingsScreen(
         SettingsTab.SERVER -> ServerTab(state, viewModel)
         SettingsTab.VOICE -> VoiceTab(state, viewModel)
         SettingsTab.PHONE -> PhoneTab(state, viewModel)
+        SettingsTab.TOOLS -> ToolsTab(state, viewModel)
         SettingsTab.DATA ->
           DataTab(state, viewModel, onOpenMemory, onOpenDocuments, onOpenTraining, onOpenBackup)
       }
@@ -207,6 +210,7 @@ private enum class SettingsTab(@param:StringRes val title: Int) {
   SERVER(R.string.settings_tab_server),
   VOICE(R.string.settings_tab_voice),
   PHONE(R.string.settings_tab_phone),
+  TOOLS(R.string.settings_tab_tools),
   DATA(R.string.settings_tab_data),
 }
 
@@ -1250,6 +1254,197 @@ private fun shellStateLabel(state: ShizukuState) =
     ShizukuState.NOT_PERMITTED -> R.string.settings_shell_unasked
     ShizukuState.REFUSED -> R.string.settings_shell_refused
   }
+
+/**
+ * Every tool Lin has, with a switch for each.
+ *
+ * Worth having for two reasons that pull in the same direction. A tool the model should not
+ * reach for is one it will reach for eventually - a 2B model offered twenty tools picks the
+ * wrong one often enough to be worth a switch - and every tool in the list costs tokens in
+ * every prompt, on a phone, before the first word of the answer.
+ *
+ * Switched off rather than removed: the tool is still listed, still described, and can be
+ * switched back on. What changes is only that the model is not told it exists.
+ */
+@Composable
+private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewModel) {
+  Text(
+    stringResource(R.string.settings_tools_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_tools_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Text(
+    stringResource(
+      R.string.settings_tools_count,
+      state.toolListing.size - state.disabledTools.size,
+      state.toolListing.size,
+    ),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier = Modifier.padding(top = 4.dp),
+  )
+
+  for (tool in state.toolListing) {
+    val on = tool.name !in state.disabledTools
+    val from = tool.fromServer
+    Row(
+      modifier =
+        Modifier.fillMaxWidth()
+          .clickable { viewModel.setToolEnabled(tool.name, !on) }
+          .padding(horizontal = 8.dp, vertical = 6.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(tool.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+          // Said on the row rather than left to the prefix in the name: a tool that goes over
+          // the network to somebody else's server is a different thing from one that runs on
+          // the phone, and the person switching it should be able to see which it is.
+          if (from.isEmpty()) tool.description
+          else stringResource(R.string.settings_tools_remote, from, tool.description),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      Switch(checked = on, onCheckedChange = { viewModel.setToolEnabled(tool.name, it) })
+    }
+  }
+
+  McpServers(viewModel)
+}
+
+/**
+ * The MCP servers the user has added, and what each is doing.
+ *
+ * A server is a URL the model's tool calls are sent to, so the screen says that plainly. The
+ * tools it provides appear in the list above with the server's name on them, and can be
+ * switched off one at a time like any other.
+ *
+ * Status is shown per server rather than as one line, because the useful case is the mixed
+ * one: a remote server working while a laptop at home is asleep. One being unreachable does
+ * not cost the others their tools.
+ */
+@Composable
+private fun ColumnScope.McpServers(viewModel: SettingsViewModel) {
+  val servers by viewModel.mcpStatus.collectAsStateWithLifecycle()
+  var adding by rememberSaveable { mutableStateOf(false) }
+  var name by rememberSaveable { mutableStateOf("") }
+  var url by rememberSaveable { mutableStateOf("") }
+  var header by rememberSaveable { mutableStateOf("") }
+
+  Text(
+    stringResource(R.string.settings_mcp_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 24.dp),
+  )
+  Text(
+    stringResource(R.string.settings_mcp_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Text(
+    stringResource(R.string.settings_mcp_warning),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+
+  if (servers.isEmpty()) {
+    Text(
+      stringResource(R.string.settings_mcp_none),
+      style = MaterialTheme.typography.bodyMedium,
+      modifier = Modifier.padding(vertical = 4.dp),
+    )
+  }
+
+  for (each in servers) {
+    Card(
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+      shape = RoundedCornerShape(18.dp),
+      modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+      Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(each.server.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+          each.server.url,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+          when {
+            each.checking -> stringResource(R.string.settings_mcp_checking)
+            each.trouble.isNotEmpty() -> each.trouble
+            else -> stringResource(R.string.settings_mcp_tools, each.toolCount)
+          },
+          style = MaterialTheme.typography.bodySmall,
+          color =
+            if (each.trouble.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.error,
+        )
+        TextButton(onClick = { viewModel.removeMcpServer(each.server.url) }) {
+          Text(stringResource(R.string.settings_mcp_remove))
+        }
+      }
+    }
+  }
+
+  if (adding) {
+    OutlinedTextField(
+      value = url,
+      onValueChange = { url = it },
+      label = { Text(stringResource(R.string.settings_mcp_url)) },
+      placeholder = { Text("https://example.com/mcp") },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+      value = name,
+      onValueChange = { name = it },
+      label = { Text(stringResource(R.string.settings_mcp_name)) },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+      value = header,
+      onValueChange = { header = it },
+      label = { Text(stringResource(R.string.settings_mcp_header)) },
+      placeholder = { Text("Authorization: Bearer …") },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      Button(
+        onClick = {
+          viewModel.addMcpServer(name, url, header)
+          name = ""
+          url = ""
+          header = ""
+          adding = false
+        },
+        enabled = url.isNotBlank(),
+      ) {
+        Text(stringResource(R.string.settings_mcp_save))
+      }
+      TextButton(onClick = { adding = false }) { Text(stringResource(R.string.settings_mcp_cancel)) }
+    }
+  } else {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      OutlinedButton(onClick = { adding = true }) {
+        Text(stringResource(R.string.settings_mcp_add))
+      }
+      if (servers.isNotEmpty()) {
+        TextButton(onClick = { viewModel.refreshMcp() }) {
+          Text(stringResource(R.string.settings_mcp_refresh))
+        }
+      }
+    }
+  }
+}
 
 /** What Lin keeps: memories, documents, the training copies, and a way out of all of it. */
 @Composable

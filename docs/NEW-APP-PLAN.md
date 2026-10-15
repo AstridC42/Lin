@@ -1420,6 +1420,78 @@ says so.
 asked for most: "what does this say", "read me that", "what's the code in that
 message".
 
+### Phase 14 — Tools you can switch, and tools from elsewhere
+
+**A switch per tool.** Every tool Lin has, listed in Settings → Tools, each
+with a switch. Two reasons pointing the same way: a 2B model offered twenty
+tools picks the wrong one often enough to be worth a switch, and every tool in
+the list costs tokens in every prompt, on a phone, before the first word.
+Switched off rather than removed — the tool stays listed and described, and
+the model is simply not told it exists. It reuses the `withhold` set built for
+`delegate`, so a switched-off tool is kept out of the list *and* out of the
+lookup.
+
+Stored as the **off** list. A stored on-list goes wrong the first time a new
+tool ships: it is in nobody's saved list, so it arrives switched off for every
+existing user, invisibly, and reads as the feature not working.
+
+This needed the tool list to move out of `ConversationViewModel`, where it had
+lived since Phase 3, into a singleton holding a `StateFlow`. A list built in
+one ViewModel cannot serve a settings screen, and cannot grow at runtime —
+which MCP requires.
+
+**MCP.** Lin speaks the Model Context Protocol over Streamable HTTP, so any
+server the user adds contributes its tools to the same list, each with the
+same switch.
+
+The thing worth recording is that **MCP has two eras**, and a client written
+from memory would get this wrong. Revision `2026-07-28` removed the
+`initialize` handshake and protocol-level sessions outright: every request now
+carries its own protocol version, client identity and capabilities in
+`params._meta`, mirrored into `MCP-Protocol-Version`, `Mcp-Method` and
+`Mcp-Name` headers so intermediaries can route without parsing bodies — and a
+server **must** reject a request whose headers and body disagree. Everything
+`2025-11-25` and earlier opens with `initialize` and keeps a session id. Most
+servers deployed today are the older kind.
+
+So Lin is dual-era: it tries modern, and on a `4xx` inspects the body before
+deciding. A recognised modern error (`-32020` header mismatch, `-32021`
+missing capability, `-32022` unsupported version) means the server is modern
+and the request should be corrected; anything else — including an empty body —
+means it is a handshake server. That one call is `looksLikeModernError`, and
+it is tested, because getting it backwards fails invisibly in both directions.
+
+A near-mistake worth keeping: when a modern server rejects a version it lists
+what it does support, and the tempting move is to take the first entry and
+retry. The list can contain only handshake-era versions, and `2025-11-25` in a
+modern request's `_meta` is not a thing — that version *is* the handshake. So
+`bestModernVersion` returns null for such a list and the client falls back
+rather than retrying forever.
+
+Other decisions, each tested:
+
+- **Tool names are prefixed with the server.** Names are unique only within
+  one server, and two servers each offering `search` is the collision the
+  specification itself gives as the example. Unprefixed, the second one loaded
+  would silently disappear.
+- **The server's JSON Schema is passed through unchanged.** `AgentTool` gained
+  a `parametersSchema` override for this; flattening a schema into Lin's own
+  parameter list and rebuilding it would lose nesting, enums and defaults the
+  server meant the model to see.
+- **A malformed tool is excluded, not fatal.** A bad `x-mcp-header`
+  annotation costs that one tool, not the server's whole list.
+- **Images are named, not pasted.** Content bytes are base64 in the JSON, and
+  a few hundred kilobytes of it would end a conversation on a 2B model.
+- **`structuredContent` is used only when there is no text**, because a server
+  returning both is required to put the same data in the text block.
+- **A tool execution error is a result, not a failure.** The server ran it and
+  it did not work: the model can act on that. A connection problem says so
+  instead, because retrying will not fix a server that is not there.
+
+Not built: resources, prompts, sampling, elicitation and roots. The last three
+are things a server would ask the phone to do, and none of them is something
+to hand a remote server on the strength of a capability flag.
+
 ### Phase 11 — The design pass
 
 Four directions were drawn side by side on a canvas - a quiet page with no

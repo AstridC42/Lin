@@ -41,8 +41,6 @@ import com.lin.agent.core.voice.speakWhenNamed
 import com.lin.agent.core.voice.shouldListenAgain
 import com.lin.agent.core.voice.shouldSpeak
 import com.lin.agent.model.DelegateTool
-import com.lin.agent.model.ReadScreenTool
-import com.lin.agent.model.SendMessageTool
 import com.lin.agent.voice.Dictation
 import com.lin.agent.voice.Heard
 import com.lin.agent.voice.Speaker
@@ -54,41 +52,18 @@ import androidx.work.WorkManager
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import com.lin.agent.R
-import com.lin.agent.core.documents.DocumentLibrary
-import com.lin.agent.core.documents.Documents
-import com.lin.agent.core.documents.PdfPages
-import com.lin.agent.core.calendar.Calendars
 import com.lin.agent.core.diag.describeFault
+import com.lin.agent.core.tools.disabledFrom
 import com.lin.agent.core.phone.permissionNeededBy
 import android.content.pm.PackageManager
 import com.lin.agent.core.calendar.todayLine
 import com.lin.agent.core.memory.Digest
-import com.lin.agent.core.tools.LaunchGuard
 import com.lin.agent.core.training.TrainingArchive
 import com.lin.agent.core.training.TrainingData
 import com.lin.agent.core.training.TrainingTurn
 import com.lin.agent.model.ConversationLog
 import com.lin.agent.model.DigestWorker
-import com.lin.agent.model.Embedders
-import com.lin.agent.model.FindPhotoTool
-import com.lin.agent.model.AddToCalendarTool
-import com.lin.agent.model.AlarmTool
-import com.lin.agent.model.CalendarTool
-import com.lin.agent.model.ListDocumentsTool
-import com.lin.agent.model.MediaTool
-import com.lin.agent.model.WeatherTool
-import com.lin.agent.model.OpenAppTool
-import com.lin.agent.model.PhoneSettingTool
-import com.lin.agent.model.PlayMusicTool
-import com.lin.agent.model.ReadDocumentTool
-import com.lin.agent.model.ReplyTool
-import com.lin.agent.model.WriteDocumentTool
-import com.lin.agent.model.UnreadTool
 import com.lin.agent.notifications.NotificationRelay
-import com.lin.agent.model.PhoneTool
-import com.lin.agent.model.RecallTool
-import com.lin.agent.model.RememberTool
-import com.lin.agent.core.memory.MemoryStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -196,62 +171,34 @@ class ConversationViewModel
 @Inject
 constructor(
   private val backends: ChatBackends,
-  private val phoneTool: PhoneTool,
-  private val memories: MemoryStore,
-  private val embedders: Embedders,
   private val dictation: Dictation,
   private val conversationLog: ConversationLog,
   private val work: WorkManager,
   private val relay: NotificationRelay,
-  private val documentLibrary: DocumentLibrary,
-  private val documents: Documents,
-  private val pdfPages: PdfPages,
   private val archive: TrainingArchive,
-  private val calendars: Calendars,
-  private val launchGuard: LaunchGuard,
   private val attachments: com.lin.agent.model.Attachments,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
-  private val privileged: com.lin.agent.privileged.Privileged,
+  private val tools: com.lin.agent.model.Tools,
+  private val mcp: com.lin.agent.mcp.McpConnections,
+  private val lastSaidHolder: com.lin.agent.model.LastSaid,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val saved: SavedStateHandle,
 ) : ViewModel() {
 
   /**
-   * What the orchestrator may do.
+   * What the orchestrator may do, as it stands right now.
    *
-   * Built here, once, from role-scoped tools - so the prompt the model sees can only ever
-   * contain what an orchestrator is allowed to ask for. The previous app assembled forty-four
-   * tools into every prompt and relied on discipline to keep that appropriate.
+   * Read from [Tools] rather than built here. It used to be assembled in this ViewModel,
+   * which was fine while nothing else needed to know what tools existed - but a settings
+   * screen for switching them off has to list them, and tools from an MCP server arrive
+   * while the app is running. One list, in one place, that both read.
+   *
+   * Taken once at the start of a turn and held for the whole of it, so a server appearing
+   * mid-answer cannot change the tools half way through.
    */
-  private val registry =
-    ToolRegistry(
-      listOf(
-        DelegateTool { backends.serverSubAgent() },
-        phoneTool,
-        RememberTool(memories, embedders),
-        RecallTool(memories, embedders),
-        FindPhotoTool(memories, embedders, attachments, appContext),
-        UnreadTool(relay),
-        ReplyTool(relay),
-        CalendarTool(calendars),
-        MediaTool(appContext),
-        WeatherTool(appContext),
-        PlayMusicTool(appContext, settings, launchGuard),
-        PhoneSettingTool(appContext, launchGuard, privileged),
-        // The two that need Lin's screen access. Both are offered whether or not it has been
-        // granted: a tool that disappeared when a permission was off would leave the model
-        // saying "I cannot send messages" rather than "that needs one switch, here it is".
-        SendMessageTool(appContext, settings, launchGuard, lastSaid = ::lastSaid),
-        ReadScreenTool(appContext),
-        OpenAppTool(appContext, launchGuard),
-        AddToCalendarTool(appContext, launchGuard),
-        AlarmTool(appContext, launchGuard),
-        ListDocumentsTool(documentLibrary),
-        ReadDocumentTool(documentLibrary, documents),
-        WriteDocumentTool(documentLibrary, documents, pdfPages),
-      )
-    )
+  private val registry
+    get() = tools.registry.value
 
   private val _state = MutableStateFlow(ConversationState(messages = restored()))
   val state: StateFlow<ConversationState> = _state.asStateFlow()
@@ -342,6 +289,10 @@ constructor(
 
   init {
     refreshReadiness()
+    // Asked once, in the background, so a server's tools are in the list by the time anybody
+    // types. Failures are reported on the settings screen rather than here: a server that is
+    // asleep should cost its own tools and nothing else, least of all the first screen.
+    viewModelScope.launch { runCatching { mcp.refresh() } }
   }
 
   /**
@@ -429,6 +380,10 @@ constructor(
     val trimmed = text.trim()
     if (trimmed.isEmpty() || _state.value.inProgress) return
     asked = if (spoken) Asked.SPOKEN else Asked.TYPED
+    // Kept where a tool can reach it. One decision depends on the person's own words rather
+    // than on the model's reading of them - whether a message should be sent or only written
+    // - and that is an action with no undo. See SendMessageTool.
+    rememberWhatWasSaid(trimmed)
     speaker.stop()
 
     // Before the message is added, because this is what decides whether it joins the previous
@@ -499,7 +454,7 @@ constructor(
             // list it costs a whole exchange on questions a 2B model was always going to
             // answer itself - it writes a brief, is told there is no server, and then writes
             // the answer - which is twice the wait and a failed tool card for nothing.
-            withhold = if (backends.hasServerModel()) emptySet() else setOf(DelegateTool.NAME),
+            withhold = withheldThisTurn(),
           )
           .run(outgoing)
           .collect { event ->
@@ -647,8 +602,25 @@ constructor(
    * answer, and sending cannot be undone. See
    * [com.lin.agent.core.screen.soundsLikeSendIt].
    */
-  private fun lastSaid(): String =
-    _state.value.messages.lastOrNull { it.role == Message.Role.USER }?.text.orEmpty()
+  private fun rememberWhatWasSaid(text: String) {
+    lastSaidHolder.text = text
+  }
+
+  /**
+   * Tools that exist but must not be offered on this turn.
+   *
+   * Two reasons, and they are different in kind. `delegate` is withheld because there is
+   * nothing behind it: offering it costs a whole exchange on questions the phone was always
+   * going to answer itself. The rest are withheld because the person switched them off, which
+   * is their decision and needs no justification from here.
+   *
+   * Read per turn rather than held, so a switch flipped in settings applies to the next
+   * question rather than the next launch.
+   */
+  private suspend fun withheldThisTurn(): Set<String> {
+    val off = disabledFrom(runCatching { settings.disabledTools.first() }.getOrNull())
+    return if (backends.hasServerModel()) off else off + DelegateTool.NAME
+  }
 
   /** What to show for a fault nobody designed for. See [describeFault]. */
   private fun describe(failure: Throwable) =

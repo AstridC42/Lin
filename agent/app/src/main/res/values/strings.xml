@@ -76,6 +76,32 @@
   <string name="permission_location_why">Lin needs your rough location to look up the
     weather. It is used for that and nothing else, and it is rounded to about a kilometre
     before it leaves the phone.</string>
+  <string name="settings_tools_heading">What Lin can do</string>
+  <string name="settings_tools_detail">Every tool Lin may reach for. Switching one off does
+    not remove it — the model is simply not told it exists, which both stops it being chosen
+    by mistake and takes its description out of every prompt.</string>
+  <string name="settings_tools_count">%1$d of %2$d on</string>
+  <string name="settings_tools_remote">From %1$s · %2$s</string>
+
+  <string name="settings_mcp_heading">Connected servers (MCP)</string>
+  <string name="settings_mcp_detail">An MCP server is somebody else\'s program that offers
+    tools — a calendar, a database, a code host, your own scripts. Add one and its tools join
+    the list above, each with its own switch.</string>
+  <string name="settings_mcp_warning">Lin sends the model\'s tool calls to the address you
+    give, with whatever arguments the model wrote. Add servers you trust, and remember that a
+    tool\'s own description comes from the server rather than from Lin.</string>
+  <string name="settings_mcp_none">No servers yet.</string>
+  <string name="settings_mcp_checking">Asking…</string>
+  <string name="settings_mcp_tools">%1$d tools</string>
+  <string name="settings_mcp_add">Add a server</string>
+  <string name="settings_mcp_refresh">Ask again</string>
+  <string name="settings_mcp_remove">Remove</string>
+  <string name="settings_mcp_url">Address</string>
+  <string name="settings_mcp_name">Name (optional)</string>
+  <string name="settings_mcp_header">Auth header (optional)</string>
+  <string name="settings_mcp_save">Add</string>
+  <string name="settings_mcp_cancel">Cancel</string>
+
   <string name="permission_allow">Allow</string>
   <string name="permission_not_now">Not now</string>
 
@@ -151,6 +177,7 @@
   <string name="settings_tab_server">Server</string>
   <string name="settings_tab_voice">Voice</string>
   <string name="settings_tab_phone">Phone</string>
+  <string name="settings_tab_tools">Tools</string>
   <string name="settings_tab_data">Data</string>
   <string name="settings_server_heading">Model server</string>
   <string name="settings_server_detail">Where the bigger model runs. A LAN address at home, or a
