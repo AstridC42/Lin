@@ -219,6 +219,9 @@
     trims the conversation to this, so it never sends more than it asked for.</string>
   <string name="settings_sampling_max_tokens">Longest reply</string>
   <string name="settings_sampling_max_tokens_hint">Tokens, at most, in one answer.</string>
+  <string name="settings_sampling_thinking">Thinking is set under Models, and applies to the
+    server model too — Brief and Thorough are sent to Ollama as its own “low” and “high”
+    levels.</string>
   <string name="settings_sampling_clear">Back to the server\'s own settings</string>
 
   <string name="settings_tab_tools">Tools</string>

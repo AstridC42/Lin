@@ -587,6 +587,16 @@ private fun ColumnScope.Sampling(state: SettingsState, viewModel: SettingsViewMo
     hint = R.string.settings_sampling_max_tokens_hint,
   )
 
+  // Said here because this is where somebody looks for it. Thinking is one setting that
+  // applies to both the phone's model and the server's, so it lives on the Models tab rather
+  // than being duplicated into two controls that could disagree.
+  Text(
+    stringResource(R.string.settings_sampling_thinking),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier = Modifier.padding(top = 8.dp),
+  )
+
   TextButton(onClick = { viewModel.clearSampling() }) {
     Text(stringResource(R.string.settings_sampling_clear))
   }

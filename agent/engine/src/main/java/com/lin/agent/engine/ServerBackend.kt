@@ -354,13 +354,10 @@ internal fun chatRequestBody(
   // Ollama takes the schema itself as `format`, which is its constrained-decoding switch.
   request.responseSchema?.let { body.put("format", JSONObject(it)) }
 
-  // Ollama's switch is a plain boolean with no budget - the server owns the model, so how long
-  // it is allowed to think is its configuration rather than this app's. Sent only when thinking
-  // was asked for: an older server that does not know the field rejects the request outright,
-  // so a turn that wants no thinking must not mention it.
-  if (thinkingFor(request.reasoning, structured = request.responseSchema != null) != null) {
-    body.put("think", true)
-  }
+  // A level rather than a boolean, and always sent. See [ollamaThink] for why both halves
+  // of that matter: Brief and Thorough were the same request until this, and "off" did not
+  // turn thinking off on a model that reasons by default.
+  body.put("think", ollamaThink(request.reasoning, structured = request.responseSchema != null).wire)
 
   return body.toString()
 }
