@@ -87,6 +87,17 @@ interface AgentTool {
 
   val parameters: List<ToolParameter>
 
+  /**
+   * The JSON Schema the model is given for this tool's arguments.
+   *
+   * Derived from [parameters] for every tool the app itself defines, which is why those
+   * declare a list rather than writing schemas by hand. An MCP tool overrides it: the server
+   * sent a complete JSON Schema, and flattening that into [ToolParameter] and building it
+   * back up would lose nesting, enums and defaults that the server meant the model to see.
+   */
+  val parametersSchema: String
+    get() = parametersSchemaOf(parameters)
+
   val roles: Set<AgentRole>
 
   suspend fun run(arguments: Map<String, Any?>): ToolResult
@@ -140,7 +151,7 @@ data class ToolInvocation(val name: String, val arguments: Map<String, Any?>)
 
 /** [this] as the backends need to advertise it. */
 fun AgentTool.spec(): ToolSpec =
-  ToolSpec(name = name, description = description, parametersSchema = parametersSchemaOf(parameters))
+  ToolSpec(name = name, description = description, parametersSchema = parametersSchema)
 
 /** JSON Schema for a tool's arguments, which is what both backends want. */
 internal fun parametersSchemaOf(parameters: List<ToolParameter>): String {
