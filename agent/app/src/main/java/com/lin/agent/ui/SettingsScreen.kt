@@ -183,6 +183,7 @@ fun SettingsScreen(
         SettingsTab.SERVER -> ServerTab(state, viewModel)
         SettingsTab.VOICE -> VoiceTab(state, viewModel)
         SettingsTab.PHONE -> PhoneTab(state, viewModel)
+        SettingsTab.TOOLS -> ToolsTab(state, viewModel)
         SettingsTab.DATA ->
           DataTab(state, viewModel, onOpenMemory, onOpenDocuments, onOpenTraining, onOpenBackup)
       }
@@ -207,6 +208,7 @@ private enum class SettingsTab(@param:StringRes val title: Int) {
   SERVER(R.string.settings_tab_server),
   VOICE(R.string.settings_tab_voice),
   PHONE(R.string.settings_tab_phone),
+  TOOLS(R.string.settings_tab_tools),
   DATA(R.string.settings_tab_data),
 }
 
@@ -1250,6 +1252,63 @@ private fun shellStateLabel(state: ShizukuState) =
     ShizukuState.NOT_PERMITTED -> R.string.settings_shell_unasked
     ShizukuState.REFUSED -> R.string.settings_shell_refused
   }
+
+/**
+ * Every tool Lin has, with a switch for each.
+ *
+ * Worth having for two reasons that pull in the same direction. A tool the model should not
+ * reach for is one it will reach for eventually - a 2B model offered twenty tools picks the
+ * wrong one often enough to be worth a switch - and every tool in the list costs tokens in
+ * every prompt, on a phone, before the first word of the answer.
+ *
+ * Switched off rather than removed: the tool is still listed, still described, and can be
+ * switched back on. What changes is only that the model is not told it exists.
+ */
+@Composable
+private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewModel) {
+  Text(
+    stringResource(R.string.settings_tools_heading),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  Text(
+    stringResource(R.string.settings_tools_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Text(
+    stringResource(
+      R.string.settings_tools_count,
+      state.toolListing.size - state.disabledTools.size,
+      state.toolListing.size,
+    ),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier = Modifier.padding(top = 4.dp),
+  )
+
+  for (tool in state.toolListing) {
+    val on = tool.name !in state.disabledTools
+    Row(
+      modifier =
+        Modifier.fillMaxWidth()
+          .clickable { viewModel.setToolEnabled(tool.name, !on) }
+          .padding(horizontal = 8.dp, vertical = 6.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(tool.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+          tool.description,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      Switch(checked = on, onCheckedChange = { viewModel.setToolEnabled(tool.name, it) })
+    }
+  }
+}
 
 /** What Lin keeps: memories, documents, the training copies, and a way out of all of it. */
 @Composable

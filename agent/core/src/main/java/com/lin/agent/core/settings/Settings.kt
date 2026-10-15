@@ -184,6 +184,18 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setTapSend(value: String) = write(TAP_SEND, value)
 
+  /**
+   * Tools the user has switched off, newline-separated. See
+   * [com.lin.agent.core.tools.disabledFrom].
+   *
+   * The *off* list rather than the on list, deliberately: a stored on-list would mean every
+   * tool added in a later version arrives switched off for everybody who already has the app,
+   * invisibly, and reads as the feature not working.
+   */
+  val disabledTools: Flow<String> = read(DISABLED_TOOLS, "")
+
+  suspend fun setDisabledTools(value: String) = write(DISABLED_TOOLS, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -467,6 +479,7 @@ class SettingsRepository(private val context: Context) {
     val CHAT_MODEL_NAME = stringPreferencesKey("chat_model_name")
     val MUSIC_APP = stringPreferencesKey("music_app")
     val TAP_SEND = stringPreferencesKey("tap_send")
+    val DISABLED_TOOLS = stringPreferencesKey("disabled_tools")
     val SPEAK_WHEN = stringPreferencesKey("speak_when")
     val VOICE_NAME = stringPreferencesKey("voice_name")
     val VOICE_CHAT = booleanPreferencesKey("voice_chat")

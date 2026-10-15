@@ -28,6 +28,10 @@ import com.lin.agent.car.CarNotification
 import com.lin.agent.core.car.DialPolicy
 import com.lin.agent.core.car.dialPolicyNamed
 import com.lin.agent.core.privileged.ShizukuState
+import com.lin.agent.core.tools.disabledFrom
+import com.lin.agent.core.tools.storedFrom
+import com.lin.agent.core.tools.withTool
+import com.lin.agent.model.ToolListing
 import com.lin.agent.core.screen.TapPolicy
 import com.lin.agent.core.screen.tapPolicyNamed
 import com.lin.agent.core.settings.SettingsRepository
@@ -105,6 +109,10 @@ data class SettingsState(
   val dialPolicy: DialPolicy = DialPolicy.NEVER,
   /** Whether Lin may press send in another app. See [com.lin.agent.core.screen.TapPolicy]. */
   val tapSend: TapPolicy = TapPolicy.NEVER,
+  /** Every tool Lin has, for the screen that switches them off. */
+  val toolListing: List<ToolListing> = emptyList(),
+  /** The ones switched off. See [com.lin.agent.core.tools.disabledFrom]. */
+  val disabledTools: Set<String> = emptySet(),
   /** Whether the "listen in the car" notification is kept up. */
   val carNotification: Boolean = false,
   /** Whether the panel may appear over the lock screen, which a car needs. */
@@ -152,6 +160,7 @@ constructor(
   private val photos: PhotoIndex,
   private val memories: MemoryStore,
   private val privileged: com.lin.agent.privileged.Privileged,
+  private val tools: com.lin.agent.model.Tools,
   private val speaker: com.lin.agent.voice.Speaker,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
@@ -184,6 +193,8 @@ constructor(
           allowDirectCalls = settings.allowDirectCalls.first(),
           dialPolicy = dialPolicyNamed(settings.dialPolicy.first()),
           tapSend = tapPolicyNamed(settings.tapSend.first()),
+          toolListing = tools.listing(),
+          disabledTools = disabledFrom(settings.disabledTools.first()),
           carNotification = settings.carNotification.first(),
           answerWhenLocked = settings.answerWhenLocked.first(),
           spokenReplies = settings.spokenReplies.first(),
@@ -466,6 +477,19 @@ constructor(
    * does not back would have this screen claiming Lin can place calls it cannot, and the call
    * policy would stage them anyway. Better that the screen says what will happen.
    */
+  /**
+   * Switches one tool on or off.
+   *
+   * Written through [withTool] rather than by editing a set in place, because the screen and
+   * the store have to agree: a set mutated here and then failing to write would leave a
+   * switch showing a state the next turn does not honour.
+   */
+  fun setToolEnabled(name: String, enabled: Boolean) {
+    val next = withTool(_state.value.disabledTools, name, enabled)
+    _state.update { it.copy(disabledTools = next) }
+    viewModelScope.launch { settings.setDisabledTools(storedFrom(next)) }
+  }
+
   fun setTapSend(policy: TapPolicy) {
     _state.update { it.copy(tapSend = policy) }
     viewModelScope.launch { settings.setTapSend(policy.name) }

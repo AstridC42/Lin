@@ -76,6 +76,12 @@
   <string name="permission_location_why">Lin needs your rough location to look up the
     weather. It is used for that and nothing else, and it is rounded to about a kilometre
     before it leaves the phone.</string>
+  <string name="settings_tools_heading">What Lin can do</string>
+  <string name="settings_tools_detail">Every tool Lin may reach for. Switching one off does
+    not remove it — the model is simply not told it exists, which both stops it being chosen
+    by mistake and takes its description out of every prompt.</string>
+  <string name="settings_tools_count">%1$d of %2$d on</string>
+
   <string name="permission_allow">Allow</string>
   <string name="permission_not_now">Not now</string>
 
@@ -151,6 +157,7 @@
   <string name="settings_tab_server">Server</string>
   <string name="settings_tab_voice">Voice</string>
   <string name="settings_tab_phone">Phone</string>
+  <string name="settings_tab_tools">Tools</string>
   <string name="settings_tab_data">Data</string>
   <string name="settings_server_heading">Model server</string>
   <string name="settings_server_detail">Where the bigger model runs. A LAN address at home, or a
