@@ -42,6 +42,27 @@
   <string name="settings_spoken_replies">Answer out loud when spoken to</string>
   <string name="settings_spoken_replies_detail">Typed questions are always answered in
     writing.</string>
+  <string name="settings_speak_never">Never out loud</string>
+  <string name="settings_speak_never_detail">Replies stay on screen. In a car, a spoken
+    question is still answered out loud.</string>
+  <string name="settings_speak_spoken_to">When you speak to it</string>
+  <string name="settings_speak_spoken_to_detail">Ask out loud, answered out loud; type, and it
+    writes</string>
+  <string name="settings_speak_always">Always out loud</string>
+  <string name="settings_speak_always_detail">Every reply, typed or spoken</string>
+  <string name="settings_voice_which">Voice</string>
+  <string name="settings_voice_none">No voices yet — the phone\'s speech engine is still
+    starting, or has none installed.</string>
+  <string name="settings_voice_sample">This is how I sound.</string>
+  <string name="settings_voice_speed">Speed %1$s</string>
+  <string name="settings_voice_pitch">Pitch %1$s</string>
+  <string name="settings_voice_more">Get more voices</string>
+  <string name="settings_voice_more_detail">Voices belong to the phone\'s speech engine rather
+    than to Lin, so this opens its settings. Google\'s and Samsung\'s engines download extra
+    voices there; a neural engine installed from elsewhere — a Piper or Sherpa-ONNX one, which
+    runs on the phone and sounds far better — appears in the list above once it is the chosen
+    engine. Anything marked “online” sends what Lin says to that engine\'s servers to be read
+    out.</string>
   <string name="settings_set_assistant">Choose Lin as your assistant</string>
   <string name="settings_assistant_detail">Opens your phone\'s own settings, where Lin appears under
     Digital assistant app. Android only lets you choose this yourself — and it goes back to

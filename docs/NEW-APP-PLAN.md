@@ -749,6 +749,39 @@ a privacy choice rather than a performance one — the rest of this app keeps
 what is said on the phone unless the user pointed it at their own server, and
 a cloud recogniser would quietly undo that for every spoken word.
 
+**Done: which voice, and when.** Speaking was one switch and one voice - the
+engine's default, whatever that happened to be.
+
+When is three ways now: never, when spoken to, or always. The middle one is
+still the default and still the one worth having, because a phone that answers
+a typed question out loud in a quiet room is why people turn these off; but
+somebody who wants a voice assistant rather than a chat can say so. "Never"
+keeps one exception, the car: a question asked out loud while driving is
+answered out loud, because an answer only on screen is no answer there.
+
+Which voice is a list, with a sample spoken the moment one is picked - a name
+like `en-gb-x-gbb-local` is not something anybody can judge by reading - plus
+speed and pitch, each previewed as it is let go of. The ordering is the part
+with a rule behind it: **offline voices come before better-sounding online
+ones**, which is the opposite of ranking by the engine's own quality score. A
+network voice means every spoken reply is sent to somebody's server to be read
+out, and that is the one thing this app does not do with anything else. They
+are still offered - it is the user's phone - but they are second and labelled.
+
+More voices are the system's to install rather than Lin's, so settings opens
+the phone's speech-engine screen and says what is there: Google's and
+Samsung's engines download extra voices, and a neural engine installed from
+elsewhere - a Piper or Sherpa-ONNX one, running on the phone and sounding far
+better than either - appears in Lin's list as soon as it is the chosen engine.
+That is the honest answer to "find a better voice online": the voice is a
+model, it belongs to an engine, and Lin's job is to use whichever one the
+phone has rather than to ship its own.
+
+*Still open:* speaking through the user's own server, which is where a
+generated or cloned voice would come from. Their stack already speaks an
+OpenAI-compatible API; a `/v1/audio/speech` call and a player is the work,
+and the trade is latency against a voice the phone cannot produce.
+
 **Done, with a caveat worth reading: "Hey Lin".** Off by default, and of all
 the defaults here that is the one least open to argument — it holds the
 microphone open indefinitely.

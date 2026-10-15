@@ -60,7 +60,7 @@ class VoicePolicyTest {
 
   @Test
   fun aSpokenQuestionGetsASpokenAnswer() {
-    assertTrue(shouldSpeak(spokenRepliesOn = true, asked = Asked.SPOKEN))
+    assertTrue(shouldSpeak(SpeakWhen.WHEN_SPOKEN_TO, asked = Asked.SPOKEN))
   }
 
   /**
@@ -71,13 +71,13 @@ class VoicePolicyTest {
    */
   @Test
   fun aTypedQuestionIsNotAnsweredOutLoud() {
-    assertFalse(shouldSpeak(spokenRepliesOn = true, asked = Asked.TYPED))
+    assertFalse(shouldSpeak(SpeakWhen.WHEN_SPOKEN_TO, asked = Asked.TYPED))
   }
 
   @Test
   fun withSpokenRepliesOffNothingIsSpoken() {
-    assertFalse(shouldSpeak(spokenRepliesOn = false, asked = Asked.SPOKEN))
-    assertFalse(shouldSpeak(spokenRepliesOn = false, asked = Asked.TYPED))
+    assertFalse(shouldSpeak(SpeakWhen.NEVER, asked = Asked.SPOKEN))
+    assertFalse(shouldSpeak(SpeakWhen.NEVER, asked = Asked.TYPED))
   }
 
   // ---- what gets read out ----
@@ -133,21 +133,37 @@ class VoicePolicyTest {
   @Test
   fun `a spoken question in a car is answered out loud whatever the setting says`() {
     // An answer only on screen is no answer to somebody driving, and they asked out loud.
-    assertTrue(shouldSpeak(spokenRepliesOn = false, asked = Asked.SPOKEN, inCar = true))
+    assertTrue(shouldSpeak(SpeakWhen.NEVER, asked = Asked.SPOKEN, inCar = true))
   }
 
   @Test
   fun `a typed question in a car is still answered in writing`() {
     // Either the car is stationary or somebody else is holding the phone. Neither wants it
     // talking, and "in a car" is not on its own a reason to speak.
-    assertFalse(shouldSpeak(spokenRepliesOn = false, asked = Asked.TYPED, inCar = true))
-    assertFalse(shouldSpeak(spokenRepliesOn = true, asked = Asked.TYPED, inCar = true))
+    assertFalse(shouldSpeak(SpeakWhen.NEVER, asked = Asked.TYPED, inCar = true))
+    assertFalse(shouldSpeak(SpeakWhen.WHEN_SPOKEN_TO, asked = Asked.TYPED, inCar = true))
   }
 
   @Test
   fun `out of a car nothing changes`() {
-    assertTrue(shouldSpeak(spokenRepliesOn = true, asked = Asked.SPOKEN, inCar = false))
-    assertFalse(shouldSpeak(spokenRepliesOn = false, asked = Asked.SPOKEN, inCar = false))
+    assertTrue(shouldSpeak(SpeakWhen.WHEN_SPOKEN_TO, asked = Asked.SPOKEN, inCar = false))
+    assertFalse(shouldSpeak(SpeakWhen.NEVER, asked = Asked.SPOKEN, inCar = false))
+  }
+
+  @Test
+  fun `always means a typed question is answered out loud too`() {
+    assertTrue(shouldSpeak(SpeakWhen.ALWAYS, asked = Asked.TYPED))
+    assertTrue(shouldSpeak(SpeakWhen.ALWAYS, asked = Asked.SPOKEN))
+  }
+
+  @Test
+  fun `an unreadable setting speaks when spoken to`() {
+    // The default has to be the middle one: never would make a wake word pointless, and
+    // always would have a phone in a quiet room start talking.
+    assertEquals(SpeakWhen.WHEN_SPOKEN_TO, speakWhenNamed(null))
+    assertEquals(SpeakWhen.WHEN_SPOKEN_TO, speakWhenNamed("whatever"))
+    assertEquals(SpeakWhen.ALWAYS, speakWhenNamed("always"))
+    assertEquals(SpeakWhen.NEVER, speakWhenNamed("NEVER"))
   }
 
 }

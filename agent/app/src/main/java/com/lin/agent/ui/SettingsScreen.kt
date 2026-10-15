@@ -46,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
@@ -86,6 +87,8 @@ import android.provider.Settings as AndroidSettings
 import androidx.compose.ui.platform.LocalContext
 import com.lin.agent.R
 import com.lin.agent.core.car.DialPolicy
+import com.lin.agent.core.voice.SpeakWhen
+import com.lin.agent.core.voice.voiceLabel
 import com.lin.agent.engine.Reasoning
 import com.lin.agent.engine.ServerKind
 import com.lin.agent.AssistActivity
@@ -547,26 +550,99 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
     style = MaterialTheme.typography.bodySmall,
     color = MaterialTheme.colorScheme.onSurfaceVariant,
   )
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Column(modifier = Modifier.weight(1f)) {
+  // Three ways rather than a switch. "When spoken to" is the default and the one worth
+  // having - a phone that answers a typed question out loud in a quiet room is the reason
+  // people turn these off - but somebody who wants a voice assistant should be able to say so.
+  Text(
+    stringResource(R.string.settings_spoken_replies),
+    style = MaterialTheme.typography.bodyLarge,
+    modifier = Modifier.padding(top = 4.dp),
+  )
+  for (speak in SpeakWhen.entries) {
+    ChoiceRow(
+      title = stringResource(speakWhenLabel(speak)),
+      detail = stringResource(speakWhenDetail(speak)),
+      selected = state.speakWhen == speak,
+      onPick = { viewModel.setSpeakWhen(speak) },
+    )
+  }
+
+  // The voice itself. Asked for when this group is opened rather than at start-up: the
+  // engine takes a moment to come up, and asking it too early gives an empty list that
+  // nothing would refresh.
+  LaunchedEffect(Unit) { viewModel.loadVoices() }
+  val sample = stringResource(R.string.settings_voice_sample)
+
+  Text(
+    stringResource(R.string.settings_voice_which),
+    style = MaterialTheme.typography.bodyLarge,
+    modifier = Modifier.padding(top = 12.dp),
+  )
+  if (state.voices.isEmpty()) {
+    Text(
+      stringResource(R.string.settings_voice_none),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+  for (voice in state.voices) {
+    ChoiceRow(
+      title = voiceLabel(voice),
+      // The engine's own name, which is the only thing telling two identical-looking
+      // voices apart - and the thing to quote if one of them misbehaves.
+      detail = voice.name,
+      selected = state.voiceName == voice.name,
+      onPick = { viewModel.useVoice(voice.name, sample) },
+    )
+  }
+
+  if (state.voices.isNotEmpty()) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+      Column(
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+      ) {
         Text(
-          stringResource(R.string.settings_spoken_replies),
-          style = MaterialTheme.typography.bodyLarge,
+          stringResource(R.string.settings_voice_speed, "%.1f".format(state.speechRate)),
+          style = MaterialTheme.typography.bodyMedium,
+        )
+        Slider(
+          value = state.speechRate,
+          onValueChange = viewModel::setSpeechRate,
+          onValueChangeFinished = { viewModel.previewVoice(sample) },
+          valueRange = 0.5f..2.0f,
+          steps = 14,
         )
         Text(
-          stringResource(R.string.settings_spoken_replies_detail),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          stringResource(R.string.settings_voice_pitch, "%.1f".format(state.speechPitch)),
+          style = MaterialTheme.typography.bodyMedium,
+        )
+        Slider(
+          value = state.speechPitch,
+          onValueChange = viewModel::setSpeechPitch,
+          onValueChangeFinished = { viewModel.previewVoice(sample) },
+          valueRange = 0.5f..2.0f,
+          steps = 14,
         )
       }
-      Switch(checked = state.spokenReplies, onCheckedChange = viewModel::setSpokenReplies)
     }
   }
+
+  val voiceContext = LocalContext.current
+  OutlinedButton(
+    // More voices are the system's to install, not Lin's: an engine like Google's or
+    // Samsung's downloads them there, and a neural one installed from elsewhere appears in
+    // the list above as soon as it is the phone's engine.
+    onClick = { openVoiceSettings(voiceContext) },
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Text(stringResource(R.string.settings_voice_more))
+  }
+  Text(
+    stringResource(R.string.settings_voice_more_detail),
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
   val context = LocalContext.current
 
   // Whether Lin is actually the assistant, read again every time this screen comes back to
@@ -1317,3 +1393,37 @@ private fun dialPolicyDetail(policy: DialPolicy): Int =
     DialPolicy.IN_THE_CAR -> R.string.settings_dial_in_the_car_detail
     DialPolicy.ALWAYS -> R.string.settings_dial_always_detail
   }
+
+private fun speakWhenLabel(speak: SpeakWhen): Int =
+  when (speak) {
+    SpeakWhen.NEVER -> R.string.settings_speak_never
+    SpeakWhen.WHEN_SPOKEN_TO -> R.string.settings_speak_spoken_to
+    SpeakWhen.ALWAYS -> R.string.settings_speak_always
+  }
+
+private fun speakWhenDetail(speak: SpeakWhen): Int =
+  when (speak) {
+    SpeakWhen.NEVER -> R.string.settings_speak_never_detail
+    SpeakWhen.WHEN_SPOKEN_TO -> R.string.settings_speak_spoken_to_detail
+    SpeakWhen.ALWAYS -> R.string.settings_speak_always_detail
+  }
+
+/**
+ * Opens the phone's own text-to-speech settings, where voices and engines are installed.
+ *
+ * Tried in order and caught rather than resolved first, like the assistant screens: package
+ * visibility can hide a screen from resolveActivity that opens perfectly well.
+ */
+private fun openVoiceSettings(context: android.content.Context) {
+  val screens =
+    listOf("com.android.settings.TTS_SETTINGS", "android.settings.ACCESSIBILITY_SETTINGS")
+  for (action in screens) {
+    val opened =
+      runCatching {
+          context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          true
+        }
+        .getOrDefault(false)
+    if (opened) return
+  }
+}
