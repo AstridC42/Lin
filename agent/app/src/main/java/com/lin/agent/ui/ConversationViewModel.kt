@@ -89,6 +89,25 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** A tool Lin used on this turn, and how it went. */
+data class ToolRun(val name: String, val state: ToolState)
+
+/** The three things that can be true of a tool call, all of which the screen shows. */
+enum class ToolState {
+  RUNNING,
+  DONE,
+  FAILED,
+}
+
+/** Marks the last still-running call of that name as finished. */
+private fun List<ToolRun>.settle(name: String, ok: Boolean): List<ToolRun> {
+  val at = indexOfLast { it.name == name && it.state == ToolState.RUNNING }
+  if (at < 0) return this
+  return toMutableList().also {
+    it[at] = ToolRun(name, if (ok) ToolState.DONE else ToolState.FAILED)
+  }
+}
+
 /** What the screen draws. */
 data class ConversationState(
   val messages: List<Message> = emptyList(),
@@ -110,7 +129,15 @@ data class ConversationState(
   /** Files and pictures waiting to go with the next message. */
   val attached: List<Attachment> = emptyList(),
   /** The tool running right now, so a long delegation reads as busy rather than stuck. */
-  val runningTool: String = "",
+  /**
+   * What Lin did on this turn, in order, with what became of each.
+   *
+   * One list rather than a name for the running one and a list of the failed ones. The screen
+   * shows all three states - running, done, could not - and two fields that each knew half of
+   * that could disagree, which is how a tool that failed while another was starting showed as
+   * neither.
+   */
+  val toolRuns: List<ToolRun> = emptyList(),
   /**
    * The model's working-out for the turn in flight, empty when it is not thinking.
    *
@@ -127,7 +154,6 @@ data class ConversationState(
    * work" will still often say it did - which is how Lin reported remembering a name it had
    * not saved. The model's account of what it did is not evidence that it did it.
    */
-  val failedTools: List<String> = emptyList(),
   /** Pictures a tool found, shown directly rather than described by a model that cannot see. */
   val shows: List<String> = emptyList(),
   /** True while the microphone is open. Shown, because an open microphone must be visible. */
@@ -278,7 +304,7 @@ constructor(
         thinking = "",
         error = "",
         shows = emptyList(),
-        failedTools = emptyList(),
+        toolRuns = emptyList(),
       )
     }
     persist(emptyList())
@@ -406,7 +432,7 @@ constructor(
         streaming = "",
         thinking = "",
         error = "",
-        failedTools = emptyList(),
+        toolRuns = emptyList(),
         shows = emptyList(),
       )
     }
@@ -460,12 +486,14 @@ constructor(
             }
             // Shown while it runs. A delegated task can take a minute on a big model, and
             // silence for a minute is indistinguishable from the app having given up.
-            is LoopEvent.ToolStarted -> _state.update { it.copy(runningTool = event.name) }
+            is LoopEvent.ToolStarted ->
+              _state.update { it.copy(toolRuns = it.toolRuns + ToolRun(event.name, ToolState.RUNNING)) }
             is LoopEvent.ToolFinished ->
               _state.update {
                 it.copy(
-                  runningTool = "",
-                  failedTools = if (event.ok) it.failedTools else it.failedTools + event.name,
+                  // The last running one of that name becomes what it became. Matched by name
+                  // rather than by position, because a turn can run two tools at once.
+                  toolRuns = it.toolRuns.settle(event.name, event.ok),
                   shows = it.shows + event.shows,
                 )
               }
@@ -479,7 +507,6 @@ constructor(
                   streaming = "",
                   thinking = "",
                   inProgress = false,
-                  runningTool = "",
                   backendId = backend.id,
                 )
               }
@@ -502,7 +529,6 @@ constructor(
                   streaming = "",
                   thinking = "",
                   inProgress = false,
-                  runningTool = "",
                   error = shown,
                   backendId = backend.id,
                 )

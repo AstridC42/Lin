@@ -16,45 +16,66 @@
 
 package com.lin.agent.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -66,17 +87,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -84,40 +104,22 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.R
-import android.content.pm.PackageManager
 import com.lin.agent.core.media.PhotoLibrary
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.engine.Message
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 
 /**
  * The conversation, full screen.
  *
- * When no model is on the device this offers the download instead of a text box. There is no
- * stand-in to fall back to: the app answers from a real engine or says it cannot, because an echo
- * that looks like a reply is the worst of the three options.
- *
- * Messages are width-capped rather than stretched. On a Fold 7 unfolded this is an 8-inch screen,
- * and a line of text running its full width is unreadable; the cap is what makes the same screen
- * work folded and open. A proper two-pane layout for the large screen comes with the agent, when
- * there is tool activity worth showing beside the conversation.
+ * The look is the one chosen in October 2026 out of four drawn side by side: cards on a dark
+ * ground, with everything Lin did shown as a thing you can act on rather than as grey text.
+ * What survived the redesign unchanged is the rule the whole app is built on - every screen
+ * says what is actually true. Which model answered is in the header, a tool that only opened
+ * something says so on the card, and a message Lin wrote is marked NOT SENT YET until the
+ * person sends it.
  *
  * The chrome is all that is here. Everything below it is [ConversationBody], shared with the
- * panel Lin wears when it is summoned - see [AssistPanel]. Two frames, one conversation screen:
- * the alternative was a second composable that would have drifted from this one by the first
- * time either was changed.
+ * panel Lin wears when it is summoned - see [AssistPanel].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,35 +137,40 @@ fun ConversationScreen(
 
   Scaffold(
     topBar = {
-      TopAppBar(
-        title = { Text(stringResource(R.string.app_name)) },
-        // Which backend answered, always visible. There is a real engine and a stand-in, and
-        // later a server as well; an assistant that quietly answered from somewhere other than
-        // the user expects would be worse than one that was simply unavailable.
-        actions = {
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            stringResource(R.string.app_name),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+          )
+          // Which model answered, under the name rather than squeezed beside it. An
+          // assistant that quietly answered from somewhere other than the user expects
+          // would be worse than one that was simply unavailable.
           Text(
             state.backendId.ifEmpty { stringResource(R.string.no_model) },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
-          // Only once there is something to end. On an empty conversation it would do nothing
-          // visible, which reads as a broken button.
-          if (state.messages.isNotEmpty()) {
-            IconButton(onClick = viewModel::startNewConversation) {
-              Icon(
-                Icons.Filled.Add,
-                contentDescription = stringResource(R.string.new_conversation),
-              )
-            }
+        }
+        // Only once there is something to end. On an empty conversation it would do nothing
+        // visible, which reads as a broken button.
+        if (state.messages.isNotEmpty()) {
+          RoundIconButton(
+            onClick = viewModel::startNewConversation,
+            description = stringResource(R.string.new_conversation),
+          ) {
+            Icon(Icons.Filled.Add, contentDescription = null)
           }
-          IconButton(onClick = onOpenSettings) {
-            Icon(
-              Icons.Filled.Settings,
-              contentDescription = stringResource(R.string.open_settings),
-            )
-          }
-        },
-      )
+        }
+        RoundIconButton(onClick = onOpenSettings, description = stringResource(R.string.open_settings)) {
+          Icon(Icons.Filled.Settings, contentDescription = null)
+        }
+      }
     },
     modifier = Modifier.imePadding(),
   ) { padding ->
@@ -191,17 +198,13 @@ fun ConversationScreen(
  *
  * Three decisions worth stating, because each had an obvious wrong version:
  *
- * The panel is as tall as what is in it, up to a cap, rather than a fixed height. A fixed panel
- * shows an expanse of empty surface before the first word and then clips the reply that arrives;
- * growing from the composer upwards means the shape follows the conversation.
- *
- * The cap is a fraction of the window rather than a number of dp, so it is a panel on a phone
- * and still a panel on a Fold's inner screen.
- *
- * What is above the panel dismisses it, and that area is a sibling of the panel rather than a
- * scrim drawn under it. A full-size scrim would rely on the panel swallowing every touch that
- * lands on it, which it is under no obligation to do - and a stray tap on your own conversation
- * closing it is the kind of bug that makes a thing feel broken.
+ * The cap is on the panel rather than on the conversation inside it, so the conversation
+ * shrinks to make room for anything else that has to be shown instead of pushing the composer
+ * off the bottom of the screen. The cap is a fraction of the window rather than a number of
+ * dp, so it is a panel on a phone and still a panel on a Fold's inner screen. And what is
+ * above the panel dismisses it, as a sibling of the panel rather than a scrim drawn under it -
+ * a full-size scrim would rely on the panel swallowing every touch that lands on it, which it
+ * is under no obligation to do.
  */
 @Composable
 fun AssistPanel(
@@ -216,11 +219,6 @@ fun AssistPanel(
   val state by viewModel.state.collectAsStateWithLifecycle()
 
   BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-    // The cap is on the panel rather than on the conversation inside it, which is the right way
-    // round: the conversation then shrinks to make room for whatever else has to be shown - an
-    // attachment, a notice, a reply waiting to be sent - instead of pushing the composer off the
-    // bottom of the screen. Three fifths of the window at its tallest: enough to read an answer,
-    // little enough to still be over something rather than instead of it.
     val panelMaxHeight = maxHeight * 0.6f
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -238,40 +236,56 @@ fun AssistPanel(
       )
 
       Surface(
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
         tonalElevation = 3.dp,
         shadowElevation = 12.dp,
         modifier = Modifier.fillMaxWidth().heightIn(max = panelMaxHeight),
       ) {
         // One bottom inset rather than two. The keyboard's inset and the navigation bar's
-        // overlap - the keyboard is drawn over where the bar was - so padding for both in turn
-        // leaves a bar-sized gap above an open keyboard. safeDrawing takes the larger of them,
-        // which is also right when the window is resized for the keyboard instead and the
-        // keyboard inset is zero.
+        // overlap, so padding for both in turn leaves a bar-sized gap above an open keyboard.
         Column(
           modifier =
             Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
-          Row(
-            modifier =
-              Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            Text(
-              stringResource(R.string.app_name),
-              style = MaterialTheme.typography.titleMedium,
+          // The handle says "this is a sheet, it goes away" before anybody reads a word.
+          Box(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
+            Box(
+              modifier =
+                Modifier.size(width = 36.dp, height = 4.dp)
+                  .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp))
             )
+          }
+
+          Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 10.dp, top = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+          ) {
+            if (state.listening) {
+              Box(
+                modifier =
+                  Modifier.size(8.dp).background(MaterialTheme.colorScheme.error, CircleShape)
+              )
+              Text(
+                stringResource(R.string.listening),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.error,
+              )
+            } else {
+              Text(
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+              )
+            }
             Spacer(modifier = Modifier.weight(1f))
-            // Who is answering, for the same reason the full screen says it: a reply from the
-            // phone when the server was expected has to be visible, panel or not.
             Text(
               state.backendId.ifEmpty { stringResource(R.string.no_model) },
               style = MaterialTheme.typography.labelMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            IconButton(onClick = onClose) {
-              Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close_panel))
+            RoundIconButton(onClick = onClose, description = stringResource(R.string.close_panel), small = true) {
+              Icon(Icons.Filled.Close, contentDescription = null)
             }
           }
 
@@ -279,8 +293,8 @@ fun AssistPanel(
             launch = launch,
             spoken = spoken,
             token = token,
-            // Takes what is left of the panel rather than all of it, so a one-line answer is a
-            // one-line panel.
+            // Takes what is left of the panel rather than all of it, so a one-line answer is
+            // a one-line panel.
             fillHeight = false,
             onGetModel = onGetModel,
             viewModel = viewModel,
@@ -294,15 +308,10 @@ fun AssistPanel(
 /**
  * The conversation itself, and the composer: everything that is the same in both frames.
  *
- * [fillHeight] is the one difference between them, and it is all of it. Full screen, the
- * conversation takes the space that is left so that the composer sits at the bottom of the
- * screen. In the panel it takes only as much as it needs, up to what is left of the panel's
- * cap - so a one-line answer is a one-line panel, and anything else that has to be shown
- * squeezes the conversation rather than pushing the composer off the bottom.
- *
- * Why a ColumnScope extension rather than a Composable taking a Modifier: both frames need
- * `weight`, which only exists in this scope, and handing a pre-built modifier in from outside
- * would put the layout decision in both callers instead of here.
+ * [fillHeight] is the one difference between them. Full screen, the conversation takes the
+ * space that is left so the composer sits at the bottom of the screen. In the panel it takes
+ * only as much as it needs, so a one-line answer is a one-line panel and anything else that
+ * has to be shown squeezes the conversation rather than pushing the composer off the bottom.
  */
 @Composable
 private fun ColumnScope.ConversationBody(
@@ -359,72 +368,61 @@ private fun ColumnScope.ConversationBody(
       state.notice,
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
     )
   }
+
   LazyColumn(
     state = listState,
-    modifier =
-      Modifier.weight(1f, fill = fillHeight)
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp),
-    verticalArrangement = Arrangement.spacedBy(8.dp),
+    modifier = Modifier.weight(1f, fill = fillHeight).fillMaxWidth().padding(horizontal = 16.dp),
+    verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    itemsIndexed(state.messages) { _, message -> Bubble(message) }
+    // The first thing anybody sees, and until this redesign it was a title bar and a text
+    // box. Only when there is genuinely nothing: a half-finished turn is not an empty screen.
+    if (state.messages.isEmpty() && state.streaming.isEmpty() && state.missingModel == null) {
+      item { NothingYet(onPick = { viewModel.send(it) }) }
+    }
+
+    itemsIndexed(state.messages) { _, message -> Said(message) }
+
     // Before the answer, collapsed, and visibly not the answer. Thinking contradicts itself
-    // and abandons approaches on the way to being right, so it is offered rather than shown:
-    // somebody who wants to know why an answer took thirty seconds can open it, and nobody
-    // has to read working-out to find the reply.
+    // and abandons approaches on the way to being right, so it is offered rather than shown.
     if (state.thinking.isNotEmpty()) {
       item { Thinking(state.thinking, inProgress = state.inProgress) }
     }
     if (state.streaming.isNotEmpty()) {
-      item { Bubble(Message(Message.Role.ASSISTANT, state.streaming)) }
+      item { Said(Message(Message.Role.ASSISTANT, state.streaming)) }
     }
-    if (state.runningTool.isNotEmpty()) {
-      item {
-        Text(
-          stringResource(R.string.running_tool),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier = Modifier.padding(vertical = 4.dp),
-        )
-      }
-    }
+
+    // What Lin did, as cards rather than as grey lines: running, done, and could not are
+    // three different things and the screen now shows which.
+    items(state.toolRuns) { run -> ToolCard(run) }
+
     // The pictures themselves, not a description of them. A model that cannot see an image
     // has nothing true to say about it, so the screen shows and the model stays quiet.
     if (state.shows.isNotEmpty()) {
       item {
         LazyRow(
           horizontalArrangement = Arrangement.spacedBy(8.dp),
-          modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+          modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         ) {
           items(state.shows) { uri -> Thumbnail(uri) }
         }
       }
     }
 
-    // Said plainly and kept on screen, because the model's own account of a failed tool is
-    // not evidence: it will often claim the thing happened anyway.
-    items(state.failedTools) { failed ->
-      Text(
-        stringResource(R.string.tool_failed, failed),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.error,
-        modifier = Modifier.padding(vertical = 2.dp),
-      )
-    }
     if (state.error.isNotEmpty()) {
       item {
         Card(
-          colors =
-            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+          shape = RoundedCornerShape(22.dp),
           modifier = Modifier.fillMaxWidth(),
         ) {
           Text(
             state.error,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(12.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(16.dp),
           )
         }
       }
@@ -438,29 +436,33 @@ private fun ColumnScope.ConversationBody(
   staged?.let { reply ->
     val replyContext = LocalContext.current
     Card(
-      colors =
-        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+      shape = RoundedCornerShape(22.dp),
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-      Column(
-        modifier = Modifier.padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        Text(
-          stringResource(R.string.reply_to, reply.to, reply.app),
-          style = MaterialTheme.typography.labelMedium,
-        )
+      Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          StateChip(
+            text = stringResource(R.string.reply_not_sent),
+            background = MaterialTheme.colorScheme.secondary,
+            foreground = MaterialTheme.colorScheme.onSecondary,
+          )
+          Text(
+            stringResource(R.string.reply_to, reply.to, reply.app),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
         Text(reply.text, style = MaterialTheme.typography.bodyLarge)
-        Text(
-          stringResource(R.string.reply_warning),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          Button(onClick = { viewModel.sendStagedReply(replyContext) }) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          Button(
+            onClick = { viewModel.sendStagedReply(replyContext) },
+            shape = RoundedCornerShape(22.dp),
+            modifier = Modifier.weight(1f),
+          ) {
             Text(stringResource(R.string.reply_send))
           }
-          OutlinedButton(onClick = viewModel::discardStagedReply) {
+          TextButton(onClick = viewModel::discardStagedReply, shape = RoundedCornerShape(22.dp)) {
             Text(stringResource(R.string.reply_discard))
           }
         }
@@ -470,15 +472,13 @@ private fun ColumnScope.ConversationBody(
 
   val missing = state.missingModel
   if (missing != null) {
-    Card(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-      Column(
-        modifier = Modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        Text(
-          stringResource(R.string.no_model_title),
-          style = MaterialTheme.typography.titleMedium,
-        )
+    Card(
+      shape = RoundedCornerShape(22.dp),
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+      modifier = Modifier.fillMaxWidth().padding(16.dp),
+    ) {
+      Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(stringResource(R.string.no_model_title), style = MaterialTheme.typography.titleMedium)
         Text(
           stringResource(
             R.string.no_model_body,
@@ -488,13 +488,13 @@ private fun ColumnScope.ConversationBody(
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Button(onClick = onGetModel, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = onGetModel, shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth()) {
           Text(stringResource(R.string.no_model_action))
         }
       }
     }
-    // Nothing below this is any use without a model, and a text box that cannot be answered is
-    // worse than no text box.
+    // Nothing below this is any use without a model, and a text box that cannot be answered
+    // is worse than no text box.
     return
   }
 
@@ -502,7 +502,7 @@ private fun ColumnScope.ConversationBody(
   if (state.attached.isNotEmpty()) {
     LazyRow(
       horizontalArrangement = Arrangement.spacedBy(8.dp),
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
     ) {
       items(state.attached) { item ->
         AssistChip(
@@ -514,25 +514,223 @@ private fun ColumnScope.ConversationBody(
     }
   }
 
-  Row(
-    modifier = Modifier.fillMaxWidth().padding(12.dp),
-    verticalAlignment = Alignment.Bottom,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-  ) {
-    val attachContext = LocalContext.current
-    val photoPicker =
-      rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let { viewModel.attach(it, asPicture = true, context = attachContext) }
-      }
-    val filePicker =
-      rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { viewModel.attach(it, asPicture = false, context = attachContext) }
-      }
-    var choosing by remember { mutableStateOf(false) }
+  Composer(
+    draft = draft,
+    onDraft = { draft = it },
+    state = state,
+    viewModel = viewModel,
+    onSent = { draft = "" },
+  )
+}
 
+/**
+ * The empty conversation.
+ *
+ * Four things Lin can actually do, which is the point: a suggestion that produces "I cannot do
+ * that" would be worse than a blank screen. Tapping one sends it as if it had been typed, so
+ * nothing here is a special path that could work when the real one does not.
+ */
+@Composable
+private fun NothingYet(onPick: (String) -> Unit) {
+  Column(
+    modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
+    verticalArrangement = Arrangement.spacedBy(14.dp),
+  ) {
+    Text(
+      stringResource(R.string.empty_greeting),
+      style = MaterialTheme.typography.headlineMedium,
+      fontWeight = FontWeight.SemiBold,
+      modifier = Modifier.padding(horizontal = 4.dp),
+    )
+
+    val suggestions =
+      listOf(R.string.empty_today, R.string.empty_music, R.string.empty_flashlight, R.string.empty_missed)
+    for (pair in suggestions.chunked(2)) {
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        for (suggestion in pair) {
+          val text = stringResource(suggestion)
+          Card(
+            onClick = { onPick(text) },
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            modifier = Modifier.weight(1f).height(96.dp),
+          ) {
+            Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+              Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.align(Alignment.BottomStart),
+              )
+            }
+          }
+        }
+      }
+    }
+
+    Text(
+      stringResource(R.string.empty_local),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+    )
+  }
+}
+
+/** One turn. The person gets a bubble; Lin gets a card, because Lin's answers are longer. */
+@Composable
+private fun Said(message: Message) {
+  val fromUser = message.role == Message.Role.USER
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start,
+  ) {
+    if (fromUser) {
+      Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 8.dp, bottomStart = 22.dp),
+        modifier = Modifier.widthIn(max = 300.dp),
+      ) {
+        Text(
+          message.text,
+          style = MaterialTheme.typography.bodyLarge,
+          modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+      }
+    } else {
+      Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 22.dp, bottomStart = 8.dp),
+        // Capped, not stretched: on a Fold's inner screen a line of text running the full
+        // width is unreadable, and the same cap works folded and open.
+        modifier = Modifier.widthIn(max = 560.dp),
+      ) {
+        // Markdown, laid out as what it meant rather than shown as what it typed.
+        MarkdownText(message.text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+      }
+    }
+  }
+}
+
+/**
+ * What a tool did, and which of the three things happened.
+ *
+ * Running, done and could-not are shown differently, and never by colour alone: each carries
+ * its own word. The project's rule about staged actions holds here too - a tool that only
+ * opened something says so in its own result, and the model is told to repeat that rather
+ * than claim the thing was done.
+ */
+@Composable
+private fun ToolCard(run: ToolRun) {
+  val colors = MaterialTheme.colorScheme
+  val (label, tint) =
+    when (run.state) {
+      ToolState.RUNNING -> stringResource(R.string.tool_running) to colors.onSurfaceVariant
+      ToolState.DONE -> stringResource(R.string.tool_done) to colors.tertiary
+      ToolState.FAILED -> stringResource(R.string.tool_failed_short) to colors.error
+    }
+
+  Surface(
+    color = colors.surfaceContainer,
+    shape = RoundedCornerShape(18.dp),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      if (run.state == ToolState.RUNNING) {
+        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+      }
+      Text(
+        run.name.replace('_', ' '),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.weight(1f),
+      )
+      Text(label, style = MaterialTheme.typography.labelMedium, color = tint)
+    }
+  }
+}
+
+/** A word with a background: the one visual that says a state rather than describing it. */
+@Composable
+private fun StateChip(text: String, background: Color, foreground: Color) {
+  Surface(color = background, contentColor = foreground, shape = RoundedCornerShape(20.dp)) {
+    Text(
+      text,
+      style = MaterialTheme.typography.labelSmall,
+      fontWeight = FontWeight.SemiBold,
+      modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+    )
+  }
+}
+
+/** The round icon buttons the header and the panel are built from. */
+@Composable
+private fun RoundIconButton(
+  onClick: () -> Unit,
+  description: String,
+  small: Boolean = false,
+  content: @Composable () -> Unit,
+) {
+  Surface(
+    onClick = onClick,
+    shape = CircleShape,
+    color = MaterialTheme.colorScheme.surfaceContainer,
+    contentColor = MaterialTheme.colorScheme.onSurface,
+    // The name is on the button rather than on the picture inside it, so a screen reader
+    // reads one thing: the icons below are passed contentDescription = null for that reason.
+    modifier =
+      Modifier.size(if (small) 32.dp else 42.dp).semantics { contentDescription = description },
+  ) {
+    Box(contentAlignment = Alignment.Center) {
+      Box(modifier = Modifier.size(if (small) 16.dp else 20.dp)) { content() }
+    }
+  }
+}
+
+/**
+ * The composer: attach, type or speak, send.
+ *
+ * The microphone is a filled circle rather than another grey glyph, because speaking is how
+ * this app is used in a car and from a summon, and the thing somebody reaches for at 70mph
+ * should not be the same weight as the paperclip.
+ */
+@Composable
+private fun ColumnScope.Composer(
+  draft: String,
+  onDraft: (String) -> Unit,
+  state: ConversationState,
+  viewModel: ConversationViewModel,
+  onSent: () -> Unit,
+) {
+  val attachContext = LocalContext.current
+  val photoPicker =
+    rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+      uri?.let { viewModel.attach(it, asPicture = true, context = attachContext) }
+    }
+  val filePicker =
+    rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+      uri?.let { viewModel.attach(it, asPicture = false, context = attachContext) }
+    }
+  val micPermission =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      if (granted) viewModel.startListening()
+    }
+  var choosing by remember { mutableStateOf(false) }
+
+  Row(
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+    verticalAlignment = Alignment.Bottom,
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
+  ) {
     Box {
-      IconButton(onClick = { choosing = true }, enabled = !state.inProgress) {
-        Icon(Icons.Filled.Add, stringResource(R.string.attach))
+      RoundIconButton(
+        onClick = { if (!state.inProgress) choosing = true },
+        description = stringResource(R.string.attach),
+      ) {
+        Icon(Icons.Filled.Add, contentDescription = null)
       }
       DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
         DropdownMenuItem(
@@ -541,9 +739,7 @@ private fun ColumnScope.ConversationBody(
             choosing = false
             // The photo picker, not a storage permission: it hands over the one picture
             // that was chosen and needs nothing granted.
-            photoPicker.launch(
-              PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-            )
+            photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
           },
         )
         DropdownMenuItem(
@@ -566,84 +762,71 @@ private fun ColumnScope.ConversationBody(
       // What the microphone has heard so far takes over the field while listening, so an
       // open microphone is never ambiguous and never silent-looking.
       value = if (state.listening) state.heard else draft,
-      onValueChange = { draft = it },
+      onValueChange = onDraft,
       modifier = Modifier.weight(1f),
       placeholder = {
         Text(stringResource(if (state.listening) R.string.listening else R.string.ask_placeholder))
       },
       readOnly = state.listening,
       maxLines = 5,
-    )
-    // The microphone, asked for at the point of use. An assistant that requests the
-    // microphone at launch, before being asked to listen to anything, is asking on the
-    // wrong terms.
-    val micPermission =
-      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) viewModel.startListening()
-      }
-    if (state.listening) {
-      IconButton(onClick = viewModel::stopListening) {
-        Icon(
-          Icons.Filled.Close,
-          contentDescription = stringResource(R.string.stop_listening),
-          tint = MaterialTheme.colorScheme.error,
-        )
-      }
-    } else if (draft.isBlank()) {
-      IconButton(
-        onClick = { micPermission.launch(Manifest.permission.RECORD_AUDIO) },
-        enabled = !state.inProgress,
-      ) {
-        Icon(painterResource(R.drawable.ic_mic), contentDescription = stringResource(R.string.speak))
-      }
-    }
-    IconButton(
-      onClick = {
-        viewModel.send(draft)
-        draft = ""
-      },
-      // Attaching something and saying nothing is a question in itself - see withDocuments.
-      enabled = (draft.isNotBlank() || state.attached.isNotEmpty()) && !state.inProgress,
-    ) {
-      Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
-    }
-  }
-}
-
-@Composable
-private fun Bubble(message: Message) {
-  val fromUser = message.role == Message.Role.USER
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start,
-  ) {
-    Card(
+      shape = RoundedCornerShape(24.dp),
       colors =
-        CardDefaults.cardColors(
-          containerColor =
-            if (fromUser) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerHigh
+        TextFieldDefaults.colors(
+          focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+          unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+          focusedIndicatorColor = Color.Transparent,
+          unfocusedIndicatorColor = Color.Transparent,
         ),
-      // Capped, not stretched: see the note on the screen above.
-      modifier = Modifier.widthIn(max = 560.dp),
+    )
+
+    // One filled button, whose job changes with what there is to do: stop listening, start
+    // listening, or send. Three buttons in a row would make the common one harder to hit.
+    val sendable = (draft.isNotBlank() || state.attached.isNotEmpty()) && !state.inProgress
+    Surface(
+      onClick = {
+        when {
+          state.listening -> viewModel.stopListening()
+          sendable -> {
+            viewModel.send(draft)
+            onSent()
+          }
+          else -> micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+      },
+      shape = CircleShape,
+      color =
+        if (state.listening) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+      contentColor =
+        if (state.listening) MaterialTheme.colorScheme.onError
+        else MaterialTheme.colorScheme.onPrimary,
+      modifier = Modifier.size(48.dp),
     ) {
-      Text(
-        message.text,
-        style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-      )
+      Box(contentAlignment = Alignment.Center) {
+        when {
+          state.listening ->
+            Icon(
+              Icons.Filled.Close,
+              contentDescription = stringResource(R.string.stop_listening),
+              modifier = Modifier.size(20.dp),
+            )
+          sendable ->
+            Icon(
+              Icons.AutoMirrored.Filled.Send,
+              contentDescription = stringResource(R.string.send),
+              modifier = Modifier.size(20.dp),
+            )
+          else ->
+            Icon(
+              painterResource(R.drawable.ic_mic),
+              contentDescription = stringResource(R.string.speak),
+              modifier = Modifier.size(20.dp),
+            )
+        }
+      }
     }
   }
 }
 
-/**
- * One found photo.
- *
- * Loaded through [PhotoLibrary], which already produces a downscaled thumbnail for indexing -
- * so the same system thumbnail serves both, and an image library's worth of transitive
- * dependencies is not added for one row of pictures. `produceState` keyed on the uri means the
- * decode happens off the main thread and is not repeated as the list scrolls.
- */
 @Composable
 private fun Thumbnail(uri: String) {
   val context = LocalContext.current
@@ -656,11 +839,15 @@ private fun Thumbnail(uri: String) {
         }
     }
 
-  Card(modifier = Modifier.height(160.dp).widthIn(min = 120.dp, max = 160.dp)) {
+  Surface(
+    shape = RoundedCornerShape(18.dp),
+    color = MaterialTheme.colorScheme.surfaceContainer,
+    modifier = Modifier.height(160.dp).widthIn(min = 120.dp, max = 160.dp),
+  ) {
     bitmap?.let {
       Image(
         bitmap = it,
-        contentDescription = stringResource(R.string.found_photo),
+        contentDescription = stringResource(R.string.photo_found),
         contentScale = ContentScale.Crop,
         modifier = Modifier.fillMaxSize(),
       )
@@ -669,31 +856,34 @@ private fun Thumbnail(uri: String) {
 }
 
 /**
- * The model's working-out, folded away.
+ * The model's working-out, offered rather than shown.
  *
- * Starts open while the turn is running and closes once the answer is in, which matches what it
- * is for: during the wait it is the only sign anything is happening, and afterwards the answer
- * is what matters. Monospaced and dimmed so it does not read as prose Lin is addressing to
- * anybody.
+ * Open while it is thinking, closed once the answer lands: somebody who wants to know why an
+ * answer took thirty seconds can open it, and nobody has to read the working to find the reply.
  */
 @Composable
 private fun Thinking(text: String, inProgress: Boolean) {
   var open by remember(inProgress) { mutableStateOf(inProgress) }
-  Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-    TextButton(onClick = { open = !open }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+  Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    TextButton(onClick = { open = !open }, contentPadding = PaddingValues(horizontal = 8.dp)) {
       Text(
         stringResource(if (open) R.string.thinking_hide else R.string.thinking_show),
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.labelLarge,
       )
     }
     if (open) {
-      Text(
-        text,
-        style = MaterialTheme.typography.bodySmall,
-        fontFamily = FontFamily.Monospace,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 4.dp),
-      )
+      Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(
+          text,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.padding(14.dp),
+        )
+      }
     }
   }
 }
