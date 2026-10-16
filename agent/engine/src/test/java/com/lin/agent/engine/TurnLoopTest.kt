@@ -60,7 +60,9 @@ class TurnLoopTest {
     assertEquals(
       listOf(
         LoopEvent.ToolStarted("clock"),
-        LoopEvent.ToolFinished("clock", ok = true),
+        // The tool's own words, carried up as it said them: the screen shows them on
+        // request, and what the model made of them is not a substitute.
+        LoopEvent.ToolFinished("clock", ok = true, said = "It is 10:30."),
         LoopEvent.Done("It is half past."),
       ),
       events,
@@ -120,7 +122,11 @@ class TurnLoopTest {
         .toList()
 
     assertEquals(0, delegate.runs)
-    assertTrue(events.contains(LoopEvent.ToolFinished("delegate", ok = false)))
+    val finished = events.filterIsInstance<LoopEvent.ToolFinished>().single()
+    assertEquals("delegate", finished.name)
+    assertFalse(finished.ok)
+    // The same sentence the model was given, so the screen can show why nothing happened.
+    assertTrue(finished.said, finished.said.contains("no tool called"))
     val told = backend.seen[1].messages.last()
     assertTrue(told.text, told.text.contains("no tool called"))
   }
@@ -216,7 +222,10 @@ class TurnLoopTest {
 
     val events = loop(backend, listOf(exploding)).run(ask("go")).toList()
 
-    assertTrue(events.contains(LoopEvent.ToolFinished("boom", ok = false)))
+    val blown = events.filterIsInstance<LoopEvent.ToolFinished>().single()
+    assertEquals("boom", blown.name)
+    assertFalse(blown.ok)
+    assertTrue(blown.said, blown.said.contains("the disk is on fire"))
     assertEquals(LoopEvent.Done("I could not."), events.last())
     assertTrue(backend.seen[1].messages.last().text.contains("the disk is on fire"))
   }
