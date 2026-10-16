@@ -315,6 +315,21 @@ internal fun chatRequestBody(
     messages.put(
       JSONObject().put("role", wireRole(message.role)).put("content", message.text).apply {
         if (message.toolName.isNotEmpty()) put("tool_name", message.toolName)
+        // The calls this turn asked for, so the results that follow are recognisable as
+        // their answers. Ollama takes the arguments as an object and uses no ids.
+        if (message.toolCalls.isNotEmpty()) {
+          val calls = JSONArray()
+          message.toolCalls.forEach { call ->
+            calls.put(
+              JSONObject()
+                .put(
+                  "function",
+                  JSONObject().put("name", call.name).put("arguments", JSONObject(call.arguments)),
+                )
+            )
+          }
+          put("tool_calls", calls)
+        }
         // Ollama takes pictures as bare base64 alongside the text, not as content parts.
         val pictures = message.attachments.filterIsInstance<Attachment.Picture>()
         if (pictures.isNotEmpty()) {
@@ -414,6 +429,31 @@ internal fun openAiRequestBody(
         .apply {
           // A tool result has to say which tool, and OpenAI's field for that is `name`.
           if (message.toolName.isNotEmpty()) put("name", message.toolName)
+          // And which call it answers. OpenAI requires this and rejects a tool message
+          // without it; the id is minted by the loop, because a server that sends none
+          // still needs the pair to be matchable on the way back.
+          if (message.toolCallId.isNotEmpty()) put("tool_call_id", message.toolCallId)
+          if (message.toolCalls.isNotEmpty()) {
+            val calls = JSONArray()
+            message.toolCalls.forEach { call ->
+              calls.put(
+                JSONObject()
+                  .put("id", call.id)
+                  .put("type", "function")
+                  .put(
+                    "function",
+                    JSONObject()
+                      .put("name", call.name)
+                      // A *string* here, not an object. This is the one place the two
+                      // dialects genuinely differ in shape rather than in spelling, and a
+                      // server handed an object where it expects serialised JSON either
+                      // rejects the request or sees a call with no arguments.
+                      .put("arguments", JSONObject(call.arguments).toString()),
+                  )
+              )
+            }
+            put("tool_calls", calls)
+          }
         }
     )
   }
