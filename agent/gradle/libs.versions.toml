@@ -18,6 +18,8 @@ junit = "4.13.2"
 # Test-only. See the note in engine/build.gradle.kts.
 orgJson = "20240303"
 coroutines = "1.10.2"
+# The Car App Library, for the screen Android Auto shows. 1.7.0 is the current stable.
+carApp = "1.7.0"
 # Matched to the archived fork, where this version is known to work with these models.
 litertlm = "0.18.0"
 
@@ -28,6 +30,8 @@ androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecyc
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleRuntimeKtx" }
 androidx-window = { group = "androidx.window", name = "window", version = "1.5.0" }
+androidx-car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
+androidx-car-app-projected = { group = "androidx.car.app", name = "app-projected", version.ref = "carApp" }
 # Shizuku: the user's own ADB-shell privileges, lent to Lin one app at a time. See
 # core/privileged for what is done with them and why the shell rather than hidden APIs.
 shizuku-api = { group = "dev.rikka.shizuku", name = "api", version.ref = "shizuku" }

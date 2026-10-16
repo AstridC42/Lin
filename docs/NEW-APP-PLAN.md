@@ -1926,6 +1926,61 @@ reminder is still set — inexactly — and the tool says the notification may b
 few minutes late. Refusing to set a reminder at all over a permission about
 punctuality would be the app being precious.
 
+### Phase 22 — Lin on the car's screen
+
+Android Auto does not show an app; it draws its own screens from templates the
+app hands it. So this is not Lin's interface shrunk — it is a different
+interface with two things on it, which is all a screen read at 70mph should
+have: **one button that opens the microphone**, and the few things somebody
+would otherwise pick the phone up to check.
+
+What the button does is worth being exact about. It starts the same listening
+service the car notification starts, and then "Hey Lin, what's the traffic
+like" is answered **out loud**. It does not run a question by itself: the
+answer has to be spoken to be any use while driving, and the thing that speaks
+it is the conversation on the phone.
+
+**The order of the rows is the feature**, so it lives in `core` with tests
+rather than in the screen. A car screen is read in the half second somebody is
+not looking at the road, and the host decides how many rows fit — so what gets
+dropped when there is room for two is not a layout detail, it is which two
+things Lin tells a driver. The declared order is: something is wrong, Lin is
+listening, the next reminder, who is waiting for a reply, what is playing —
+last, because it is the one thing already audible.
+
+A limit of zero rows is **a real answer rather than an error**: it means the
+screen has room for the microphone and nothing more, which is the collapsed
+state the feature was asked for. Two things follow from that. The guard catches
+a negative limit too, because `take(-1)` throws and a host reporting nonsense
+is not a reason for a driver's screen to crash. And since **a pane with no rows
+is not a legal template**, the no-rows case falls back to a message template
+carrying the same button — which is also the case on a fresh install with no
+reminders, no messages and nothing playing, so it is reachable rather than
+theoretical.
+
+Three decisions that came from reading the library rather than guessing:
+
+- **The host is not trusted by default.** Anything on the phone could claim to
+  be a car and bind the service, and what it would get is a button that turns
+  on the microphone. The release build accepts only the hosts the library ships
+  signatures for; a debug build accepts anything, which is what makes the
+  desktop head unit work.
+- **The coloured button is marked primary.** `ActionsConstraints` restricts a
+  background colour to the primary action, so a coloured action without
+  `FLAG_PRIMARY` is a template the host rejects rather than draws.
+- **The category is `IOT`.** Android Auto only shows templated apps in the
+  categories it supports — navigation, points of interest, internet of things
+  and weather — and an assistant is none of them. IoT is the closest true
+  description: Lin's car screen is one control surface for things on the phone.
+
+**The caveat, written down rather than discovered in a car park.** Google's own
+testing guide says the Android Auto "unknown sources" developer setting *does
+not* apply to apps built with the Car App Library. A side-loaded Lin may
+therefore not appear on a real head unit even with developer mode on, and the
+documented paths are the desktop head unit or a Play internal track. Nothing in
+the app can change that; it is a distribution rule, and the existing car
+notification remains the way to start listening without it.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

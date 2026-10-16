@@ -404,6 +404,33 @@
         </service>
 
         <!--
+          Lin on the car's screen.
+
+          Exported because the Android Auto host - a different app - binds it; LinCarService
+          checks who is calling, and in a release build accepts only the hosts the Car App
+          Library ships signatures for.
+
+          The category is IOT, which needs explaining. Android Auto only shows templated apps
+          in the categories it supports - navigation, points of interest, internet of things
+          and weather - and an assistant is none of them. IOT is the closest true description:
+          Lin's car screen is one control surface for things on the phone. Anything else here
+          would be a claim the app cannot back up.
+        -->
+        <service
+            android:name=".car.LinCarService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@drawable/lin_mark_mono">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.IOT" />
+            </intent-filter>
+        </service>
+
+        <!-- The oldest car host Lin can talk to. Level 6 is what the IOT category needs. -->
+        <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="6" />
+
+        <!--
           A reminder coming due, and the restart that would otherwise have lost it.
 
           Not exported: the only things that may send to it are the alarm manager and the
