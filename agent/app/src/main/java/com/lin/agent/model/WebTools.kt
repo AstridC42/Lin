@@ -143,7 +143,12 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     val answer = runCatching { web.get(url, headers) }.getOrNull()
     val hits =
       if (answer?.ok == true) hitsFrom(SearchProvider.WIKIPEDIA, answer.body) else emptyList()
-    if (hits.isEmpty()) return ToolResult.Failed(why)
+    // Said out loud, because otherwise the model is told only about the SearXNG and reports
+    // one failure where there were two - and "Wikipedia had nothing either" is the part that
+    // tells the user the question itself may need rewording.
+    if (hits.isEmpty()) {
+      return ToolResult.Failed("$why Wikipedia was tried as well and had nothing for this query.")
+    }
 
     return ToolResult.Ok(
       hitsInWords(
@@ -218,6 +223,11 @@ class ReadPageTool(private val web: Web) : AgentTool {
 
   override val roles = setOf(AgentRole.ORCHESTRATOR, AgentRole.SUB_AGENT)
 
+  override val guidance =
+    "read_page only reads an address that came from a search result or from the user. Never " +
+      "assemble one that looks right - a guessed address answers 404, which costs a turn and " +
+      "tells you nothing. If you have no address, search for one first."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val asked = (arguments["url"] as? String)?.trim().orEmpty()
     if (asked.isEmpty()) return ToolResult.Failed("No address was given.")
@@ -235,8 +245,12 @@ class ReadPageTool(private val web: Web) : AgentTool {
 
     if (!page.ok) {
       return ToolResult.Failed(
-        "$url answered ${page.status}. Say the page could not be read rather than guessing " +
-          "what was on it."
+        "$url answered ${page.status}." +
+          // Almost always a model that assembled a plausible-looking address rather than
+          // using one from a result list. Worth saying, because the fix is to search.
+          (if (page.status == 404) " That address does not exist - if you assembled it " +
+            "rather than taking it from a search result, search for the page instead." else "") +
+          " Say the page could not be read rather than guessing what was on it."
       )
     }
 
