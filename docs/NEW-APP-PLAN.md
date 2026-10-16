@@ -1745,6 +1745,43 @@ used in another, and two missing imports — which is the argument for doing it
 that way: the compiler found every real problem, and a careful manual pass
 over two thousand lines would not have.
 
+### Phase 20 — Things Lin does without being asked
+
+The feature that makes "assistant" mean something other than "chat window". A
+question somebody asks every morning is a question they should have to ask
+once: a routine is a question, a time and some days, and Lin runs a real turn
+with the real tools and puts the answer in a notification.
+
+**Periodic, not exact.** The worker wakes every quarter of an hour and usually
+finds nothing to do. That is cheaper than it sounds and much simpler than an
+exact alarm per task — exact alarms need a permission Android grants
+grudgingly, and a routine is not worth asking somebody for that.
+
+Lateness is handled by the rule instead of the schedule, and that rule is the
+interesting part. A task late by up to three hours still runs: a briefing at
+08:40 because the phone was asleep at 08:00 is still the briefing somebody
+wanted. Later than that is skipped until tomorrow, because **a morning
+briefing delivered at eleven at night is not a late briefing, it is a wrong
+one.**
+
+Three smaller decisions, each with a test:
+
+- **Once a day, not once per check.** Without that, a daily briefing would
+  arrive twelve times before lunch. The mark is written *after* an answer, so
+  a task that failed is retried rather than lost for the day.
+- **Empty days means every day**, rather than all seven being stored. A task
+  created before the app knew about weekdays keeps working instead of quietly
+  matching nothing.
+- **Delegation is withheld in a routine.** A background task is the worst
+  place to spend a minute on a server round trip nobody is waiting through.
+
+The settings written after each task rather than at the end of the batch, so
+one that answered is not run again because a later one crashed the worker.
+
+This is the first thing to use the tool registry as a singleton rather than
+through the conversation's ViewModel — which is what Phase 19's refactor was
+for, though it was done for the settings screen.
+
 ### Phase 11 — The design pass
 
 Four directions were drawn side by side on a canvas - a quiet page with no

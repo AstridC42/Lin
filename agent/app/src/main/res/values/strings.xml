@@ -224,6 +224,25 @@
     levels.</string>
   <string name="settings_sampling_clear">Back to the server\'s own settings</string>
 
+  <string name="standing_channel">Routines</string>
+  <string name="standing_channel_detail">Answers to the things you asked Lin to check on a
+    schedule.</string>
+  <string name="settings_standing_heading">Things Lin does on its own</string>
+  <string name="settings_standing_detail">A question you ask every day is one you should only
+    have to ask once. Lin runs it in the background and puts the answer in a notification.
+    Late by up to three hours is still delivered; later than that waits for tomorrow, because
+    a morning briefing arriving at night is the wrong message rather than a late one.</string>
+  <string name="settings_standing_none">Nothing scheduled.</string>
+  <string name="settings_standing_add">Add a routine</string>
+  <string name="settings_standing_ask">What should Lin ask itself?</string>
+  <string name="settings_standing_hour">Hour (0–23)</string>
+  <string name="settings_standing_minute">Minute</string>
+  <string name="settings_standing_days">Which days? Leave all off for every day.</string>
+  <string name="settings_standing_save">Add</string>
+  <string name="settings_standing_cancel">Cancel</string>
+  <string name="settings_standing_remove">Remove</string>
+  <string name="settings_standing_everyday">Every day</string>
+
   <string name="settings_tab_persona">Who Lin is</string>
 
   <string name="settings_persona_heading">Who Lin is talking to</string>

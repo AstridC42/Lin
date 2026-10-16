@@ -54,6 +54,8 @@ import androidx.work.NetworkType
 import com.lin.agent.R
 import com.lin.agent.core.diag.describeFault
 import com.lin.agent.core.tools.disabledFrom
+import com.lin.agent.core.standing.tasksFrom
+import com.lin.agent.model.StandingWorker
 import com.lin.agent.core.persona.personaFrom
 import com.lin.agent.core.persona.personaPrompt
 import com.lin.agent.engine.AgentTool
@@ -298,6 +300,14 @@ constructor(
     // types. Failures are reported on the settings screen rather than here: a server that is
     // asleep should cost its own tools and nothing else, least of all the first screen.
     viewModelScope.launch { runCatching { mcp.refresh() } }
+    // The periodic check is re-synced at launch as well as when the list changes, because
+    // WorkManager's queue does not survive the app's data being cleared and a routine that
+    // silently stopped running is worse than one that never existed.
+    viewModelScope.launch {
+      runCatching {
+        StandingWorker.sync(work, tasksFrom(settings.standingTasks.first()))
+      }
+    }
   }
 
   /**

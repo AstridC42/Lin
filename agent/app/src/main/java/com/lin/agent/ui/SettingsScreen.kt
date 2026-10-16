@@ -49,6 +49,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
+import com.lin.agent.core.standing.StandingTask
+import com.lin.agent.core.standing.clockTime
+import com.lin.agent.core.standing.dayNumbers
 import com.lin.agent.core.persona.Answers
 import com.lin.agent.core.persona.answeredCount
 import com.lin.agent.core.persona.personaPrompt
@@ -1893,6 +1897,8 @@ private fun ColumnScope.PersonaTab(state: SettingsState, viewModel: SettingsView
     }
   }
 
+  Routines(state, viewModel)
+
   Section(R.string.settings_persona_preview_heading) {
     val composed = personaPrompt(state.persona)
     Text(
@@ -1912,6 +1918,143 @@ private fun ColumnScope.PersonaTab(state: SettingsState, viewModel: SettingsView
     }
   }
 }
+
+/**
+ * Things Lin does on a schedule without being asked.
+ *
+ * The feature that makes "assistant" mean something other than "chat window": a question
+ * somebody asks every morning is a question they should have to ask once.
+ *
+ * Shown here rather than under Tools because it is not a capability - it is a standing
+ * instruction about what Lin should do with the capabilities it has, which is the same kind
+ * of thing as the rest of this tab.
+ */
+@Composable
+private fun ColumnScope.Routines(state: SettingsState, viewModel: SettingsViewModel) {
+  var adding by rememberSaveable { mutableStateOf(false) }
+  var ask by rememberSaveable { mutableStateOf("") }
+  var hour by rememberSaveable { mutableStateOf("8") }
+  var minute by rememberSaveable { mutableStateOf("00") }
+  var days by rememberSaveable { mutableStateOf(setOf<Int>()) }
+
+  Section(R.string.settings_standing_heading) {
+    Text(
+      stringResource(R.string.settings_standing_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    if (state.standing.isEmpty() && !adding) {
+      Text(stringResource(R.string.settings_standing_none), style = MaterialTheme.typography.bodyMedium)
+    }
+
+    for (task in state.standing) {
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(task.ask, style = MaterialTheme.typography.bodyLarge)
+          Text(
+            clockTime(task) + " · " + whichDays(task),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(
+          checked = task.enabled,
+          onCheckedChange = { viewModel.setStandingEnabled(task.id, it) },
+        )
+        TextButton(onClick = { viewModel.removeStanding(task.id) }) {
+          Text(stringResource(R.string.settings_standing_remove))
+        }
+      }
+    }
+
+    if (adding) {
+      OutlinedTextField(
+        value = ask,
+        onValueChange = { ask = it },
+        label = { Text(stringResource(R.string.settings_standing_ask)) },
+        placeholder = { Text(stringResource(R.string.empty_today)) },
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+          value = hour,
+          onValueChange = { hour = it.filter(Char::isDigit).take(2) },
+          label = { Text(stringResource(R.string.settings_standing_hour)) },
+          singleLine = true,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          modifier = Modifier.weight(1f),
+        )
+        OutlinedTextField(
+          value = minute,
+          onValueChange = { minute = it.filter(Char::isDigit).take(2) },
+          label = { Text(stringResource(R.string.settings_standing_minute)) },
+          singleLine = true,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          modifier = Modifier.weight(1f),
+        )
+      }
+      Text(
+        stringResource(R.string.settings_standing_days),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        for (day in 1..7) {
+          FilterChip(
+            selected = day in days,
+            onClick = { days = if (day in days) days - day else days + day },
+            label = { Text(dayInitial(day)) },
+          )
+        }
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+          enabled = ask.isNotBlank(),
+          onClick = {
+            viewModel.saveStanding(
+              StandingTask(
+                id = java.util.UUID.randomUUID().toString(),
+                ask = ask.trim(),
+                hour = hour.toIntOrNull()?.coerceIn(0, 23) ?: 8,
+                minute = minute.toIntOrNull()?.coerceIn(0, 59) ?: 0,
+                days = days,
+              )
+            )
+            ask = ""
+            days = emptySet()
+            adding = false
+          },
+        ) {
+          Text(stringResource(R.string.settings_standing_save))
+        }
+        TextButton(onClick = { adding = false }) {
+          Text(stringResource(R.string.settings_standing_cancel))
+        }
+      }
+    } else {
+      OutlinedButton(onClick = { adding = true }) {
+        Text(stringResource(R.string.settings_standing_add))
+      }
+    }
+  }
+}
+
+/** Monday first, matching the day numbers the tasks use. */
+@Composable
+private fun whichDays(task: StandingTask): String {
+  val days = dayNumbers(task)
+  return if (days.isEmpty()) stringResource(R.string.settings_standing_everyday)
+  else days.joinToString(" ") { dayInitial(it) }
+}
+
+private fun dayInitial(day: Int): String =
+  java.time.DayOfWeek.of(day.coerceIn(1, 7))
+    .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
 
 private fun questionLabel(question: Answers) =
   when (question) {

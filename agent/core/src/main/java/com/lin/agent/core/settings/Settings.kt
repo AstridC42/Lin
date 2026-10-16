@@ -270,6 +270,14 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setPersona(value: String) = write(PERSONA, value)
 
+  /**
+   * Things Lin does on a schedule without being asked, as JSON. See
+   * [com.lin.agent.core.standing.tasksFrom].
+   */
+  val standingTasks: Flow<String> = read(STANDING_TASKS, "")
+
+  suspend fun setStandingTasks(value: String) = write(STANDING_TASKS, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -559,6 +567,7 @@ class SettingsRepository(private val context: Context) {
     val SEARCH_URL = stringPreferencesKey("search_url")
     val SEARCH_KEY = stringPreferencesKey("search_key")
     val PERSONA = stringPreferencesKey("persona")
+    val STANDING_TASKS = stringPreferencesKey("standing_tasks")
     val SERVER_TEMPERATURE = stringPreferencesKey("server_temperature")
     val SERVER_TOP_P = stringPreferencesKey("server_top_p")
     val SERVER_TOP_K = stringPreferencesKey("server_top_k")
