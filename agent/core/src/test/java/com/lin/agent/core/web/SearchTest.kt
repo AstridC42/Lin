@@ -321,3 +321,77 @@ class WikipediaSearchTest {
     assertEquals(SearchProvider.BRAVE, searchProviderNamed("BRAVE"))
   }
 }
+
+class SearxngEnginesTest {
+
+  // What a SearXNG whose engines are all being blocked actually answers: 200, an empty result
+  // list, and a full list of excuses. webutils.get_json_response builds unresponsive_engines
+  // as (engine, message) pairs.
+  private val blocked =
+    """
+    {"query":"orin nano super","results":[],"answers":[],"corrections":[],"infoboxes":[],
+     "suggestions":[],
+     "unresponsive_engines":[["google","CAPTCHA"],["startpage","Suspended: CAPTCHA"],
+                             ["duckduckgo","timeout"]]}
+    """
+
+  @Test
+  fun `the engines that refused are named`() {
+    assertEquals(
+      "google (CAPTCHA), startpage (Suspended: CAPTCHA), duckduckgo (timeout)",
+      enginesThatFailed(blocked),
+    )
+  }
+
+  @Test
+  fun `an engine named without a reason is still named`() {
+    // The field is in no specification, and other clients have met both shapes. An engine
+    // name with no reason attached is still worth saying.
+    assertEquals(
+      "google, startpage (CAPTCHA)",
+      enginesThatFailed("""{"unresponsive_engines":["google",["startpage","CAPTCHA"],[""]]}"""),
+    )
+  }
+
+  @Test
+  fun `a long list is cut rather than filling the screen`() {
+    val many = (1..9).joinToString(",") { """["engine$it","CAPTCHA"]""" }
+    val said = enginesThatFailed("""{"unresponsive_engines":[$many]}""")
+    assertTrue(said, said.endsWith("and 3 more"))
+    assertTrue(said, said.startsWith("engine1 (CAPTCHA)"))
+    assertTrue(said, !said.contains("engine7"))
+  }
+
+  @Test
+  fun `a healthy reply names nothing`() {
+    assertEquals("", enginesThatFailed("""{"results":[],"unresponsive_engines":[]}"""))
+    assertEquals("", enginesThatFailed("""{"results":[]}"""))
+    assertEquals("", enginesThatFailed("not json"))
+  }
+
+  @Test
+  fun `an empty search says the engines failed rather than that nothing exists`() {
+    // The case this is all for: a search that had worked for weeks, nothing changed at
+    // either end, and the real fault - the instance's address being blocked by the engines -
+    // invisible behind "nothing came back".
+    val said = nothingCameBack(SearchProvider.SEARXNG, blocked)
+    assertTrue(said, said.contains("google (CAPTCHA)"))
+    assertTrue(said, said.contains("server's problem"))
+    assertTrue(said, said.contains("do not say the thing they asked about does not exist"))
+  }
+
+  @Test
+  fun `the settings report leads with the engines when there are any`() {
+    val said = searchTrialReport(200, 0, blocked)
+    assertTrue(said, said.startsWith("HTTP 200 · 0 results"))
+    assertTrue(said, said.contains("engines down: google (CAPTCHA)"))
+    // The first bytes of JSON tell nobody anything once the engines have been named.
+    assertTrue(said, !said.contains("starting"))
+  }
+
+  @Test
+  fun `and still shows the first bytes when there are none`() {
+    val said = searchTrialReport(200, 0, "<!DOCTYPE html>")
+    assertTrue(said, said.contains("starting \"<!DOCTYPE html>\""))
+  }
+}

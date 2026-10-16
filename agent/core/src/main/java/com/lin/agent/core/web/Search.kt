@@ -16,6 +16,7 @@
 
 package com.lin.agent.core.web
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** Where Lin searches. */
@@ -289,6 +290,19 @@ fun urlEscape(text: String): String =
  * at.
  */
 fun nothingCameBack(provider: SearchProvider, body: String): String {
+  // A SearXNG that answers with an empty list is usually not saying "no results". It is
+  // saying its own engines would not talk to it, and it says which ones - so that goes in
+  // the message, because "google: CAPTCHA" is a fault somebody can act on and "nothing came
+  // back" is not. This is the shape of the report that arrived from a real phone: a search
+  // that had worked for weeks, with nothing changed at either end.
+  val engines = enginesThatFailed(body)
+  if (engines.isNotEmpty()) {
+    return "The SearXNG answered, but its own search engines did not: $engines. That is the " +
+      "server's problem rather than the question's - engines block the address a self-hosted " +
+      "SearXNG calls from, and the fix is usually updating it or turning on other engines. " +
+      "Tell the user exactly which engines failed and why, and do not say the thing they " +
+      "asked about does not exist."
+  }
   val what = body.trim()
   val shape =
     when {
@@ -303,6 +317,39 @@ fun nothingCameBack(provider: SearchProvider, body: String): String {
 }
 
 /**
+ * The engines a SearXNG says would not answer, as "google (CAPTCHA), startpage (timeout)".
+ *
+ * SearXNG builds this list in `webutils.get_json_response` as `unresponsive_engines`, a list
+ * of (engine, message) pairs - so an instance whose engines are all being blocked answers 200
+ * with an empty result list and a full list of excuses. Reading it is the difference between
+ * "nothing came back" and a fault somebody can fix.
+ *
+ * Entries that are a bare string rather than a pair are accepted too. The field is not part
+ * of any specification, other clients have met both shapes, and an engine name with no reason
+ * is still worth saying.
+ */
+fun enginesThatFailed(body: String, limit: Int = 6): String {
+  val json = runCatching { JSONObject(body) }.getOrNull() ?: return ""
+  val listed = json.optJSONArray("unresponsive_engines") ?: return ""
+  val said = mutableListOf<String>()
+  for (index in 0 until listed.length()) {
+    when (val row = listed.opt(index)) {
+      is String -> if (row.isNotBlank()) said.add(row.trim())
+      is JSONArray -> {
+        val engine = row.optString(0).trim()
+        val why = row.optString(1).trim()
+        if (engine.isNotEmpty()) said.add(if (why.isEmpty()) engine else "$engine ($why)")
+      }
+      else -> Unit
+    }
+  }
+  if (said.isEmpty()) return ""
+  val shown = said.take(limit)
+  val rest = said.size - shown.size
+  return shown.joinToString(", ") + if (rest > 0) " and $rest more" else ""
+}
+
+/**
  * One line describing what a trial search actually got, for the settings screen.
  *
  * The screen needs a fact, not a verdict. "Search is not working" sends somebody round in
@@ -311,10 +358,14 @@ fun nothingCameBack(provider: SearchProvider, body: String): String {
  */
 fun searchTrialReport(status: Int, hits: Int, body: String): String {
   val head = body.trim().take(40).replace(Regex("\\s+"), " ")
+  val engines = enginesThatFailed(body)
   return buildString {
     append("HTTP ").append(status)
     append(" · ").append(hits).append(if (hits == 1) " result" else " results")
     append(" · ").append(body.length).append(" bytes")
-    if (head.isNotEmpty()) append(" starting \"").append(head).append('"')
+    // Before the first bytes rather than after: when a SearXNG names the engines that failed,
+    // that is the whole answer and nobody needs to read the JSON behind it.
+    if (engines.isNotEmpty()) append(" · engines down: ").append(engines)
+    else if (head.isNotEmpty()) append(" starting \"").append(head).append('"')
   }
 }
