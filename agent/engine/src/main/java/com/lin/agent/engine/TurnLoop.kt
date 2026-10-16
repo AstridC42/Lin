@@ -95,6 +95,8 @@ class TurnLoop(
     var toolCalls = 0
     var toolCallRetries = 0
     var alreadyNudgedOutOfARut = false
+    /** Numbers the calls of this turn, so a result can name the one it answers. */
+    var callsSoFar = 0
     // Whether anything in this turn has produced an answer. Read when a tool fails - see
     // [toolFailureText] - because a failure arriving after a success must not become the reply.
     var somethingWorked = false
@@ -134,13 +136,19 @@ class TurnLoop(
           return@flow
         }
         is Exchange.WantsTools -> {
-          // Whatever it said on the way to asking is still part of the reply, so it is kept
+          // The turn that asked for the tools, written back into the conversation before
+          // their results are. This is not bookkeeping: a tool result with no preceding
+          // assistant tool-call turn is a result the model does not recognise as the answer
+          // to anything, so it asks again until the budget stops it. See Message.toolCalls.
+          //
+          // Whatever it said on the way to asking rides on the same turn, so it is kept
           // rather than discarded when the tool result comes back.
-          if (outcome.spokenText.isNotBlank()) {
-            messages.add(Message(Message.Role.ASSISTANT, outcome.spokenText))
-          }
+          val asked = outcome.calls.map { it.copy(id = it.id.ifEmpty { "call_${++callsSoFar}" }) }
+          messages.add(
+            Message(Message.Role.ASSISTANT, outcome.spokenText, toolCalls = asked)
+          )
 
-          for (call in outcome.calls) {
+          for (call in asked) {
             if (toolCalls >= budget.maxToolCalls) {
               emit(
                 LoopEvent.Failed(
@@ -161,6 +169,9 @@ class TurnLoop(
                   Message.Role.TOOL,
                   "You already ran this and got an answer above. Use it, or answer without it.",
                   toolName = call.name,
+                  // Still answers the call it was asked for. A tool message with no id is
+                  // one an OpenAI-faithful server rejects outright.
+                  toolCallId = call.id,
                 )
               )
               continue
@@ -181,7 +192,8 @@ class TurnLoop(
             messages.add(
               Message(
                 Message.Role.TOOL,
-                when (result) {
+                toolCallId = call.id,
+                text = when (result) {
                   is ToolResult.Ok ->
                     // Said in the tool's own result rather than left for the model to work
                     // out. A model that is handed nothing and told nothing describes the

@@ -147,7 +147,23 @@ class ToolRegistry(tools: List<AgentTool>) {
 data class ToolSpec(val name: String, val description: String, val parametersSchema: String)
 
 /** What the model asked to run. Arguments are untrusted: it invents them. */
-data class ToolInvocation(val name: String, val arguments: Map<String, Any?>)
+data class ToolInvocation(
+  val name: String,
+  val arguments: Map<String, Any?>,
+  /**
+   * What this call is called, for matching a result to it.
+   *
+   * Empty until the loop assigns one. OpenAI requires a tool result to name the call it
+   * answers and rejects the request otherwise; Ollama does not use ids at all. Minted by the
+   * loop rather than taken from the server, because a server that sends none still needs the
+   * pair to be matchable on the way back.
+   *
+   * Deliberately not part of what makes two calls the same: see [fingerprintOf], which
+   * compares the name and the arguments, because a model asking twice for the same thing has
+   * asked twice whatever the ids are.
+   */
+  val id: String = "",
+)
 
 /** [this] as the backends need to advertise it. */
 fun AgentTool.spec(): ToolSpec =

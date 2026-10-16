@@ -25,6 +25,20 @@ data class Message(
   val toolName: String = "",
   /** Files and pictures the user sent with this message. See [Attachment]. */
   val attachments: List<Attachment> = emptyList(),
+  /**
+   * On an assistant message: the tools it asked for.
+   *
+   * This being absent was a real bug and an invisible one. Tool calls were read out of a
+   * server's reply and never written back into the conversation sent to it, so after a tool
+   * ran the server saw a user question followed by a tool result with **no assistant turn
+   * in between that had asked for it**. Chat templates render a tool result in the context
+   * of the call it answers; without that turn the model does not recognise it as the answer
+   * to anything, so it asks again - and again, until the loop's budget stops it. From the
+   * outside: a tool card saying Done, then "this is taking more steps than it should".
+   */
+  val toolCalls: List<ToolInvocation> = emptyList(),
+  /** On a tool message: which call it answers. Required by OpenAI, unused by Ollama. */
+  val toolCallId: String = "",
 ) {
   enum class Role {
     USER,
