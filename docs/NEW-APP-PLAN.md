@@ -1842,6 +1842,90 @@ says what is actually true - which model answered, whether a thing was done or
 only opened, whether Lin can see a picture it is being asked about. A prettier
 interface that smooths those over would be a worse one.
 
+### Phase 21 — Who Lin is by default, and reminders that actually arrive
+
+Two things, and the second is the one that was missing outright.
+
+**The prompt is asked for once, not written down — but it ships with answers.**
+Phase 19 made the personal half of the system prompt come from a ten-question
+quiz, with the rule that *an unanswered question contributes nothing*. Correct,
+and it had a consequence nobody wanted: a fresh install had no personal half at
+all, so Lin had to be told the same four things in every conversation. So the
+quiz was asked in the chat instead, and the answers it produced are what Lin
+now ships with — a name, a voice, a city, metric units, what the person mostly
+asks about, what to do when it does not know, and what to do with work the
+phone is too small for.
+
+Two of the eleven questions are deliberately *not* filled in, and that is the
+part worth keeping:
+
+- **Language** is blank because "whichever I asked in" is the absence of an
+  instruction, not an instruction to answer in English.
+- **What to always ask about first** is blank because the answer was "trust the
+  switches". That question overrides the Tools tab, so a default of "always ask
+  before sending" would quietly make those switches a lie.
+
+Replacing the shipped set is all-or-nothing: answer one question of your own
+and none of the shipped answers apply. Merging them would give somebody who
+said "call me Sam" a prompt that also claims they live in Lisbon — worse than
+either prompt alone, and invisible from the quiz screen.
+
+One question was changed rather than added to: **tone is now a multiple
+choice**, because the first person to answer it picked two. "Warm" and
+"playful" describe one voice, and forcing a single pick threw half the answer
+away. The sentences were reworded so two of them stack into a voice rather than
+reading as two contradictory orders — none of them opens with "Speak".
+
+**Reminders.** Lin could already open the clock app with an alarm half filled
+in, which is not a reminder — it is Lin asking somebody else to set one. Now
+there is `remind_me`, `list_reminders` and `cancel_reminder`: a moment, some
+words, and a notification from Lin that arrives whether or not anything is
+open.
+
+The parsing is the part with the tests. `whenItFires` turns "in 25 minutes",
+"18:30", "tomorrow morning", "monday at 9am" or "2026-10-17 07:00" into one
+instant, and **returns nothing when the phrase names no moment** — null rather
+than a guess, because a model asked for a time will happily produce "soon", and
+a reminder that fires at a time nobody chose is worse than no reminder: it
+teaches the person not to trust the ones that are right. Null makes the tool
+ask "when?", which is a question with an answer.
+
+What rolls forward and what does not is the other half of that rule. "19:00"
+with no day means the next 19:00 — a time already past today is obviously meant
+for tomorrow. But "today at 09:00" said in the afternoon is returned *in the
+past*, so the tool can say so: moving it to tomorrow would be the parser
+deciding what somebody meant. A weekday that is today and gone rolls a week,
+not a day. A written date is never moved at all, and one nobody could have
+meant — `2026-13-45` — is nothing rather than a fallback.
+
+Four smaller decisions, each with a test that was proven able to fail:
+
+- **The written date comes out of the text before the clock is looked for.**
+  "2026-10-17 07:00" holds three pairs of digits that could pass for an hour and
+  two of them are the date, which is how seven in the morning becomes five in
+  the afternoon.
+- **Weekdays are matched as whole words.** "sat" is in "saturate" and "mon" is
+  in "money", and a reminder that quietly lands next Monday is a bug nobody
+  reports — they just stop setting them.
+- **An ambiguous cancellation cancels nothing.** Cancelling the wrong reminder
+  fails silently: nothing happens at the moment something should have. Two
+  possible matches come back as a question.
+- **The id is the moment plus the flattened words**, so the same reminder asked
+  for twice is one reminder rather than two notifications a second apart.
+
+On the phone side, the words are stored and the moment goes to `AlarmManager`,
+and both are needed: **an alarm does not survive a reboot**, so without the
+boot receiver every reminder set before a restart would be listed as pending
+and never arrive — the worst of the available failures, because the person has
+no way of telling. One that came due while the phone was off is delivered up to
+three hours late and dropped after that, which is Phase 20's rule.
+
+`SCHEDULE_EXACT_ALARM` rather than `USE_EXACT_ALARM`: the first is asked for
+and can be refused, the second is granted at install and cannot. Refused, a
+reminder is still set — inexactly — and the tool says the notification may be a
+few minutes late. Refusing to set a reminder at all over a permission about
+punctuality would be the app being precious.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

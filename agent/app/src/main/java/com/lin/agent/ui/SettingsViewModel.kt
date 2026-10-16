@@ -137,6 +137,10 @@ data class SettingsState(
   val searchKey: String = "",
   /** Things Lin does on a schedule. See [com.lin.agent.core.standing.StandingTask]. */
   val standing: List<StandingTask> = emptyList(),
+  /** Reminders Lin will send, soonest first. */
+  val reminders: List<com.lin.agent.core.remind.Reminder> = emptyList(),
+  /** Whether Lin may set an alarm for the exact minute, or only for roughly then. */
+  val exactAlarms: Boolean = true,
   /** What the user answered about themselves. See [com.lin.agent.core.persona.Persona]. */
   val persona: Persona = emptyMap(),
   /** Every tool Lin has, for the screen that switches them off. */
@@ -190,6 +194,7 @@ constructor(
   private val photos: PhotoIndex,
   private val memories: MemoryStore,
   private val privileged: com.lin.agent.privileged.Privileged,
+  private val reminders: com.lin.agent.remind.ReminderBook,
   private val tools: com.lin.agent.model.Tools,
   private val work: androidx.work.WorkManager,
   private val mcp: com.lin.agent.mcp.McpConnections,
@@ -235,6 +240,8 @@ constructor(
           searchKey = settings.searchKey.first(),
           persona = personaFrom(settings.persona.first()),
           standing = tasksFrom(settings.standingTasks.first()),
+          reminders = reminders.ahead(),
+          exactAlarms = reminders.exactAllowed(),
           toolListing = tools.listing(),
           disabledTools = disabledFrom(settings.disabledTools.first()),
           carNotification = settings.carNotification.first(),
@@ -676,6 +683,31 @@ constructor(
     _state.update { it.copy(standing = tasks) }
     viewModelScope.launch { settings.setStandingTasks(storedTasks(tasks)) }
     StandingWorker.sync(work, tasks)
+  }
+
+  /**
+   * Cancels a reminder from the screen.
+   *
+   * Here as well as in the tool because this is the list somebody checks when they do not
+   * trust that a reminder was cancelled - and the answer to "did it really go?" cannot itself
+   * be a sentence from a model.
+   */
+  fun cancelReminder(id: String) {
+    _state.update { it.copy(reminders = it.reminders.filterNot { r -> r.id == id }) }
+    viewModelScope.launch {
+      reminders.cancel(id)
+      // Read back rather than trusted: the book is the truth, and one fired while the screen
+      // was open would otherwise stay on it.
+      _state.update { it.copy(reminders = reminders.ahead()) }
+    }
+  }
+
+  /** Opens the system screen where exact alarms are allowed, if this phone has one. */
+  fun askForExactAlarms() {
+    val intent = reminders.exactPermissionIntent() ?: return
+    runCatching {
+      appContext.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
   }
 
   fun clearPersona() {

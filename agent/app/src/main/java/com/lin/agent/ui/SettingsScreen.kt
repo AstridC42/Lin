@@ -54,8 +54,11 @@ import com.lin.agent.core.standing.StandingTask
 import com.lin.agent.core.standing.clockTime
 import com.lin.agent.core.standing.dayNumbers
 import com.lin.agent.core.persona.Answers
+import com.lin.agent.core.remind.whenInWords
 import com.lin.agent.core.persona.answeredCount
+import com.lin.agent.core.persona.personaOrDefault
 import com.lin.agent.core.persona.personaPrompt
+import com.lin.agent.core.persona.usingDefaultPersona
 import com.lin.agent.core.web.SearchProvider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -116,6 +119,7 @@ import com.lin.agent.voice.canAppearOverOtherApps
 import com.lin.agent.voice.linIsTheAssistant
 import com.lin.agent.voice.openAppearOverOtherApps
 import com.lin.agent.voice.openAssistantSettings
+import java.time.ZoneId
 
 /**
  * Settings, in five groups.
@@ -1069,6 +1073,60 @@ private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewMo
     }
   }
 
+  /*
+   * Reminders, shown here next to the rest of what Lin does with the phone rather than under
+   * a tab of its own. This is the list somebody checks when they want to know whether a
+   * reminder really exists, which is a question a sentence from a model cannot settle.
+   */
+  Section(R.string.settings_reminders_heading) {
+    Text(
+      stringResource(R.string.settings_reminders_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    if (!state.exactAlarms) {
+      // Said plainly rather than hidden, because the symptom - a reminder arriving at 18:04 -
+      // is otherwise indistinguishable from a bug.
+      Text(
+        stringResource(R.string.settings_reminders_exact),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      TextButton(onClick = viewModel::askForExactAlarms) {
+        Text(stringResource(R.string.settings_reminders_exact_fix))
+      }
+    }
+
+    if (state.reminders.isEmpty()) {
+      Text(
+        stringResource(R.string.settings_reminders_none),
+        style = MaterialTheme.typography.bodyMedium,
+      )
+    }
+
+    val now = remember(state.reminders) { System.currentTimeMillis() }
+    for (reminder in state.reminders) {
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(reminder.text, style = MaterialTheme.typography.bodyLarge)
+          Text(
+            whenInWords(reminder.atMillis, now, ZoneId.systemDefault()),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        TextButton(onClick = { viewModel.cancelReminder(reminder.id) }) {
+          Text(stringResource(R.string.settings_reminders_cancel))
+        }
+      }
+    }
+  }
+
   Section(R.string.settings_weather_heading) {
     Text(
       stringResource(R.string.settings_weather_detail),
@@ -1900,7 +1958,18 @@ private fun ColumnScope.PersonaTab(state: SettingsState, viewModel: SettingsView
   Routines(state, viewModel)
 
   Section(R.string.settings_persona_preview_heading) {
-    val composed = personaPrompt(state.persona)
+    // Deliberately the prompt Lin will really be given, not the answers on this screen. Until
+    // somebody answers a question of their own that is the shipped set, and a preview that went
+    // blank while Lin carried on being personal would be a screen lying about the app.
+    val shipped = usingDefaultPersona(state.persona)
+    val composed = personaPrompt(personaOrDefault(state.persona))
+    if (shipped) {
+      Text(
+        stringResource(R.string.settings_persona_preview_shipped),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
     Text(
       composed.ifBlank { stringResource(R.string.settings_persona_preview_empty) },
       style = MaterialTheme.typography.bodyMedium,
@@ -1913,8 +1982,10 @@ private fun ColumnScope.PersonaTab(state: SettingsState, viewModel: SettingsView
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    TextButton(onClick = { viewModel.clearPersona() }) {
-      Text(stringResource(R.string.settings_persona_clear))
+    if (!shipped) {
+      TextButton(onClick = { viewModel.clearPersona() }) {
+        Text(stringResource(R.string.settings_persona_clear))
+      }
     }
   }
 }
@@ -2067,6 +2138,7 @@ private fun questionLabel(question: Answers) =
     Answers.USES -> R.string.persona_q_uses
     Answers.ASK_FIRST -> R.string.persona_q_ask_first
     Answers.UNSURE -> R.string.persona_q_unsure
+    Answers.BIG -> R.string.persona_q_big
     Answers.ABOUT -> R.string.persona_q_about
   }
 
@@ -2111,6 +2183,8 @@ private fun optionLabel(question: Answers, option: String): Int =
     Answers.ASK_FIRST to "open" -> R.string.persona_o_ask_first_open
     Answers.UNSURE to "say_so" -> R.string.persona_o_unsure_say_so
     Answers.UNSURE to "look_it_up" -> R.string.persona_o_unsure_look_it_up
+    Answers.BIG to "here" -> R.string.persona_o_big_here
+    Answers.BIG to "delegate" -> R.string.persona_o_big_delegate
     else -> error("no label for ${question.id}=$option")
   }
 

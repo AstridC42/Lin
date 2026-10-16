@@ -95,6 +95,21 @@
     <!-- Setting a timer outright. An alarm still opens the clock app to be confirmed. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
+    <!--
+      Lin's own reminders, which are not the clock app's alarms.
+
+      SCHEDULE_EXACT_ALARM rather than USE_EXACT_ALARM: the first is asked for and can be
+      refused, the second is granted at install and cannot. A reminder is worth asking for and
+      not worth taking - refused, ReminderBook falls back to an inexact alarm and the tool says
+      the notification may be a few minutes late, which is a far better outcome than an app
+      that quietly helps itself to a permission about punctuality.
+
+      RECEIVE_BOOT_COMPLETED is not optional for this feature. Alarms are lost on restart, so
+      without it every reminder set before a reboot would be listed as pending and never arrive.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
 
@@ -387,6 +402,31 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service" />
         </service>
+
+        <!--
+          A reminder coming due, and the restart that would otherwise have lost it.
+
+          Not exported: the only things that may send to it are the alarm manager and the
+          system's boot broadcast, both of which reach a receiver in the app's own package.
+          MY_PACKAGE_REPLACED as well as BOOT_COMPLETED, because an update clears alarms
+          exactly as a reboot does.
+
+          Not direct-boot aware, and so deliberately not listening for
+          LOCKED_BOOT_COMPLETED: the reminders are kept in the app's own encrypted storage,
+          which cannot be read until the phone is first unlocked. Reminders come back then,
+          which is also the first moment anybody could see a notification.
+        -->
+        <receiver
+            android:name=".remind.ReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.lin.agent.REMIND" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Listens for "Hey Lin". Started by the setting, and stopped with it. -->
         <service

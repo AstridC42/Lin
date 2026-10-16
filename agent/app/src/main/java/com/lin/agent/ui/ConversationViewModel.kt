@@ -57,6 +57,7 @@ import com.lin.agent.core.tools.disabledFrom
 import com.lin.agent.core.standing.tasksFrom
 import com.lin.agent.model.StandingWorker
 import com.lin.agent.core.persona.personaFrom
+import com.lin.agent.core.persona.personaOrDefault
 import com.lin.agent.core.persona.personaPrompt
 import com.lin.agent.engine.AgentTool
 import com.lin.agent.engine.capabilityPrompt
@@ -190,6 +191,7 @@ constructor(
   private val lastSaidHolder: com.lin.agent.model.LastSaid,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
+  private val reminders: com.lin.agent.remind.ReminderBook,
   private val saved: SavedStateHandle,
 ) : ViewModel() {
 
@@ -308,6 +310,11 @@ constructor(
         StandingWorker.sync(work, tasksFrom(settings.standingTasks.first()))
       }
     }
+    // Reminders go back on the clock here as well as after a reboot. The boot broadcast is
+    // the reliable path, but it is not the only way a phone loses its alarms - a force stop,
+    // a battery optimiser, a restore onto another phone - and arming an alarm that is already
+    // armed costs nothing.
+    viewModelScope.launch { runCatching { reminders.rearm() } }
   }
 
   /**
@@ -742,12 +749,16 @@ constructor(
    * about the six tools added after it was written. A prompt assembled from the tools
    * actually on offer cannot drift from them. See [capabilityPrompt].
    *
-   * The personal half is whatever the user answered in the quiz, and nothing when they have
-   * not taken it.
+   * The personal half is whatever the user answered in the quiz, or the answers Lin ships
+   * with when they have not taken it - see [DEFAULT_PERSONA]. It is never empty, because an
+   * assistant that has to be told who it is talking to in every conversation is one nobody
+   * finishes setting up.
    */
   private suspend fun promptForToday(offered: List<AgentTool>): String {
     val who =
-      personaPrompt(personaFrom(runCatching { settings.persona.first() }.getOrNull()))
+      personaPrompt(
+        personaOrDefault(personaFrom(runCatching { settings.persona.first() }.getOrNull()))
+      )
     return buildString {
       append(todayLine(System.currentTimeMillis()))
       append(" This is the real date; use it and never a date you remember from elsewhere. ")

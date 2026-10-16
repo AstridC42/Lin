@@ -42,8 +42,14 @@ enum class Answers(val id: String, val kind: Kind, val options: List<String> = e
   /** What to call them. A name, or empty for nothing in particular. */
   NAME("name", Kind.TEXT),
 
-  /** How Lin should sound. */
-  TONE("tone", Kind.ONE_OF, listOf("plain", "warm", "precise", "playful")),
+  /**
+   * How Lin should sound.
+   *
+   * More than one, because the answers are not alternatives: "warm" and "playful" describe the
+   * same voice, and so do "plain" and "precise". Forcing a single pick threw away half of what
+   * the first person to answer it told us.
+   */
+  TONE("tone", Kind.ANY_OF, listOf("plain", "warm", "precise", "playful")),
 
   /** How much Lin should say when it has a choice. */
   LENGTH("length", Kind.ONE_OF, listOf("short", "medium", "full")),
@@ -69,6 +75,9 @@ enum class Answers(val id: String, val kind: Kind, val options: List<String> = e
 
   /** What to do when it does not know. */
   UNSURE("unsure", Kind.ONE_OF, listOf("say_so", "look_it_up")),
+
+  /** What to do with work the phone's own model is too small for. */
+  BIG("big", Kind.ONE_OF, listOf("here", "delegate")),
 
   /** Anything else worth always knowing. Free text. */
   ABOUT("about", Kind.TEXT);
@@ -103,15 +112,10 @@ fun personaPrompt(persona: Persona): String {
 
   first(persona, Answers.NAME)?.let { said.add("The user is called $it; address them by name.") }
 
-  first(persona, Answers.TONE)?.let {
-    when (it) {
-      "plain" -> "Speak plainly and get to the point. No preamble, no sign-off."
-      "warm" -> "Speak warmly and conversationally, as a friend would, without being effusive."
-      "precise" -> "Speak precisely. Prefer exact words to approximate ones, and say what you are unsure of."
-      "playful" -> "Speak lightly, with some humour, but never at the cost of being clear."
-      else -> null
-    }?.let(said::add)
-  }
+  // Worded so that two of them read as one voice rather than as two orders: each is a clause
+  // about how to speak, none of them opens with "Speak", and so "warm" and "playful" together
+  // describe somebody rather than contradicting each other.
+  all(persona, Answers.TONE).mapNotNull(::toneInWords).forEach(said::add)
 
   first(persona, Answers.LENGTH)?.let {
     when (it) {
@@ -162,10 +166,33 @@ fun personaPrompt(persona: Persona): String {
     }?.let(said::add)
   }
 
+  first(persona, Answers.BIG)?.let {
+    when (it) {
+      // "If you can" rather than "always", because the tool that does this is withheld when no
+      // server is configured, and an instruction to use something absent is how a turn gets
+      // spent apologising.
+      "delegate" ->
+        "When something needs a much larger model - real research, long writing, heavy " +
+          "analysis - hand it to the server model if you can rather than attempting it here."
+      "here" ->
+        "Answer here yourself. Do not hand work to a server model unless the user asks you to."
+      else -> null
+    }?.let(said::add)
+  }
+
   first(persona, Answers.ABOUT)?.let { said.add("The user says: $it") }
 
   return said.joinToString(" ")
 }
+
+private fun toneInWords(id: String): String? =
+  when (id) {
+    "plain" -> "Get to the point. No preamble, no sign-off."
+    "warm" -> "Be warm and direct, as a friend would be, without being effusive."
+    "precise" -> "Be precise: prefer exact words to approximate ones, and say what you are unsure of."
+    "playful" -> "Keep it light, with some dry humour, but never at the cost of being clear."
+    else -> null
+  }
 
 private fun useInWords(id: String): String? =
   when (id) {
@@ -243,3 +270,47 @@ fun storedPersona(persona: Persona): String {
 
 /** How many questions have an answer, for a screen that says how far through somebody is. */
 fun answeredCount(persona: Persona): Int = Answers.entries.count { persona[it.id]?.any { a -> a.isNotBlank() } == true }
+
+/**
+ * The answers Lin ships with.
+ *
+ * Not a guess at an average person. These are the answers the first person to use Lin actually
+ * gave, question by question, and they are here because the alternative was worse: a new
+ * install with an untouched quiz got no personal half at all, which made Lin a stranger that
+ * had to be told the same four things in every conversation.
+ *
+ * Two questions are deliberately missing rather than filled in. Language is absent because
+ * "whichever I asked in" is the absence of an instruction, not an instruction to answer in
+ * English - [personaPrompt] says nothing at all and the model follows the question. ASK_FIRST
+ * is absent because the answer was "trust the switches": that question overrides the Tools tab,
+ * so a default of "always ask before sending" would quietly make those switches a lie.
+ *
+ * Anyone the answers do not fit replaces them by answering a single question in the quiz - see
+ * [personaOrDefault], which is all-or-nothing on purpose. Half these answers mixed with half of
+ * somebody else's would be a prompt nobody wrote.
+ */
+val DEFAULT_PERSONA: Persona =
+  mapOf(
+    Answers.NAME.id to listOf("Sam"),
+    Answers.TONE.id to listOf("warm", "playful"),
+    Answers.LENGTH.id to listOf("medium"),
+    Answers.PLACE.id to listOf("Lisbon, Israel"),
+    Answers.UNITS.id to listOf("metric"),
+    Answers.USES.id to listOf("messages", "calendar", "music", "lookups"),
+    Answers.UNSURE.id to listOf("look_it_up"),
+    Answers.BIG.id to listOf("delegate"),
+    Answers.ABOUT.id to listOf("Mostly reminders and brainstorming."),
+  )
+
+/**
+ * The answers to build the prompt from: somebody's own, or the ones Lin ships with.
+ *
+ * All or nothing, and the one answered question is the switch. Merging the two - taking a name
+ * from one and a city from the other - would give somebody who answered "call me Sam" a prompt
+ * that also says they are in Lisbon, which is worse than either prompt on its own and
+ * impossible to see from the quiz screen.
+ */
+fun personaOrDefault(persona: Persona): Persona = persona.ifEmpty { DEFAULT_PERSONA }
+
+/** Whether the shipped answers are the ones in use, for a screen that should say so. */
+fun usingDefaultPersona(persona: Persona): Boolean = persona.isEmpty()
