@@ -1510,6 +1510,23 @@ private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewM
           modifier = Modifier.fillMaxWidth(),
         )
     }
+
+    // One real search, and what it actually got. Four different faults all read as "I
+    // couldn't find anything" in the conversation; a status and a count tell them apart.
+    TextButton(onClick = viewModel::trySearch, enabled = !state.searchTrying) {
+      Text(
+        stringResource(
+          if (state.searchTrying) R.string.settings_search_trying else R.string.settings_search_try
+        )
+      )
+    }
+    if (state.searchTrial.isNotEmpty()) {
+      Text(
+        state.searchTrial,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
   }
 
 }

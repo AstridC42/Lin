@@ -1981,6 +1981,41 @@ documented paths are the desktop head unit or a Play internal track. Nothing in
 the app can change that; it is a distribution rule, and the existing car
 notification remains the way to start listening without it.
 
+### Phase 23 — Three things that were quietly wrong
+
+All three came from one afternoon's screenshots, and all three had the same
+shape: Lin said something confident and untrue because a tool failed quietly.
+
+**"I can't find an app called Clock"**, on a phone with a clock on its home
+screen. The app list was read with `queryIntentActivities(launchable,
+MATCH_DEFAULT_ONLY)`, and that flag keeps only activities whose filter declares
+`CATEGORY_DEFAULT`. A launcher icon declares `MAIN` and `LAUNCHER`; most do not
+add `DEFAULT`. So **whole apps were missing from the list, and which ones
+depended on whether their author had added a category nobody needs.** The fix
+is to ask with no flags, which is how a launcher does it. The matching code was
+never the problem — it never saw the app.
+
+**A search that found nothing became a claim about the world.** Asked about
+Doctor Who Lego sets, Lin answered *"it's possible there aren't any official
+sets currently available"*. It had searched, got zero results, and the tool
+returned that as a **success** reading "Nothing came back" — so the model did
+what a model does with an empty result and reasoned about why the thing might
+not exist.
+
+An empty web search is almost never news about the world; it is news about the
+search. So zero hits is now a failure, and the message says what actually came
+back — an empty reply, data with no results in it, or a page rather than data,
+quoting its first forty characters — and tells the model, in those words, **not
+to say the thing does not exist, because nothing here says that.**
+
+**And a way to tell the four faults apart.** A search that returns nothing has
+four usual causes: no provider chosen, a wrong address, a key the service
+rejects, and a SearXNG serving HTML because its JSON format is off. From the
+conversation all four arrive identically, as "I couldn't find anything". So the
+settings screen now runs one real search and reports the fact rather than a
+verdict: `HTTP 200 · 0 results · 4812 bytes starting "<!DOCTYPE html>"`. That
+is one line somebody can read out, or screenshot, and it names the fault.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

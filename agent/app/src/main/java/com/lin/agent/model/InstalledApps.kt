@@ -18,7 +18,6 @@ package com.lin.agent.model
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import com.lin.agent.core.apps.InstalledApp
 
 /**
@@ -37,7 +36,13 @@ fun installedApps(context: Context): List<InstalledApp> =
   runCatching {
       val launchable = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
       context.packageManager
-        .queryIntentActivities(launchable, PackageManager.MATCH_DEFAULT_ONLY)
+        // No flags, and that is the fix for "I can't find an app called Clock" on a phone
+        // with a clock on its home screen. MATCH_DEFAULT_ONLY keeps only activities whose
+        // filter declares CATEGORY_DEFAULT, and a launcher icon declares MAIN and LAUNCHER -
+        // most do not add DEFAULT. So the flag quietly dropped whole apps from the list, and
+        // which ones depended on whether their author happened to add a category nobody
+        // needs. Asking for the launcher intent with no flags is how a launcher does it.
+        .queryIntentActivities(launchable, 0)
         .map { resolved ->
           InstalledApp(
             label = resolved.loadLabel(context.packageManager).toString(),

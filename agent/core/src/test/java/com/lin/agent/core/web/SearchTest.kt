@@ -183,3 +183,51 @@ class SearchTest {
     assertTrue(hitsInWords("q", listOf(SearchHit("", "https://x", ""))).contains("https://x"))
   }
 }
+
+class SearchEmptyTest {
+
+  @Test
+  fun `an empty search never says the thing does not exist`() {
+    // The bug this exists for: with no results Lin said "it's possible there aren't any
+    // official Doctor Who Lego sets" - a claim about the world built from a broken search.
+    val said = nothingCameBack(SearchProvider.BRAVE, """{"web":{"results":[]}}""")
+    assertTrue(said, said.contains("do not tell them"))
+    assertTrue(said, said.contains("does not exist"))
+    assertTrue(said, said.contains("brave"))
+  }
+
+  @Test
+  fun `what came back is named, so the fault can be found`() {
+    assertTrue(nothingCameBack(SearchProvider.SEARXNG, "").contains("an empty reply"))
+    assertTrue(
+      nothingCameBack(SearchProvider.SEARXNG, """{"results":[]}""").contains("no results in it")
+    )
+    // An array counts as data too. A service that answers `[]` has given an empty answer,
+    // not a web page, and telling somebody to go and look at their JSON settings over it
+    // would send them after the wrong fault.
+    assertTrue(nothingCameBack(SearchProvider.BRAVE, "[]").contains("no results in it"))
+    val page = nothingCameBack(SearchProvider.SEARXNG, "<!DOCTYPE html><html><head>")
+    assertTrue(page, page.contains("a page rather than data"))
+    assertTrue(page, page.contains("<!DOCTYPE html>"))
+  }
+
+  @Test
+  fun `the trial report is a fact rather than a verdict`() {
+    // What somebody can read out, or screenshot, and have it mean something.
+    val page = "<!DOCTYPE html><html><head>"
+    assertEquals(
+      "HTTP 200 · 0 results · ${page.length} bytes starting \"$page\"",
+      searchTrialReport(200, 0, page),
+    )
+    assertEquals("HTTP 403 · 0 results · 0 bytes", searchTrialReport(403, 0, ""))
+    assertEquals("HTTP 200 · 1 result · 2 bytes starting \"{}\"", searchTrialReport(200, 1, "{}"))
+  }
+
+  @Test
+  fun `a long first line is cut rather than filling the screen`() {
+    val report = searchTrialReport(200, 0, "x".repeat(500))
+    assertTrue(report, report.contains("500 bytes"))
+    assertTrue(report, report.contains("x".repeat(40)))
+    assertTrue(report, !report.contains("x".repeat(41)))
+  }
+}
