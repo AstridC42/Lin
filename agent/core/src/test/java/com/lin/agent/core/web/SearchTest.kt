@@ -18,6 +18,7 @@ package com.lin.agent.core.web
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,12 +26,14 @@ import org.junit.Test
 class SearchTest {
 
   @Test
-  fun `nothing stored means no provider`() {
-    assertEquals(SearchProvider.NONE, searchProviderNamed(null))
-    assertEquals(SearchProvider.NONE, searchProviderNamed(""))
-    // A value written by a newer build and read by an older one reads as none rather than
-    // throwing on a screen somebody is trying to open.
-    assertEquals(SearchProvider.NONE, searchProviderNamed("KAGI"))
+  fun `nothing stored means the provider that needs no setting up`() {
+    // This used to expect NONE, and the expectation was the bug: a fresh phone could not look
+    // anything up until its owner had found an API key. The keyless one is the default now.
+    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed(null))
+    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed(""))
+    // A value written by a newer build and read by an older one still reads as something
+    // usable rather than throwing on a screen somebody is trying to open.
+    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed("KAGI"))
   }
 
   @Test
@@ -229,5 +232,92 @@ class SearchEmptyTest {
     assertTrue(report, report.contains("500 bytes"))
     assertTrue(report, report.contains("x".repeat(40)))
     assertTrue(report, !report.contains("x".repeat(41)))
+  }
+}
+
+class WikipediaSearchTest {
+
+  // The shape the API documents: query.search[] with title, pageid and an HTML snippet.
+  private val body =
+    """
+    {"batchcomplete":"","continue":{"sroffset":6,"continue":"-||"},
+     "query":{"searchinfo":{"totalhits":812},
+      "search":[
+       {"ns":0,"title":"Nvidia Jetson","pageid":41160772,"size":12044,"wordcount":1100,
+        "snippet":"The <span class=\"searchmatch\">Orin</span> <span class=\"searchmatch\">Nano</span> Super is a developer kit &amp; module",
+        "timestamp":"2026-09-01T10:00:00Z"},
+       {"ns":0,"title":"Tegra","pageid":12345,"size":900,"wordcount":120,
+        "snippet":"Tegra &quot;Orin&quot; is a system on a chip","timestamp":"2026-08-01T10:00:00Z"}
+      ]}}
+    """
+
+  @Test
+  fun `a wikipedia search needs nothing filled in`() {
+    // The point of it being here: no key, no address, nothing to get wrong on a fresh phone.
+    val request = searchRequest(SearchProvider.WIKIPEDIA, "orin nano super", baseUrl = "", apiKey = "")
+    assertNotNull(request)
+    val (url, headers) = request!!
+    assertTrue(url, url.startsWith("https://en.wikipedia.org/w/api.php?action=query&list=search"))
+    assertTrue(url, url.contains("srsearch=orin%20nano%20super"))
+    assertTrue(url, url.contains("format=json"))
+    assertEquals("application/json", headers["Accept"])
+  }
+
+  @Test
+  fun `results come back as title, link and text`() {
+    val hits = hitsFrom(SearchProvider.WIKIPEDIA, body)
+    assertEquals(2, hits.size)
+    assertEquals("Nvidia Jetson", hits.first().title)
+    // By page id, because a title has to be percent-encoded and gets it wrong for exactly
+    // the pages whose names have the interesting characters in them.
+    assertEquals("https://en.wikipedia.org/?curid=41160772", hits.first().url)
+  }
+
+  @Test
+  fun `the highlighting markup never reaches the model`() {
+    // The API wraps every matched word in a span, because it is written for a web page. Left
+    // in, a model reads the tags as part of the sentence and repeats them.
+    val said = hitsFrom(SearchProvider.WIKIPEDIA, body).first().snippet
+    assertEquals("The Orin Nano Super is a developer kit & module", said)
+  }
+
+  @Test
+  fun `entities are decoded, and the ampersand last of all`() {
+    assertEquals("a & b", withoutMarkup("a &amp; b"))
+    assertEquals("say \"this\"", withoutMarkup("say &quot;this&quot;"))
+    // "&amp;lt;" is the four characters "&lt;", not a less-than sign. Decoding the ampersand
+    // first would turn it into one.
+    assertEquals("&lt;", withoutMarkup("&amp;lt;"))
+    assertEquals("one two", withoutMarkup("one\n\n   two"))
+  }
+
+  @Test
+  fun `a reply with no search in it is no results rather than a crash`() {
+    assertEquals(emptyList<SearchHit>(), hitsFrom(SearchProvider.WIKIPEDIA, """{"query":{}}"""))
+    assertEquals(emptyList<SearchHit>(), hitsFrom(SearchProvider.WIKIPEDIA, "not json"))
+  }
+
+  @Test
+  fun `the model is told it is holding an encyclopaedia`() {
+    // Six Wikipedia articles and a question about this week's prices is a wrong answer
+    // waiting to happen, and the model cannot see which search it was unless told.
+    val note = sourceNote(SearchProvider.WIKIPEDIA)
+    assertTrue(note, note.contains("not the whole web"))
+    assertEquals("", sourceNote(SearchProvider.BRAVE))
+    val said = hitsInWords("orin", hitsFrom(SearchProvider.WIKIPEDIA, body), note)
+    assertTrue(said, said.contains("Wikipedia only"))
+    assertTrue(said, said.contains("Nvidia Jetson"))
+  }
+
+  @Test
+  fun `a phone with nothing chosen can still look something up`() {
+    // The default used to be "nothing", and what that produced was an assistant that could
+    // not look anything up until its owner had found an API key.
+    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed(null))
+    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed(""))
+    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed("something from a newer build"))
+    // But a choice that was made is still honoured, including the choice of nothing.
+    assertEquals(SearchProvider.NONE, searchProviderNamed("none"))
+    assertEquals(SearchProvider.BRAVE, searchProviderNamed("BRAVE"))
   }
 }

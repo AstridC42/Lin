@@ -22,6 +22,7 @@ import com.lin.agent.core.web.SearchProvider
 import com.lin.agent.core.web.hitsFrom
 import com.lin.agent.core.web.hitsInWords
 import com.lin.agent.core.web.nothingCameBack
+import com.lin.agent.core.web.sourceNote
 import com.lin.agent.core.web.readableText
 import com.lin.agent.core.web.searchProviderNamed
 import com.lin.agent.core.web.searchRequest
@@ -112,7 +113,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     // Doctor Who Lego sets" - a confident claim about the world assembled out of a search
     // that did not work. An empty web search is news about the search, not about the world.
     if (hits.isEmpty()) return ToolResult.Failed(nothingCameBack(provider, answer.body))
-    return ToolResult.Ok(hitsInWords(query, hits))
+    return ToolResult.Ok(hitsInWords(query, hits, sourceNote(provider)))
   }
 
   private fun notSetUp(provider: SearchProvider) =
@@ -121,6 +122,12 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
         "Lin has no search service set up, so it cannot look anything up. Tell the user it is " +
           "in settings under Tools, and that it takes either their own SearXNG address or a " +
           "Brave API key. Then answer from what you know and say you could not check."
+      // Unreachable: Wikipedia needs nothing filled in, so its request is never null. Here
+      // because the compiler is right to insist, and a silent `else` would hide the day a
+      // fourth provider arrives without its own sentence.
+      SearchProvider.WIKIPEDIA ->
+        "The Wikipedia search could not be built, which should not happen. Say the lookup " +
+          "failed rather than guessing an answer."
       SearchProvider.SEARXNG ->
         "A SearXNG is chosen but its address is empty. Say it needs filling in under Tools."
       SearchProvider.BRAVE ->

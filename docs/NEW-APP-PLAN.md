@@ -2016,6 +2016,52 @@ settings screen now runs one real search and reports the fact rather than a
 verdict: `HTTP 200 · 0 results · 4812 bytes starting "<!DOCTYPE html>"`. That
 is one line somebody can read out, or screenshot, and it names the fault.
 
+### Phase 24 — Seeing what the tool said, and a search that needs no setting up
+
+Phase 23 made an empty search tell the truth, and the next screenshot showed
+the truth arriving as *"it's possible the search settings need checking under
+Tools"*. Which is correct, and useless. The tool had said which of four faults
+it was; **the model paraphrased it away**, because that is what models do with
+a sentence they are given.
+
+**So the tool's own words are now on the screen.** `ToolFinished` carries
+`said` — what the model was told, word for word — and a tool row can be tapped
+to show it. Nothing summarises it on the way up. This is not a search feature:
+every tool failure in the app was previously visible only as whatever the model
+made of it, and a paraphrase of a diagnosis is not a diagnosis.
+
+**And a provider that needs nothing.** The honest finding from an afternoon of
+probing is that there is no free, keyless, reliable *web* search API:
+DuckDuckGo's HTML endpoints answer a challenge page to anything that is not a
+browser, and every general API wants a key or a server. What does exist is
+Wikipedia's search API — documented, keyless, stable — so that is now a
+provider, and the default.
+
+The default changing from "nothing" to Wikipedia is a change of mind worth
+recording. The first default was chosen on the grounds that an app should not
+pick a third party on somebody's behalf. What it produced in practice was an
+assistant that could not look anything up until its owner had found an API key,
+which is a worse imposition than an encyclopaedia lookup nobody asked for.
+Anybody who wants their own SearXNG or a Brave key is two taps away.
+
+It is **not** a web search and is never sold as one. The results carry a note
+saying so — *"Wikipedia only, not the whole web — say so if the question was
+about prices, news, releases or anything from the last few months"* — because
+six encyclopaedia articles and a question about this week's prices is a wrong
+answer waiting to happen, and the model cannot see which search it is holding
+unless the result tells it.
+
+Two details the API forced:
+
+- **Links by page id, not title.** A title has to be percent-encoded and gets
+  it wrong for exactly the pages whose names contain the interesting
+  characters. `?curid=` is the id the API just handed back.
+- **The highlighting markup comes out.** Snippets arrive with
+  `<span class="searchmatch">` around every matched word, because the API is
+  written for a web page. Left in, a model reads the tags as part of the
+  sentence and repeats them. The ampersand is decoded **last**, or `&amp;lt;` —
+  the four characters `&lt;` — turns into a less-than sign.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
