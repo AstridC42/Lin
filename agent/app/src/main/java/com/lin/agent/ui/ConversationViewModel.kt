@@ -54,6 +54,12 @@ import androidx.work.NetworkType
 import com.lin.agent.R
 import com.lin.agent.core.diag.describeFault
 import com.lin.agent.core.tools.disabledFrom
+import com.lin.agent.core.standing.tasksFrom
+import com.lin.agent.model.StandingWorker
+import com.lin.agent.core.persona.personaFrom
+import com.lin.agent.core.persona.personaPrompt
+import com.lin.agent.engine.AgentTool
+import com.lin.agent.engine.capabilityPrompt
 import com.lin.agent.engine.delegationIsWorthIt
 import com.lin.agent.core.phone.permissionNeededBy
 import android.content.pm.PackageManager
@@ -294,6 +300,14 @@ constructor(
     // types. Failures are reported on the settings screen rather than here: a server that is
     // asleep should cost its own tools and nothing else, least of all the first screen.
     viewModelScope.launch { runCatching { mcp.refresh() } }
+    // The periodic check is re-synced at launch as well as when the list changes, because
+    // WorkManager's queue does not survive the app's data being cleared and a routine that
+    // silently stopped running is worse than one that never existed.
+    viewModelScope.launch {
+      runCatching {
+        StandingWorker.sync(work, tasksFrom(settings.standingTasks.first()))
+      }
+    }
   }
 
   /**
@@ -441,6 +455,12 @@ constructor(
           it.copy(notice = listOf(notice, unseen).filter { line -> line.isNotBlank() }.joinToString(" "))
         }
 
+          // Worked out once and used twice: the prompt describes exactly the tools the turn
+        // will be given, so it can neither promise one that was withheld nor stay silent
+        // about one that is there.
+        val withheld = withheldThisTurn()
+        val offered = registry.forRole(AgentRole.ORCHESTRATOR).filterNot { it.name in withheld }
+
         val builder = StringBuilder()
         // Read per turn rather than held, so changing the level applies to the next question
         // instead of the next launch.
@@ -449,13 +469,13 @@ constructor(
             backend = backend,
             registry = registry,
             role = AgentRole.ORCHESTRATOR,
-            systemPrompt = promptForToday(),
+            systemPrompt = promptForToday(offered),
             reasoning = reasoningNamed(settings.reasoning.first()),
             // Nothing to hand work to means `delegate` is not offered at all. Left in the
             // list it costs a whole exchange on questions a 2B model was always going to
             // answer itself - it writes a brief, is told there is no server, and then writes
             // the answer - which is twice the wait and a failed tool card for nothing.
-            withhold = withheldThisTurn(),
+            withhold = withheld,
           )
           .run(outgoing)
           .collect { event ->
@@ -713,10 +733,29 @@ constructor(
    * time of day would build a fresh conversation every minute and throw the history away with
    * it. The date changes once a day, which costs one rebuild.
    */
-  private fun promptForToday(): String =
-    todayLine(System.currentTimeMillis()) +
-      " This is the real date; use it and never a date you remember from elsewhere. " +
-      ORCHESTRATOR_PROMPT
+  /**
+   * The system prompt for this turn: the date, who the user is, and what Lin can do.
+   *
+   * All three parts are built rather than written down. The capability half used to be a
+   * constant listing every tool and how to treat it, and by the time it was replaced it
+   * still said Lin could not change Wi-Fi - which Shizuku had made untrue - and said nothing
+   * about the six tools added after it was written. A prompt assembled from the tools
+   * actually on offer cannot drift from them. See [capabilityPrompt].
+   *
+   * The personal half is whatever the user answered in the quiz, and nothing when they have
+   * not taken it.
+   */
+  private suspend fun promptForToday(offered: List<AgentTool>): String {
+    val who =
+      personaPrompt(personaFrom(runCatching { settings.persona.first() }.getOrNull()))
+    return buildString {
+      append(todayLine(System.currentTimeMillis()))
+      append(" This is the real date; use it and never a date you remember from elsewhere. ")
+      append("You are Lin, an assistant running on this phone. ")
+      if (who.isNotBlank()) append(who).append(' ')
+      append(capabilityPrompt(offered))
+    }
+  }
 
   private fun persist(messages: List<Message>) {
     saved[KEY_ROLES] = ArrayList(messages.map { it.role.name })
@@ -782,48 +821,6 @@ constructor(
   }
 
   private companion object {
-    /**
-     * Short, and that is the design rather than an omission.
-     *
-     * The app this replaces carried a prompt long enough to crowd out the conversation, because
-     * forty-four tools each needed explaining. An orchestrator with one tool needs a sentence
-     * about when to use it and a sentence about what not to lose.
-     */
-    const val ORCHESTRATOR_PROMPT =
-      "You are Lin, an assistant running on this phone. Answer directly whenever you can. " +
-        "For work that needs a much larger model - real research, long writing, heavy analysis " +
-        "- call delegate. When you do, copy every condition the user stated into constraints, " +
-        "word for word; never invent one they did not say. " +
-        "To ring someone or text them, call phone_action; it opens the dialer or the composer " +
-        "for the user to confirm, so say what you have put on screen rather than claiming it " +
-        "is done. Never invent a phone number - pass the name instead. " +
-        "Call remember when the user says to keep something, and recall when they refer to " +
-        "something you were not told in this conversation. If recall finds nothing, say so " +
-        "rather than filling the gap. " +
-        "Use find_photo to look through the user\'s pictures; they appear on screen. Set its " +
-        "look argument when the question is about what is IN a photo - the best match is then " +
-        "shown to you and you may describe it. Without it you have not seen them, so never " +
-        "describe what is in one. " +
-        "reply_to_message writes a reply onto the screen for the user to send; it does " +
-        "not send, so read the wording back and never say a message has gone. " +
-        "Use whats_on to look at the calendar rather than guessing what the user has on. " +
-        "add_to_calendar opens the calendar filled in and the user saves it, so say it is " +
-        "ready rather than saying it is in their calendar; work the date out from today's " +
-        "date above and pass it as numbers. A timer is set straight away, but an alarm opens " +
-        "the clock to be confirmed - do not say an alarm is set. " +
-        "Use media to see or change what is playing; check with action 'what' before " +
-        "saying what is on. play_music starts something new in the user\'s own music app - " +
-        "pass what they said, such as 'Stan by Eminem'; read its result before answering, " +
-        "because it says whether the music actually started or only a search opened. " +
-        "open_app opens an app by name. " +
-        "phone_setting does the flashlight and Do Not Disturb outright; for wi-fi, bluetooth, " +
-        "NFC and airplane mode Android allows no app to switch them, so it opens the phone\'s " +
-        "own panel - say it is ready to tap and never say the setting was changed. " +
-        "weather answers what it is doing outside - never answer that from your own " +
-        "knowledge, which is months old and somewhere else. " +
-        "These tools are everything Lin can do to the phone: if something is not on this " +
-        "list, say you cannot do it rather than describing how the user could."
-
     const val DIGEST_WORK = "digest"
 
     const val KEY_ROLES = "conversation_roles"

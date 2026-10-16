@@ -28,6 +28,13 @@ import com.lin.agent.car.CarNotification
 import com.lin.agent.core.car.DialPolicy
 import com.lin.agent.core.car.dialPolicyNamed
 import com.lin.agent.core.privileged.ShizukuState
+import com.lin.agent.core.persona.Persona
+import com.lin.agent.core.standing.StandingTask
+import com.lin.agent.core.standing.storedTasks
+import com.lin.agent.core.standing.tasksFrom
+import com.lin.agent.model.StandingWorker
+import com.lin.agent.core.persona.personaFrom
+import com.lin.agent.core.persona.storedPersona
 import com.lin.agent.core.tools.disabledFrom
 import com.lin.agent.engine.mcp.McpServer
 import com.lin.agent.engine.mcp.hostOf
@@ -128,6 +135,10 @@ data class SettingsState(
   val searchProvider: SearchProvider = SearchProvider.NONE,
   val searchUrl: String = "",
   val searchKey: String = "",
+  /** Things Lin does on a schedule. See [com.lin.agent.core.standing.StandingTask]. */
+  val standing: List<StandingTask> = emptyList(),
+  /** What the user answered about themselves. See [com.lin.agent.core.persona.Persona]. */
+  val persona: Persona = emptyMap(),
   /** Every tool Lin has, for the screen that switches them off. */
   val toolListing: List<ToolListing> = emptyList(),
   /** The ones switched off. See [com.lin.agent.core.tools.disabledFrom]. */
@@ -180,6 +191,7 @@ constructor(
   private val memories: MemoryStore,
   private val privileged: com.lin.agent.privileged.Privileged,
   private val tools: com.lin.agent.model.Tools,
+  private val work: androidx.work.WorkManager,
   private val mcp: com.lin.agent.mcp.McpConnections,
   private val speaker: com.lin.agent.voice.Speaker,
   @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
@@ -221,6 +233,8 @@ constructor(
           searchProvider = searchProviderNamed(settings.searchProvider.first()),
           searchUrl = settings.searchUrl.first(),
           searchKey = settings.searchKey.first(),
+          persona = personaFrom(settings.persona.first()),
+          standing = tasksFrom(settings.standingTasks.first()),
           toolListing = tools.listing(),
           disabledTools = disabledFrom(settings.disabledTools.first()),
           carNotification = settings.carNotification.first(),
@@ -624,6 +638,49 @@ constructor(
   fun onSearchKeyChanged(value: String) {
     _state.update { it.copy(searchKey = value) }
     viewModelScope.launch { settings.setSearchKey(value) }
+  }
+
+  /**
+   * Records one answer, or clears it when nothing is left.
+   *
+   * Written as it is answered rather than behind a Save button. Each question is independent
+   * of the others and of anything on a server, so there is nothing to validate together -
+   * and a quiz that loses your answers because you left the screen is a quiz nobody finishes.
+   */
+  fun setPersonaAnswer(questionId: String, values: List<String>) {
+    val kept = values.map { it.trim() }.filter { it.isNotEmpty() }
+    val next = _state.value.persona.toMutableMap()
+    if (kept.isEmpty()) next.remove(questionId) else next[questionId] = kept
+    _state.update { it.copy(persona = next) }
+    viewModelScope.launch { settings.setPersona(storedPersona(next)) }
+  }
+
+  /**
+   * Adds a routine, or changes one with the same id.
+   *
+   * The periodic check is synced on every change rather than only when the first one is
+   * added, because switching the last one off should stop the phone waking every quarter of
+   * an hour for nothing.
+   */
+  fun saveStanding(task: StandingTask) {
+    val next = _state.value.standing.filterNot { it.id == task.id } + task
+    writeStanding(next)
+  }
+
+  fun removeStanding(id: String) = writeStanding(_state.value.standing.filterNot { it.id == id })
+
+  fun setStandingEnabled(id: String, enabled: Boolean) =
+    writeStanding(_state.value.standing.map { if (it.id == id) it.copy(enabled = enabled) else it })
+
+  private fun writeStanding(tasks: List<StandingTask>) {
+    _state.update { it.copy(standing = tasks) }
+    viewModelScope.launch { settings.setStandingTasks(storedTasks(tasks)) }
+    StandingWorker.sync(work, tasks)
+  }
+
+  fun clearPersona() {
+    _state.update { it.copy(persona = emptyMap()) }
+    viewModelScope.launch { settings.setPersona("") }
   }
 
   fun setTapSend(policy: TapPolicy) {

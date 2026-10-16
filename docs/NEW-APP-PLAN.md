@@ -1691,6 +1691,97 @@ answer is five, and a second look at anything spent the budget on a task that
 was going fine. The wall clock and the repetition guard are still underneath
 it.
 
+### Phase 19 — A prompt that is asked for rather than written down
+
+**The capability half could not stay true.** The system prompt was a constant
+listing every tool and how to treat it, and by the time it was replaced it
+still said Lin could not change Wi-Fi — which Shizuku had made untrue phases
+earlier — and said nothing at all about the six tools added after it was
+written. Nothing enforced the correspondence; keeping it was a matter of
+remembering, and it was not remembered.
+
+So `AgentTool` gained `guidance`: a sentence or two about how to use that
+tool and what not to claim about it, living on the tool rather than in a
+paragraph somewhere else. `capabilityPrompt` assembles the prompt from the
+tools a turn is **actually** given — after the role filter and after anything
+the user switched off — so it can neither promise a tool that is not there nor
+stay silent about one that is. Sorted by name, which is not tidiness: an
+unchanged prefix is what lets a server reuse its cache of it, and a prompt
+that reshuffled itself every turn would throw that away on every question.
+
+**The personal half is asked.** A free-text "system prompt" box would be
+cheaper and worse: most people leave it empty, and the rest write something
+that fights the capability half. A ten-question quiz asks only what the app
+genuinely cannot work out — what to call them, which language, where they are,
+how much to say, what Lin must always ask about first — and composes the rest.
+
+The rule the composition turns on: **an unanswered question contributes
+nothing**. Not a default sentence. A prompt that says "answer in English" to
+somebody who never said so is a prompt making a decision on their behalf and
+hiding it in text they cannot see.
+
+The screen shows the composed text verbatim, not a summary. Somebody handing
+an assistant standing instructions about themselves should be able to read
+exactly what it was told, and a preview that paraphrased would be the one part
+of that screen able to lie quietly.
+
+Two small decisions worth keeping. Picking an already-selected radio option
+clears it, because every question is optional and a radio group with no way
+back makes that untrue. And the option labels are an exhaustive `when` over
+the question-and-option pair rather than a resource name built from strings,
+so an option added in `core` without a label is a compile error instead of a
+blank row.
+
+**Settings are cards now.** One UI's shape: each group in a rounded container
+with its name above it in the accent colour, rather than one flat column where
+the only thing separating "which model answers" from "what Lin may do to the
+phone" is a slightly larger line of text. The heading sits outside the card,
+which is the detail that makes it read as grouping rather than as a list of
+boxes.
+
+Twenty-one sections were converted by a mechanical transform rather than by
+hand. It produced three compile errors — one `val` declared in one section and
+used in another, and two missing imports — which is the argument for doing it
+that way: the compiler found every real problem, and a careful manual pass
+over two thousand lines would not have.
+
+### Phase 20 — Things Lin does without being asked
+
+The feature that makes "assistant" mean something other than "chat window". A
+question somebody asks every morning is a question they should have to ask
+once: a routine is a question, a time and some days, and Lin runs a real turn
+with the real tools and puts the answer in a notification.
+
+**Periodic, not exact.** The worker wakes every quarter of an hour and usually
+finds nothing to do. That is cheaper than it sounds and much simpler than an
+exact alarm per task — exact alarms need a permission Android grants
+grudgingly, and a routine is not worth asking somebody for that.
+
+Lateness is handled by the rule instead of the schedule, and that rule is the
+interesting part. A task late by up to three hours still runs: a briefing at
+08:40 because the phone was asleep at 08:00 is still the briefing somebody
+wanted. Later than that is skipped until tomorrow, because **a morning
+briefing delivered at eleven at night is not a late briefing, it is a wrong
+one.**
+
+Three smaller decisions, each with a test:
+
+- **Once a day, not once per check.** Without that, a daily briefing would
+  arrive twelve times before lunch. The mark is written *after* an answer, so
+  a task that failed is retried rather than lost for the day.
+- **Empty days means every day**, rather than all seven being stored. A task
+  created before the app knew about weekdays keeps working instead of quietly
+  matching nothing.
+- **Delegation is withheld in a routine.** A background task is the worst
+  place to spend a minute on a server round trip nobody is waiting through.
+
+The settings written after each task rather than at the end of the batch, so
+one that answered is not run again because a later one crashed the worker.
+
+This is the first thing to use the tool registry as a singleton rather than
+through the conversation's ViewModel — which is what Phase 19's refactor was
+for, though it was done for the settings screen.
+
 ### Phase 11 — The design pass
 
 Four directions were drawn side by side on a canvas - a quiet page with no

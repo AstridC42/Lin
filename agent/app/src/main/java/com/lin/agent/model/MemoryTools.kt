@@ -103,6 +103,9 @@ class RememberTool(
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "Call remember when the user says to keep something."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val fact = (arguments["fact"] as? String)?.trim().orEmpty()
     if (fact.isEmpty()) return ToolResult.Failed("There was nothing to remember.")
@@ -155,6 +158,10 @@ class RecallTool(
     )
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
+
+  override val guidance =
+      "Call recall when they refer to something you were not told in this conversation; if it " +
+      "finds nothing, say so rather than filling the gap."
 
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val about = (arguments["about"] as? String)?.trim().orEmpty()

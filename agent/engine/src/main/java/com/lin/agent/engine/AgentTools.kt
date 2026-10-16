@@ -100,7 +100,55 @@ interface AgentTool {
 
   val roles: Set<AgentRole>
 
+  /**
+   * A sentence or two of prompt, about how to use this tool and what not to claim about it.
+   *
+   * Separate from [description], which tells the model what the tool is for and goes in the
+   * schema. This is the behaviour around it: that a staged action is not a done one, that a
+   * result has to be read before answering, that a tool's absence is not an invitation to
+   * explain how the user could do it themselves.
+   *
+   * It lives on the tool because the alternative had already failed. The system prompt was a
+   * hand-written constant listing every tool and how to treat it, and by the time it was
+   * replaced it still said Lin could not change Wi-Fi - which Shizuku had made untrue - and
+   * said nothing at all about the six tools added after it was written. A prompt assembled
+   * from the tools that are switched on cannot drift from them.
+   *
+   * Empty by default, which is a fine answer: a tool whose description is enough needs no
+   * second paragraph competing for the model's attention.
+   */
+  val guidance: String
+    get() = ""
+
   suspend fun run(arguments: Map<String, Any?>): ToolResult
+}
+
+/**
+ * The capability half of a system prompt, built from the tools actually on offer.
+ *
+ * [tools] is what the turn will really be given - after the role filter and after anything
+ * the user switched off - so the prompt can neither promise a tool that is not there nor stay
+ * silent about one that is.
+ *
+ * Sorted by name, like the registry's own listing, so the prompt is byte-identical between
+ * turns that offer the same tools. That is not tidiness: an unchanged prefix is what lets a
+ * server reuse its cache of it, and a prompt that reshuffled itself every turn would throw
+ * that away on every question.
+ */
+fun capabilityPrompt(tools: List<AgentTool>): String {
+  if (tools.isEmpty()) {
+    return "You have no tools at all in this conversation. Answer from what you know, and " +
+      "say plainly when you cannot do something rather than describing how the user could."
+  }
+  val said = tools.sortedBy { it.name }.mapNotNull { it.guidance.trim().takeIf(String::isNotEmpty) }
+  return buildString {
+    append("Answer directly whenever you can. ")
+    said.forEach { append(it.trimEnd()).append(' ') }
+    append(
+      "Those tools are everything you can do to this phone: if something is not among them, " +
+        "say you cannot do it rather than explaining how the user could."
+    )
+  }
 }
 
 /**

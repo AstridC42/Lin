@@ -72,6 +72,10 @@ class WeatherTool(private val context: Context) : AgentTool {
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "weather answers what it is doing outside - never answer that from your own knowledge, " +
+      "which is months old and somewhere else."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val asked = (arguments["when"] as? String).orEmpty()
     val ahead =

@@ -71,6 +71,12 @@ class FindPhotoTool(
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "Use find_photo to look through the user's pictures; they appear on screen. Set its " +
+      "look argument when the question is about what is IN a photo - the best match is then " +
+      "shown to you and you may describe it. Without it you have not seen them, so never " +
+      "describe what is in one."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val describe = (arguments["describe"] as? String)?.trim().orEmpty()
     if (describe.isEmpty()) return ToolResult.Failed("There was nothing to look for.")

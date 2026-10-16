@@ -75,6 +75,11 @@ class PlayMusicTool(
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "play_music starts something in the user's own music app - pass what they said, such as " +
+      "'Stan by Eminem', or leave it out and it resumes whatever was playing. Read its " +
+      "result, because it says whether the music actually started or only a search opened."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val said = (arguments["what"] as? String).orEmpty()
     val request = musicRequest(said)
