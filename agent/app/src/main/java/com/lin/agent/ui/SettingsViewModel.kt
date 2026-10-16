@@ -29,7 +29,11 @@ import com.lin.agent.core.car.DialPolicy
 import com.lin.agent.core.car.dialPolicyNamed
 import com.lin.agent.core.privileged.ShizukuState
 import com.lin.agent.core.persona.Persona
+import com.lin.agent.R
 import com.lin.agent.core.standing.StandingTask
+import com.lin.agent.core.web.hitsFrom
+import com.lin.agent.core.web.searchRequest
+import com.lin.agent.core.web.searchTrialReport
 import com.lin.agent.core.standing.storedTasks
 import com.lin.agent.core.standing.tasksFrom
 import com.lin.agent.model.StandingWorker
@@ -135,6 +139,9 @@ data class SettingsState(
   val searchProvider: SearchProvider = SearchProvider.NONE,
   val searchUrl: String = "",
   val searchKey: String = "",
+  /** What a trial search actually got back, for a screen that must say facts rather than verdicts. */
+  val searchTrial: String = "",
+  val searchTrying: Boolean = false,
   /** Things Lin does on a schedule. See [com.lin.agent.core.standing.StandingTask]. */
   val standing: List<StandingTask> = emptyList(),
   /** Reminders Lin will send, soonest first. */
@@ -195,6 +202,7 @@ constructor(
   private val memories: MemoryStore,
   private val privileged: com.lin.agent.privileged.Privileged,
   private val reminders: com.lin.agent.remind.ReminderBook,
+  private val web: com.lin.agent.web.Web,
   private val tools: com.lin.agent.model.Tools,
   private val work: androidx.work.WorkManager,
   private val mcp: com.lin.agent.mcp.McpConnections,
@@ -699,6 +707,47 @@ constructor(
       // Read back rather than trusted: the book is the truth, and one fired while the screen
       // was open would otherwise stay on it.
       _state.update { it.copy(reminders = reminders.ahead()) }
+    }
+  }
+
+  /**
+   * Runs one real search and reports exactly what came back.
+   *
+   * Here because the alternative is guesswork. A search that returns nothing has four usual
+   * causes - no provider, a wrong address, a key the service rejects, and a SearXNG that
+   * serves HTML instead of JSON - and they are indistinguishable from the conversation, where
+   * all four arrive as "I couldn't find anything". A status, a count and the first few bytes
+   * tell them apart in one line, and it is a line somebody can read out or screenshot.
+   */
+  fun trySearch() {
+    if (_state.value.searchTrying) return
+    _state.update { it.copy(searchTrying = true, searchTrial = "") }
+    viewModelScope.launch {
+      val provider = _state.value.searchProvider
+      val request =
+        searchRequest(
+          provider = provider,
+          query = "hello world",
+          baseUrl = _state.value.searchUrl,
+          apiKey = _state.value.searchKey,
+        )
+      val said =
+        if (request == null) {
+          appContext.getString(R.string.settings_search_try_unset)
+        } else {
+          val (url, headers) = request
+          val got = runCatching { web.get(url, headers) }
+          got.fold(
+            onSuccess = { searchTrialReport(it.status, hitsFrom(provider, it.body).size, it.body) },
+            onFailure = {
+              appContext.getString(
+                R.string.settings_search_try_unreachable,
+                it.message ?: it::class.java.simpleName,
+              )
+            },
+          )
+        }
+      _state.update { it.copy(searchTrying = false, searchTrial = said) }
     }
   }
 

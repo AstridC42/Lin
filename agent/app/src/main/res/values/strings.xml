@@ -316,6 +316,12 @@
     <item quantity="other">%1$d messages waiting</item>
   </plurals>
 
+  <string name="settings_search_try">Try a search</string>
+  <string name="settings_search_trying">Searching…</string>
+  <string name="settings_search_try_unset">Nothing to try: pick a provider and fill in its
+    address or key first.</string>
+  <string name="settings_search_try_unreachable">Could not reach it: %1$s</string>
+
   <string name="reminder_channel">Reminders</string>
   <string name="reminder_channel_detail">The reminders you asked Lin to send.</string>
   <string name="reminder_from_lin">Reminder from Lin</string>
