@@ -187,3 +187,44 @@ fun urlEscape(text: String): String =
       else append('%').append("%02X".format(value))
     }
   }
+
+/**
+ * What to say when the search service answered and there was nothing in it.
+ *
+ * This exists because of the one failure that matters here: with no results, Lin said *"it's
+ * possible there aren't any official Doctor Who Lego sets"* - a confident claim about the
+ * world, built out of a search that did not work. An empty result from a web search is almost
+ * never news about the world; it is news about the search. So this never reads as "nothing
+ * exists", and it says what actually came back so the fault can be found rather than guessed
+ * at.
+ */
+fun nothingCameBack(provider: SearchProvider, body: String): String {
+  val what = body.trim()
+  val shape =
+    when {
+      what.isEmpty() -> "an empty reply"
+      what.startsWith("{") || what.startsWith("[") -> "data with no results in it"
+      else -> "a page rather than data (it starts \"${what.take(40).replace('\n', ' ')}\")"
+    }
+  return "The search service (${provider.name.lowercase()}) answered with $shape, so this " +
+    "lookup did not work. Tell the user the search came back empty and that its settings may " +
+    "need checking under Tools - do not tell them the thing they asked about does not exist, " +
+    "because nothing here says that."
+}
+
+/**
+ * One line describing what a trial search actually got, for the settings screen.
+ *
+ * The screen needs a fact, not a verdict. "Search is not working" sends somebody round in
+ * circles; "HTTP 200 - 0 results - 4812 bytes starting <!DOCTYPE html>" tells them, and tells
+ * anybody they show it to, exactly which of the four usual faults it is.
+ */
+fun searchTrialReport(status: Int, hits: Int, body: String): String {
+  val head = body.trim().take(40).replace(Regex("\\s+"), " ")
+  return buildString {
+    append("HTTP ").append(status)
+    append(" · ").append(hits).append(if (hits == 1) " result" else " results")
+    append(" · ").append(body.length).append(" bytes")
+    if (head.isNotEmpty()) append(" starting \"").append(head).append('"')
+  }
+}

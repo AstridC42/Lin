@@ -21,6 +21,7 @@ import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.core.web.SearchProvider
 import com.lin.agent.core.web.hitsFrom
 import com.lin.agent.core.web.hitsInWords
+import com.lin.agent.core.web.nothingCameBack
 import com.lin.agent.core.web.readableText
 import com.lin.agent.core.web.searchProviderNamed
 import com.lin.agent.core.web.searchRequest
@@ -106,6 +107,11 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
           "its settings.yml."
       )
     }
+    // Nothing found is a failure, not an answer. This used to return Ok with "Nothing came
+    // back", and what the user saw was Lin saying "it's possible there aren't any official
+    // Doctor Who Lego sets" - a confident claim about the world assembled out of a search
+    // that did not work. An empty web search is news about the search, not about the world.
+    if (hits.isEmpty()) return ToolResult.Failed(nothingCameBack(provider, answer.body))
     return ToolResult.Ok(hitsInWords(query, hits))
   }
 
