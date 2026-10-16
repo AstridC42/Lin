@@ -278,6 +278,18 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setStandingTasks(value: String) = write(STANDING_TASKS, value)
 
+  /**
+   * The reminders Lin has been asked to send, as JSON. See
+   * [com.lin.agent.core.remind.remindersFrom].
+   *
+   * Here rather than in a database because an alarm does not survive a reboot and the words
+   * have to. They are read back at every start and put on the clock again; without that a
+   * reminder set before a restart would be listed as pending forever and never arrive.
+   */
+  val reminders: Flow<String> = read(REMINDERS, "")
+
+  suspend fun setReminders(value: String) = write(REMINDERS, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -568,6 +580,7 @@ class SettingsRepository(private val context: Context) {
     val SEARCH_KEY = stringPreferencesKey("search_key")
     val PERSONA = stringPreferencesKey("persona")
     val STANDING_TASKS = stringPreferencesKey("standing_tasks")
+    val REMINDERS = stringPreferencesKey("reminders")
     val SERVER_TEMPERATURE = stringPreferencesKey("server_temperature")
     val SERVER_TOP_P = stringPreferencesKey("server_top_p")
     val SERVER_TOP_K = stringPreferencesKey("server_top_k")

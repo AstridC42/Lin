@@ -251,6 +251,8 @@
     adds nothing at all, rather than a default you never chose.</string>
   <string name="settings_persona_progress">%1$d of %2$d answered</string>
   <string name="settings_persona_clear">Clear all answers</string>
+  <string name="settings_persona_preview_shipped">Lin ships with a set of answers, shown below.
+    Answer any question above and yours replace them all.</string>
   <string name="settings_persona_preview_heading">What Lin will be told</string>
   <string name="settings_persona_preview_empty">Nothing yet. Lin will work from its abilities
     alone.</string>
@@ -296,6 +298,20 @@
   <string name="persona_o_unsure_say_so">Say so plainly</string>
   <string name="persona_o_unsure_look_it_up">Look it up first, then say so if it still
     cannot</string>
+  <string name="reminder_channel">Reminders</string>
+  <string name="reminder_channel_detail">The reminders you asked Lin to send.</string>
+  <string name="reminder_from_lin">Reminder from Lin</string>
+  <string name="settings_reminders_heading">Reminders</string>
+  <string name="settings_reminders_detail">What Lin will notify you about. Ask Lin to set one,
+    or to cancel it.</string>
+  <string name="settings_reminders_none">Nothing set.</string>
+  <string name="settings_reminders_cancel">Cancel</string>
+  <string name="settings_reminders_exact">Exact alarms are off, so a reminder can arrive a few
+    minutes late.</string>
+  <string name="settings_reminders_exact_fix">Allow exact alarms</string>
+  <string name="persona_q_big">What about work that is too big for the phone?</string>
+  <string name="persona_o_big_here">Answer it here anyway</string>
+  <string name="persona_o_big_delegate">Hand it to the server model</string>
   <string name="persona_q_about">Anything else Lin should always know?</string>
   <string name="persona_q_about_hint">Free text. Goes to Lin word for word.</string>
 

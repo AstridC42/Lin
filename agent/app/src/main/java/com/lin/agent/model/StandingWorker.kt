@@ -32,6 +32,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.lin.agent.R
 import com.lin.agent.core.persona.personaFrom
+import com.lin.agent.core.persona.personaOrDefault
 import com.lin.agent.core.persona.personaPrompt
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.core.standing.StandingTask
@@ -140,7 +141,9 @@ class StandingWorker(private val context: Context, params: WorkerParameters) :
     val withheld = off + DelegateTool.NAME
     val offered = registry.forRole(AgentRole.ORCHESTRATOR).filterNot { it.name in withheld }
 
-    val who = personaPrompt(personaFrom(deps.settings().persona.first()))
+    // The same persona the conversation uses, shipped answers included: a routine that spoke
+    // to somebody else's Lin would be the one place the personal half silently did not apply.
+    val who = personaPrompt(personaOrDefault(personaFrom(deps.settings().persona.first())))
     val prompt = buildString {
       append("You are Lin, an assistant running on this phone. ")
       append("This question was asked by a standing routine rather than typed just now, so ")

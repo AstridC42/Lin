@@ -78,6 +78,7 @@ constructor(
   private val privileged: Privileged,
   private val lastSaid: LastSaid,
   private val web: com.lin.agent.web.Web,
+  private val reminders: com.lin.agent.remind.ReminderBook,
 ) {
 
   /**
@@ -113,6 +114,11 @@ constructor(
       OpenAppTool(context, launchGuard),
       AddToCalendarTool(context, launchGuard),
       AlarmTool(context, launchGuard),
+      // Lin's own reminders, which are not the clock app's alarms: these arrive as a
+      // notification from Lin whether or not anything is open.
+      RemindTool(reminders) { java.time.ZoneId.systemDefault() },
+      ListRemindersTool(reminders) { java.time.ZoneId.systemDefault() },
+      CancelReminderTool(reminders) { java.time.ZoneId.systemDefault() },
       ListDocumentsTool(documentLibrary),
       ReadDocumentTool(documentLibrary, documents),
       WriteDocumentTool(documentLibrary, documents, pdfPages),

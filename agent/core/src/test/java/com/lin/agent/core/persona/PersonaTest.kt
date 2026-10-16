@@ -113,13 +113,107 @@ class PersonaTest {
         "uses" to listOf("messages", "music"),
         "ask_first" to listOf("send"),
         "unsure" to listOf("look_it_up"),
+        "big" to listOf("delegate"),
         "about" to listOf("I drive a lot and often ask with my voice."),
       )
     val said = personaPrompt(persona)
     for (expected in listOf("Ben", "Hebrew", "Tel Aviv", "Celsius", "drive a lot")) {
       assertTrue(expected, said.contains(expected))
     }
-    assertEquals(10, answeredCount(persona))
+    assertEquals(Answers.entries.size, answeredCount(persona))
+  }
+
+
+  @Test
+  fun `two tones read as one voice rather than two orders`() {
+    // The answer that made TONE a multiple choice: "warm" and "playful" describe the same
+    // person. Both have to arrive, and neither may open with the same word, or the prompt
+    // reads as a model being given contradictory instructions about how to speak.
+    val said = personaPrompt(mapOf("tone" to listOf("warm", "playful")))
+    assertTrue(said, said.contains("warm"))
+    assertTrue(said, said.contains("humour"))
+    assertFalse(said, said.contains("Speak"))
+  }
+
+  @Test
+  fun `handing big work to the server is hedged and keeping it here is not`() {
+    // The tool that does the handing over is withheld when no server is configured, so an
+    // absolute instruction to use it would spend turns apologising for something absent.
+    val away = personaPrompt(mapOf("big" to listOf("delegate")))
+    assertTrue(away, away.contains("if you can"))
+    val here = personaPrompt(mapOf("big" to listOf("here")))
+    assertTrue(here, here.contains("unless the user asks"))
+  }
+
+  // ---- the answers Lin ships with ----
+
+  @Test
+  fun `the shipped answers say who Lin is talking to`() {
+    val said = personaPrompt(DEFAULT_PERSONA)
+    for (expected in
+      listOf("Looper", "address them by name", "Tel Aviv", "Celsius", "look it up", "brainstorming")) {
+      assertTrue(expected, said.contains(expected))
+    }
+  }
+
+  @Test
+  fun `the shipped answers leave language and what to ask about first unsaid`() {
+    // Both were answered with the absence of an instruction: "whichever I asked in", and
+    // "trust the switches". A default sentence for either would quietly override something -
+    // the question, or the Tools tab.
+    val said = personaPrompt(DEFAULT_PERSONA)
+    // The language sentence, not the word "answer": the length answer legitimately says
+    // "Answer in a short paragraph", and an assertion that cannot tell them apart would pass
+    // for the wrong reason the moment either sentence is reworded.
+    assertFalse(said, said.contains("whatever language the question was asked in"))
+    assertFalse(said, said.contains("Always ask"))
+  }
+
+  @Test
+  fun `every shipped answer is a question that exists and an option that is offered`() {
+    // A typo here is invisible: the prompt simply comes out missing a line. This is the test
+    // that makes it a build failure instead.
+    for ((id, values) in DEFAULT_PERSONA) {
+      val question = Answers.byId(id)
+      assertTrue("no question called $id", question != null)
+      val asked = question!!
+      if (asked.kind == Answers.Kind.TEXT) {
+        assertEquals("$id is text, so one answer", 1, values.size)
+        assertTrue("$id is blank", values.first().isNotBlank())
+      } else {
+        for (value in values) {
+          assertTrue("$id=$value is not offered", value in asked.options)
+        }
+        if (asked.kind == Answers.Kind.ONE_OF) {
+          assertEquals("$id takes one answer", 1, values.size)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun `one answer of your own replaces the shipped set entirely`() {
+    // All or nothing on purpose. Somebody who says "call me Sam" and nothing else must not
+    // end up with a prompt that also says they are in Tel Aviv.
+    val mine = mapOf("name" to listOf("Sam"))
+    assertEquals(mine, personaOrDefault(mine))
+    val said = personaPrompt(personaOrDefault(mine))
+    assertTrue(said, said.contains("Sam"))
+    assertFalse(said, said.contains("Tel Aviv"))
+  }
+
+  @Test
+  fun `an untouched quiz still makes Lin personal`() {
+    assertEquals(DEFAULT_PERSONA, personaOrDefault(emptyMap()))
+    assertTrue(usingDefaultPersona(emptyMap()))
+    assertFalse(usingDefaultPersona(mapOf("name" to listOf("Sam"))))
+  }
+
+  @Test
+  fun `the shipped answers survive the same storage the quiz uses`() {
+    // Not hypothetical: clearing the quiz stores nothing, which is what brings these back,
+    // and a settings backup round-trips through the same two functions.
+    assertEquals(DEFAULT_PERSONA, personaFrom(storedPersona(DEFAULT_PERSONA)))
   }
 
   // ---- storage ----
