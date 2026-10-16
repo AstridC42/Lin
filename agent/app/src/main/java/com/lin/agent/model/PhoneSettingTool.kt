@@ -96,6 +96,13 @@ class PhoneSettingTool(
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "phone_setting sets the flashlight and Do Not Disturb outright. Wi-fi, bluetooth, NFC " +
+      "and airplane mode it can only set directly when the user has lent Lin the shell's " +
+      "privileges through Shizuku; otherwise it opens the phone's own panel for them to tap. " +
+      "Read the result - it says which of the two happened, and you must never say a setting " +
+      "was changed when a panel was merely opened."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val saidSetting = (arguments["setting"] as? String).orEmpty()
     val switch =

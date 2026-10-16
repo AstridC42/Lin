@@ -94,6 +94,11 @@ class PhoneTool(
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "To ring someone or text them, call phone_action; it opens the dialer or the composer " +
+      "for the user to confirm, so say what you have put on screen rather than claiming it is " +
+      "done, and never invent a phone number - pass the name instead."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val who = (arguments["who"] as? String)?.trim().orEmpty()
     if (who.isEmpty()) return ToolResult.Failed("No one was named, so nothing was done.")

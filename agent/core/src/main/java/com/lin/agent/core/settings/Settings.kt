@@ -258,6 +258,18 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setSearchKey(value: String) = write(SEARCH_KEY, value)
 
+  /**
+   * The answers to the questions about who the user is, as JSON. See
+   * [com.lin.agent.core.persona.personaFrom].
+   *
+   * Only what they answered. An unanswered question contributes nothing to the prompt rather
+   * than a default, because a prompt that decides something on somebody's behalf and hides it
+   * in text they cannot see is worse than a prompt that is quiet.
+   */
+  val persona: Flow<String> = read(PERSONA, "")
+
+  suspend fun setPersona(value: String) = write(PERSONA, value)
+
   val musicApp: Flow<String> = read(MUSIC_APP, "")
 
   suspend fun setMusicApp(value: String) = write(MUSIC_APP, value)
@@ -546,6 +558,7 @@ class SettingsRepository(private val context: Context) {
     val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
     val SEARCH_URL = stringPreferencesKey("search_url")
     val SEARCH_KEY = stringPreferencesKey("search_key")
+    val PERSONA = stringPreferencesKey("persona")
     val SERVER_TEMPERATURE = stringPreferencesKey("server_temperature")
     val SERVER_TOP_P = stringPreferencesKey("server_top_p")
     val SERVER_TOP_K = stringPreferencesKey("server_top_k")

@@ -48,10 +48,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import com.lin.agent.core.persona.Answers
+import com.lin.agent.core.persona.answeredCount
+import com.lin.agent.core.persona.personaPrompt
 import com.lin.agent.core.web.SearchProvider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
@@ -185,6 +190,7 @@ fun SettingsScreen(
       // it anything to show is then a compile error rather than an empty tab.
       when (tab) {
         SettingsTab.MODELS -> ModelsTab(state, viewModel)
+        SettingsTab.PERSONA -> PersonaTab(state, viewModel)
         SettingsTab.SERVER -> ServerTab(state, viewModel)
         SettingsTab.VOICE -> VoiceTab(state, viewModel)
         SettingsTab.PHONE -> PhoneTab(state, viewModel)
@@ -210,6 +216,7 @@ fun SettingsScreen(
  */
 private enum class SettingsTab(@param:StringRes val title: Int) {
   MODELS(R.string.settings_tab_models),
+  PERSONA(R.string.settings_tab_persona),
   SERVER(R.string.settings_tab_server),
   VOICE(R.string.settings_tab_voice),
   PHONE(R.string.settings_tab_phone),
@@ -225,53 +232,74 @@ private enum class SettingsTab(@param:StringRes val title: Int) {
  */
 @Composable
 private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewModel) {
-  Text(
-    stringResource(R.string.settings_models_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_device, state.memoryGb, state.socModel.ifEmpty { "?" }),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  for (line in state.models) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-      Column(
-        modifier = Modifier.padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-      ) {
-        Text(line.name, style = MaterialTheme.typography.bodyLarge)
-        Text(
-          line.detail,
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        // Only for what is actually here. Offering to use something not downloaded would
-        // be a button that cannot work.
-        if (line.present && line.model.role == ModelRole.CHAT) {
-          if (state.chatModel == line.name) {
-            TextButton(onClick = { viewModel.useChatModel(line.name) }) {
-              Text(stringResource(R.string.model_chosen))
-            }
-          } else {
-            OutlinedButton(onClick = { viewModel.useChatModel(line.name) }) {
-              Text(stringResource(R.string.model_use))
+  Section(R.string.settings_models_heading) {
+    Text(
+      stringResource(R.string.settings_device, state.memoryGb, state.socModel.ifEmpty { "?" }),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    for (line in state.models) {
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+          modifier = Modifier.padding(12.dp),
+          verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+          Text(line.name, style = MaterialTheme.typography.bodyLarge)
+          Text(
+            line.detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          // Only for what is actually here. Offering to use something not downloaded would
+          // be a button that cannot work.
+          if (line.present && line.model.role == ModelRole.CHAT) {
+            if (state.chatModel == line.name) {
+              TextButton(onClick = { viewModel.useChatModel(line.name) }) {
+                Text(stringResource(R.string.model_chosen))
+              }
+            } else {
+              OutlinedButton(onClick = { viewModel.useChatModel(line.name) }) {
+                Text(stringResource(R.string.model_use))
+              }
             }
           }
-        }
-        when (val download = line.download) {
-          DownloadState.Waiting ->
-            // Indeterminate, because nothing is moving yet. Showing a bar stuck at zero is
-            // how a queued download gets mistaken for a broken one.
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-              LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+          when (val download = line.download) {
+            DownloadState.Waiting ->
+              // Indeterminate, because nothing is moving yet. Showing a bar stuck at zero is
+              // how a queued download gets mistaken for a broken one.
+              Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                  Text(
+                    stringResource(R.string.download_waiting),
+                    style = MaterialTheme.typography.bodySmall,
+                  )
+                  TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
+                    Text(stringResource(R.string.download_stop))
+                  }
+                }
+              }
+            is DownloadState.Running -> {
+              // Determinate where the total is known, which it is from the catalogue. A
+              // spinner for a twenty-minute transfer tells the user nothing.
+              LinearProgressIndicator(
+                progress = { download.percent / 100f },
+                modifier = Modifier.fillMaxWidth(),
+              )
               Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
               ) {
                 Text(
-                  stringResource(R.string.download_waiting),
+                  stringResource(
+                    R.string.download_progress,
+                    download.percent,
+                    "%.1f".format(download.receivedBytes / 1_000_000_000.0),
+                    "%.1f".format(download.totalBytes / 1_000_000_000.0),
+                  ),
                   style = MaterialTheme.typography.bodySmall,
                 )
                 TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
@@ -279,119 +307,93 @@ private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewM
                 }
               }
             }
-          is DownloadState.Running -> {
-            // Determinate where the total is known, which it is from the catalogue. A
-            // spinner for a twenty-minute transfer tells the user nothing.
-            LinearProgressIndicator(
-              progress = { download.percent / 100f },
-              modifier = Modifier.fillMaxWidth(),
-            )
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-              Text(
-                stringResource(
-                  R.string.download_progress,
-                  download.percent,
-                  "%.1f".format(download.receivedBytes / 1_000_000_000.0),
-                  "%.1f".format(download.totalBytes / 1_000_000_000.0),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-              )
-              TextButton(onClick = { viewModel.cancelDownload(line.model) }) {
-                Text(stringResource(R.string.download_stop))
+            is DownloadState.Failed ->
+              Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                  download.message,
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.error,
+                )
+                // Resuming, not restarting: whatever arrived is still on disk.
+                Button(onClick = { viewModel.download(line.model) }) {
+                  Text(stringResource(R.string.download_retry))
+                }
               }
-            }
+            else ->
+              if (line.present) {
+                Text(
+                  stringResource(R.string.download_ready),
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.primary,
+                )
+              } else {
+                Button(onClick = { viewModel.download(line.model) }) {
+                  Text(stringResource(R.string.download_start))
+                }
+              }
           }
-          is DownloadState.Failed ->
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-              Text(
-                download.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-              )
-              // Resuming, not restarting: whatever arrived is still on disk.
-              Button(onClick = { viewModel.download(line.model) }) {
-                Text(stringResource(R.string.download_retry))
-              }
-            }
-          else ->
-            if (line.present) {
-              Text(
-                stringResource(R.string.download_ready),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-              )
-            } else {
-              Button(onClick = { viewModel.download(line.model) }) {
-                Text(stringResource(R.string.download_start))
-              }
-            }
         }
       }
     }
-  }
-  // Still shown now that downloading works, because copying a file in is the one way to
-  // avoid spending two and a half gigabytes of somebody's allowance twice.
-  Text(
-    stringResource(R.string.settings_models_where),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Text(
-    state.modelsDirectory,
-    style = MaterialTheme.typography.bodySmall,
-    fontFamily = FontFamily.Monospace,
-    modifier = Modifier.padding(bottom = 32.dp),
-  )
-
-  Text(
-    stringResource(R.string.settings_reasoning_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_reasoning_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Column {
-      // Radio rows rather than a slider: there are three of them and each one needs a
-      // sentence saying what it costs, which a slider has nowhere to put.
-      ReasoningChoice(
-        level = Reasoning.OFF,
-        label = R.string.settings_reasoning_off,
-        detail = R.string.settings_reasoning_off_detail,
-        selected = state.reasoning,
-        onPick = viewModel::setReasoning,
-      )
-      ReasoningChoice(
-        level = Reasoning.BRIEF,
-        label = R.string.settings_reasoning_brief,
-        detail = R.string.settings_reasoning_brief_detail,
-        selected = state.reasoning,
-        onPick = viewModel::setReasoning,
-      )
-      ReasoningChoice(
-        level = Reasoning.THOROUGH,
-        label = R.string.settings_reasoning_thorough,
-        detail = R.string.settings_reasoning_thorough_detail,
-        selected = state.reasoning,
-        onPick = viewModel::setReasoning,
-      )
-    }
-  }
-  // Said plainly, because the levels mean something different depending on which model is
-  // answering and a setting that silently means two things is worse than one that explains.
-  if (state.answerOnServer) {
+    // Still shown now that downloading works, because copying a file in is the one way to
+    // avoid spending two and a half gigabytes of somebody's allowance twice.
     Text(
-      stringResource(R.string.settings_reasoning_unavailable),
+      stringResource(R.string.settings_models_where),
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    Text(
+      state.modelsDirectory,
+      style = MaterialTheme.typography.bodySmall,
+      fontFamily = FontFamily.Monospace,
+      modifier = Modifier.padding(bottom = 32.dp),
+    )
   }
+
+  Section(R.string.settings_reasoning_heading) {
+    Text(
+      stringResource(R.string.settings_reasoning_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Card(modifier = Modifier.fillMaxWidth()) {
+      Column {
+        // Radio rows rather than a slider: there are three of them and each one needs a
+        // sentence saying what it costs, which a slider has nowhere to put.
+        ReasoningChoice(
+          level = Reasoning.OFF,
+          label = R.string.settings_reasoning_off,
+          detail = R.string.settings_reasoning_off_detail,
+          selected = state.reasoning,
+          onPick = viewModel::setReasoning,
+        )
+        ReasoningChoice(
+          level = Reasoning.BRIEF,
+          label = R.string.settings_reasoning_brief,
+          detail = R.string.settings_reasoning_brief_detail,
+          selected = state.reasoning,
+          onPick = viewModel::setReasoning,
+        )
+        ReasoningChoice(
+          level = Reasoning.THOROUGH,
+          label = R.string.settings_reasoning_thorough,
+          detail = R.string.settings_reasoning_thorough_detail,
+          selected = state.reasoning,
+          onPick = viewModel::setReasoning,
+        )
+      }
+    }
+    // Said plainly, because the levels mean something different depending on which model is
+    // answering and a setting that silently means two things is worse than one that explains.
+    if (state.answerOnServer) {
+      Text(
+        stringResource(R.string.settings_reasoning_unavailable),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+  }
+
 }
 
 /**
@@ -408,120 +410,112 @@ private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewM
  */
 @Composable
 private fun ColumnScope.ServerTab(state: SettingsState, viewModel: SettingsViewModel) {
-  Text(
-    stringResource(R.string.settings_server_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 16.dp),
-  )
-  Text(
-    stringResource(R.string.settings_server_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  // Which kind, before the address, because it decides what a correct address looks like
-  // and what the key field is for.
-  Row(
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    ServerKind.entries.forEach { kind ->
-      FilterChip(
-        selected = state.serverKind == kind,
-        onClick = { viewModel.setServerKind(kind) },
-        label = { Text(serverKindLabel(kind)) },
-      )
+  Section(R.string.settings_server_heading) {
+    Text(
+      stringResource(R.string.settings_server_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    // Which kind, before the address, because it decides what a correct address looks like
+    // and what the key field is for.
+    Row(
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      ServerKind.entries.forEach { kind ->
+        FilterChip(
+          selected = state.serverKind == kind,
+          onClick = { viewModel.setServerKind(kind) },
+          label = { Text(serverKindLabel(kind)) },
+        )
+      }
     }
-  }
-  Text(
-    stringResource(serverKindDetail(state.serverKind)),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
+    Text(
+      stringResource(serverKindDetail(state.serverKind)),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
-  OutlinedTextField(
-    value = state.ollamaUrl,
-    onValueChange = viewModel::onUrlChanged,
-    label = { Text(stringResource(R.string.settings_server_url)) },
-    placeholder = { Text(serverKindPlaceholder(state.serverKind)) },
-    singleLine = true,
-    modifier = Modifier.fillMaxWidth(),
-  )
-  OutlinedTextField(
-    value = state.ollamaAuthHeader,
-    onValueChange = viewModel::onAuthHeaderChanged,
-    label = { Text(stringResource(R.string.settings_server_header)) },
-    placeholder = { Text("Authorization: Bearer ...") },
-    // Not single-line, because a Cloudflare Access service token is two headers and this
-    // field exists for exactly that case.
-    singleLine = false,
-    minLines = 1,
-    maxLines = 4,
-    modifier = Modifier.fillMaxWidth(),
-  )
-  Text(
-    stringResource(R.string.settings_server_header_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-    Button(onClick = viewModel::save) { Text(stringResource(R.string.settings_save)) }
-    if (state.saved) {
-      Text(
-        stringResource(R.string.settings_saved),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 14.dp),
-      )
+    OutlinedTextField(
+      value = state.ollamaUrl,
+      onValueChange = viewModel::onUrlChanged,
+      label = { Text(stringResource(R.string.settings_server_url)) },
+      placeholder = { Text(serverKindPlaceholder(state.serverKind)) },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+      value = state.ollamaAuthHeader,
+      onValueChange = viewModel::onAuthHeaderChanged,
+      label = { Text(stringResource(R.string.settings_server_header)) },
+      placeholder = { Text("Authorization: Bearer ...") },
+      // Not single-line, because a Cloudflare Access service token is two headers and this
+      // field exists for exactly that case.
+      singleLine = false,
+      minLines = 1,
+      maxLines = 4,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Text(
+      stringResource(R.string.settings_server_header_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+      Button(onClick = viewModel::save) { Text(stringResource(R.string.settings_save)) }
+      if (state.saved) {
+        Text(
+          stringResource(R.string.settings_saved),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.padding(top = 14.dp),
+        )
+      }
     }
   }
 
-  Text(
-    stringResource(R.string.settings_server_models_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_server_models_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  ServerModels(
-    state = state.serverModels,
-    picked = state.serverModel,
-    typed = state.serverModelTyped,
-    onCheck = viewModel::checkServer,
-    onPick = viewModel::pickServerModel,
-    onType = viewModel::typeServerModel,
-  )
-
-  Text(
-    stringResource(R.string.settings_answer_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_answer_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-      ChoiceRow(
-        title = stringResource(R.string.settings_answer_phone),
-        detail = stringResource(R.string.settings_answer_phone_detail),
-        selected = !state.answerOnServer,
-        onPick = { viewModel.setAnswerOnServer(false) },
-      )
-      ChoiceRow(
-        title = stringResource(R.string.settings_answer_server),
-        detail = stringResource(R.string.settings_answer_server_detail),
-        selected = state.answerOnServer,
-        onPick = { viewModel.setAnswerOnServer(true) },
-      )
-    }
+  Section(R.string.settings_server_models_heading) {
+    Text(
+      stringResource(R.string.settings_server_models_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    ServerModels(
+      state = state.serverModels,
+      picked = state.serverModel,
+      typed = state.serverModelTyped,
+      onCheck = viewModel::checkServer,
+      onPick = viewModel::pickServerModel,
+      onType = viewModel::typeServerModel,
+    )
   }
 
-  Sampling(state, viewModel)
+  Section(R.string.settings_answer_heading) {
+    Text(
+      stringResource(R.string.settings_answer_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Card(modifier = Modifier.fillMaxWidth()) {
+      Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        ChoiceRow(
+          title = stringResource(R.string.settings_answer_phone),
+          detail = stringResource(R.string.settings_answer_phone_detail),
+          selected = !state.answerOnServer,
+          onPick = { viewModel.setAnswerOnServer(false) },
+        )
+        ChoiceRow(
+          title = stringResource(R.string.settings_answer_server),
+          detail = stringResource(R.string.settings_answer_server_detail),
+          selected = state.answerOnServer,
+          onPick = { viewModel.setAnswerOnServer(true) },
+        )
+      }
+    }
+
+    Sampling(state, viewModel)
+  }
+
 }
 
 /**
@@ -537,69 +531,67 @@ private fun ColumnScope.ServerTab(state: SettingsState, viewModel: SettingsViewM
  */
 @Composable
 private fun ColumnScope.Sampling(state: SettingsState, viewModel: SettingsViewModel) {
-  Text(
-    stringResource(R.string.settings_sampling_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 24.dp),
-  )
-  Text(
-    stringResource(R.string.settings_sampling_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  // Said before the boxes, because it is the one consequence somebody cannot see coming: a
-  // model sampling at temperature while emitting an exact tool-call grammar writes calls that
-  // do not parse, and the symptom is Lin saying it could not do something it can.
-  Text(
-    stringResource(R.string.settings_sampling_warning),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
+  Section(R.string.settings_sampling_heading) {
+    Text(
+      stringResource(R.string.settings_sampling_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    // Said before the boxes, because it is the one consequence somebody cannot see coming: a
+    // model sampling at temperature while emitting an exact tool-call grammar writes calls that
+    // do not parse, and the symptom is Lin saying it could not do something it can.
+    Text(
+      stringResource(R.string.settings_sampling_warning),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
-  NumberSetting(
-    value = state.serverTemperature,
-    onChange = viewModel::onTemperatureChanged,
-    label = R.string.settings_sampling_temperature,
-    hint = R.string.settings_sampling_temperature_hint,
-  )
-  NumberSetting(
-    value = state.serverTopP,
-    onChange = viewModel::onTopPChanged,
-    label = R.string.settings_sampling_top_p,
-    hint = R.string.settings_sampling_top_p_hint,
-  )
-  NumberSetting(
-    value = state.serverTopK,
-    onChange = viewModel::onTopKChanged,
-    label = R.string.settings_sampling_top_k,
-    hint = R.string.settings_sampling_top_k_hint,
-  )
-  NumberSetting(
-    value = state.serverContext,
-    onChange = viewModel::onServerContextChanged,
-    label = R.string.settings_sampling_context,
-    hint = R.string.settings_sampling_context_hint,
-  )
-  NumberSetting(
-    value = state.serverMaxTokens,
-    onChange = viewModel::onMaxTokensChanged,
-    label = R.string.settings_sampling_max_tokens,
-    hint = R.string.settings_sampling_max_tokens_hint,
-  )
+    NumberSetting(
+      value = state.serverTemperature,
+      onChange = viewModel::onTemperatureChanged,
+      label = R.string.settings_sampling_temperature,
+      hint = R.string.settings_sampling_temperature_hint,
+    )
+    NumberSetting(
+      value = state.serverTopP,
+      onChange = viewModel::onTopPChanged,
+      label = R.string.settings_sampling_top_p,
+      hint = R.string.settings_sampling_top_p_hint,
+    )
+    NumberSetting(
+      value = state.serverTopK,
+      onChange = viewModel::onTopKChanged,
+      label = R.string.settings_sampling_top_k,
+      hint = R.string.settings_sampling_top_k_hint,
+    )
+    NumberSetting(
+      value = state.serverContext,
+      onChange = viewModel::onServerContextChanged,
+      label = R.string.settings_sampling_context,
+      hint = R.string.settings_sampling_context_hint,
+    )
+    NumberSetting(
+      value = state.serverMaxTokens,
+      onChange = viewModel::onMaxTokensChanged,
+      label = R.string.settings_sampling_max_tokens,
+      hint = R.string.settings_sampling_max_tokens_hint,
+    )
 
-  // Said here because this is where somebody looks for it. Thinking is one setting that
-  // applies to both the phone's model and the server's, so it lives on the Models tab rather
-  // than being duplicated into two controls that could disagree.
-  Text(
-    stringResource(R.string.settings_sampling_thinking),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-    modifier = Modifier.padding(top = 8.dp),
-  )
+    // Said here because this is where somebody looks for it. Thinking is one setting that
+    // applies to both the phone's model and the server's, so it lives on the Models tab rather
+    // than being duplicated into two controls that could disagree.
+    Text(
+      stringResource(R.string.settings_sampling_thinking),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(top = 8.dp),
+    )
 
-  TextButton(onClick = { viewModel.clearSampling() }) {
-    Text(stringResource(R.string.settings_sampling_clear))
+    TextButton(onClick = { viewModel.clearSampling() }) {
+      Text(stringResource(R.string.settings_sampling_clear))
+    }
   }
+
 }
 
 /**
@@ -656,558 +648,533 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
     onDispose { systemLifecycle.lifecycle.removeObserver(observer) }
   }
 
-  Text(
-    stringResource(R.string.settings_voice_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_voice_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  // Three ways rather than a switch. "When spoken to" is the default and the one worth
-  // having - a phone that answers a typed question out loud in a quiet room is the reason
-  // people turn these off - but somebody who wants a voice assistant should be able to say so.
-  Text(
-    stringResource(R.string.settings_spoken_replies),
-    style = MaterialTheme.typography.bodyLarge,
-    modifier = Modifier.padding(top = 4.dp),
-  )
-  for (speak in SpeakWhen.entries) {
-    ChoiceRow(
-      title = stringResource(speakWhenLabel(speak)),
-      detail = stringResource(speakWhenDetail(speak)),
-      selected = state.speakWhen == speak,
-      onPick = { viewModel.setSpeakWhen(speak) },
-    )
-  }
-
-  // A conversation rather than a series of questions: ask out loud, hear the answer, reply,
-  // without reaching for the phone in between. Off by default, because a microphone that
-  // reopens by itself is the thing people are right to be wary of.
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          stringResource(R.string.settings_voice_chat),
-          style = MaterialTheme.typography.bodyLarge,
-        )
-        Text(
-          stringResource(R.string.settings_voice_chat_detail),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-      Switch(checked = state.voiceChat, onCheckedChange = viewModel::setVoiceChat)
-    }
-  }
-
-  // The voice itself. Asked for when this group is opened rather than at start-up: the
-  // engine takes a moment to come up, and asking it too early gives an empty list that
-  // nothing would refresh.
-  LaunchedEffect(Unit) { viewModel.loadVoices() }
-  val sample = stringResource(R.string.settings_voice_sample)
-
-  Text(
-    stringResource(R.string.settings_voice_which),
-    style = MaterialTheme.typography.bodyLarge,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  if (state.voices.isEmpty()) {
+  Section(R.string.settings_voice_heading) {
     Text(
-      stringResource(R.string.settings_voice_none),
+      stringResource(R.string.settings_voice_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    // Three ways rather than a switch. "When spoken to" is the default and the one worth
+    // having - a phone that answers a typed question out loud in a quiet room is the reason
+    // people turn these off - but somebody who wants a voice assistant should be able to say so.
+    Text(
+      stringResource(R.string.settings_spoken_replies),
+      style = MaterialTheme.typography.bodyLarge,
+      modifier = Modifier.padding(top = 4.dp),
+    )
+    for (speak in SpeakWhen.entries) {
+      ChoiceRow(
+        title = stringResource(speakWhenLabel(speak)),
+        detail = stringResource(speakWhenDetail(speak)),
+        selected = state.speakWhen == speak,
+        onPick = { viewModel.setSpeakWhen(speak) },
+      )
+    }
+
+    // A conversation rather than a series of questions: ask out loud, hear the answer, reply,
+    // without reaching for the phone in between. Off by default, because a microphone that
+    // reopens by itself is the thing people are right to be wary of.
+    Card(modifier = Modifier.fillMaxWidth()) {
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            stringResource(R.string.settings_voice_chat),
+            style = MaterialTheme.typography.bodyLarge,
+          )
+          Text(
+            stringResource(R.string.settings_voice_chat_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(checked = state.voiceChat, onCheckedChange = viewModel::setVoiceChat)
+      }
+    }
+
+    // The voice itself. Asked for when this group is opened rather than at start-up: the
+    // engine takes a moment to come up, and asking it too early gives an empty list that
+    // nothing would refresh.
+    LaunchedEffect(Unit) { viewModel.loadVoices() }
+    val sample = stringResource(R.string.settings_voice_sample)
+
+    Text(
+      stringResource(R.string.settings_voice_which),
+      style = MaterialTheme.typography.bodyLarge,
+      modifier = Modifier.padding(top = 12.dp),
+    )
+    if (state.voices.isEmpty()) {
+      Text(
+        stringResource(R.string.settings_voice_none),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    for (voice in state.voices) {
+      ChoiceRow(
+        title = voiceLabel(voice),
+        // The engine's own name, which is the only thing telling two identical-looking
+        // voices apart - and the thing to quote if one of them misbehaves.
+        detail = voice.name,
+        selected = state.voiceName == voice.name,
+        onPick = { viewModel.useVoice(voice.name, sample) },
+      )
+    }
+
+    if (state.voices.isNotEmpty()) {
+      Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+          modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+          verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+          Text(
+            stringResource(R.string.settings_voice_speed, "%.1f".format(state.speechRate)),
+            style = MaterialTheme.typography.bodyMedium,
+          )
+          Slider(
+            value = state.speechRate,
+            onValueChange = viewModel::setSpeechRate,
+            onValueChangeFinished = { viewModel.previewVoice(sample) },
+            valueRange = 0.5f..2.0f,
+            steps = 14,
+          )
+          Text(
+            stringResource(R.string.settings_voice_pitch, "%.1f".format(state.speechPitch)),
+            style = MaterialTheme.typography.bodyMedium,
+          )
+          Slider(
+            value = state.speechPitch,
+            onValueChange = viewModel::setSpeechPitch,
+            onValueChangeFinished = { viewModel.previewVoice(sample) },
+            valueRange = 0.5f..2.0f,
+            steps = 14,
+          )
+        }
+      }
+    }
+
+    val voiceContext = LocalContext.current
+    OutlinedButton(
+      // More voices are the system's to install, not Lin's: an engine like Google's or
+      // Samsung's downloads them there, and a neural one installed from elsewhere appears in
+      // the list above as soon as it is the phone's engine.
+      onClick = { openVoiceSettings(voiceContext) },
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Text(stringResource(R.string.settings_voice_more))
+    }
+    Text(
+      stringResource(R.string.settings_voice_more_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val context = LocalContext.current
+
+    // Whether Lin is actually the assistant, read again every time this screen comes back to
+    // the front - because the only way to change it is to leave for the system's settings and
+    // come back, so a value read once is stale exactly when somebody is looking at it.
+
+    // Said before the button rather than after it, because this is the answer to the question
+    // somebody opens this section with: the power button does nothing, is Lin even set? Three
+    // states and not two - null is the phone declining to say, and guessing "no" there would
+    // be a made-up fact on the one screen meant to clear this up.
+    var noAssistantScreen by remember { mutableStateOf(false) }
+    Text(
+      stringResource(
+        when (isAssistant) {
+          true -> R.string.settings_assistant_is_lin
+          false -> R.string.settings_assistant_is_other
+          null -> R.string.settings_assistant_unknown
+        }
+      ),
+      style = MaterialTheme.typography.bodyMedium,
+      color =
+        if (isAssistant == true) MaterialTheme.colorScheme.onSurface
+        else MaterialTheme.colorScheme.error,
+    )
+    if (isAssistant == true && summonsThePanel == false) {
+      Text(
+        stringResource(R.string.settings_assistant_old_door),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    OutlinedButton(
+      // Android gives no way to request the assistant role directly - it is the user's
+      // choice to make in their own settings, which is correct. This only takes them there,
+      // to whichever of those screens the phone actually has: starting one it does not
+      // throws, and this button used to swallow that and look broken.
+      onClick = { noAssistantScreen = !openAssistantSettings(context) },
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Text(stringResource(R.string.settings_set_assistant))
+    }
+    Text(
+      stringResource(
+        if (noAssistantScreen) R.string.settings_assistant_no_screen
+        else R.string.settings_assistant_detail
+      ),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    // The panel, from inside the app. Half a feature and half a diagnosis: it is the only way
+    // to see the thing without a working summon, and whether it appears from here says which
+    // half is broken - Lin, or the phone's idea of which app it should be asking.
+    OutlinedButton(
+      onClick = {
+        runCatching {
+          context.startActivity(
+            Intent(context, AssistActivity::class.java)
+              .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          )
+        }
+      },
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Text(stringResource(R.string.settings_try_panel))
+    }
+    Text(
+      stringResource(R.string.settings_try_panel_detail),
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
   }
-  for (voice in state.voices) {
-    ChoiceRow(
-      title = voiceLabel(voice),
-      // The engine's own name, which is the only thing telling two identical-looking
-      // voices apart - and the thing to quote if one of them misbehaves.
-      detail = voice.name,
-      selected = state.voiceName == voice.name,
-      onPick = { viewModel.useVoice(voice.name, sample) },
-    )
-  }
 
-  if (state.voices.isNotEmpty()) {
+  Section(R.string.settings_wake_heading) {
+    Text(
+      stringResource(R.string.settings_wake_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val wakeContext = LocalContext.current
+    val wakePermission =
+      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.setWakeWord(on = true, granted = granted)
+        if (granted) WakeService.start(wakeContext)
+      }
     Card(modifier = Modifier.fillMaxWidth()) {
-      Column(
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
       ) {
         Text(
-          stringResource(R.string.settings_voice_speed, "%.1f".format(state.speechRate)),
-          style = MaterialTheme.typography.bodyMedium,
+          stringResource(R.string.settings_wake),
+          style = MaterialTheme.typography.bodyLarge,
+          modifier = Modifier.weight(1f),
         )
-        Slider(
-          value = state.speechRate,
-          onValueChange = viewModel::setSpeechRate,
-          onValueChangeFinished = { viewModel.previewVoice(sample) },
-          valueRange = 0.5f..2.0f,
-          steps = 14,
-        )
-        Text(
-          stringResource(R.string.settings_voice_pitch, "%.1f".format(state.speechPitch)),
-          style = MaterialTheme.typography.bodyMedium,
-        )
-        Slider(
-          value = state.speechPitch,
-          onValueChange = viewModel::setSpeechPitch,
-          onValueChangeFinished = { viewModel.previewVoice(sample) },
-          valueRange = 0.5f..2.0f,
-          steps = 14,
+        Switch(
+          checked = state.wakeWord,
+          onCheckedChange = { wanted ->
+            if (wanted) {
+              wakePermission.launch(Manifest.permission.RECORD_AUDIO)
+            } else {
+              viewModel.setWakeWord(on = false, granted = false)
+              WakeService.stop(wakeContext)
+            }
+          },
         )
       }
     }
   }
 
-  val voiceContext = LocalContext.current
-  OutlinedButton(
-    // More voices are the system's to install, not Lin's: an engine like Google's or
-    // Samsung's downloads them there, and a neural one installed from elsewhere appears in
-    // the list above as soon as it is the phone's engine.
-    onClick = { openVoiceSettings(voiceContext) },
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    Text(stringResource(R.string.settings_voice_more))
-  }
-  Text(
-    stringResource(R.string.settings_voice_more_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  val context = LocalContext.current
-
-  // Whether Lin is actually the assistant, read again every time this screen comes back to
-  // the front - because the only way to change it is to leave for the system's settings and
-  // come back, so a value read once is stale exactly when somebody is looking at it.
-
-  // Said before the button rather than after it, because this is the answer to the question
-  // somebody opens this section with: the power button does nothing, is Lin even set? Three
-  // states and not two - null is the phone declining to say, and guessing "no" there would
-  // be a made-up fact on the one screen meant to clear this up.
-  var noAssistantScreen by remember { mutableStateOf(false) }
-  Text(
-    stringResource(
-      when (isAssistant) {
-        true -> R.string.settings_assistant_is_lin
-        false -> R.string.settings_assistant_is_other
-        null -> R.string.settings_assistant_unknown
-      }
-    ),
-    style = MaterialTheme.typography.bodyMedium,
-    color =
-      if (isAssistant == true) MaterialTheme.colorScheme.onSurface
-      else MaterialTheme.colorScheme.error,
-  )
-  if (isAssistant == true && summonsThePanel == false) {
+  Section(R.string.settings_car_heading) {
     Text(
-      stringResource(R.string.settings_assistant_old_door),
+      stringResource(R.string.settings_car_detail),
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-  }
-  OutlinedButton(
-    // Android gives no way to request the assistant role directly - it is the user's
-    // choice to make in their own settings, which is correct. This only takes them there,
-    // to whichever of those screens the phone actually has: starting one it does not
-    // throws, and this button used to swallow that and look broken.
-    onClick = { noAssistantScreen = !openAssistantSettings(context) },
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    Text(stringResource(R.string.settings_set_assistant))
-  }
-  Text(
-    stringResource(
-      if (noAssistantScreen) R.string.settings_assistant_no_screen
-      else R.string.settings_assistant_detail
-    ),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-
-  // The panel, from inside the app. Half a feature and half a diagnosis: it is the only way
-  // to see the thing without a working summon, and whether it appears from here says which
-  // half is broken - Lin, or the phone's idea of which app it should be asking.
-  OutlinedButton(
-    onClick = {
-      runCatching {
-        context.startActivity(
-          Intent(context, AssistActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
+    Card(modifier = Modifier.fillMaxWidth()) {
+      Column {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              stringResource(R.string.settings_car_notification),
+              style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+              stringResource(R.string.settings_car_notification_detail),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(checked = state.carNotification, onCheckedChange = viewModel::setCarNotification)
+        }
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              stringResource(R.string.settings_car_locked),
+              style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+              stringResource(R.string.settings_car_locked_detail),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(
+            checked = state.answerWhenLocked,
+            onCheckedChange = viewModel::setAnswerWhenLocked,
+          )
+        }
       }
-    },
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    Text(stringResource(R.string.settings_try_panel))
-  }
-  Text(
-    stringResource(R.string.settings_try_panel_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-
-  Text(
-    stringResource(R.string.settings_wake_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_wake_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  val wakeContext = LocalContext.current
-  val wakePermission =
-    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-      viewModel.setWakeWord(on = true, granted = granted)
-      if (granted) WakeService.start(wakeContext)
     }
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
+
+    // The second half of a working wake word, and the half nobody would guess at. Shown only
+    // while the wake word is on: it is not a permission to ask for otherwise.
+    if (state.wakeWord) {
       Text(
-        stringResource(R.string.settings_wake),
-        style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier.weight(1f),
+        stringResource(
+          if (mayAppearOverOtherApps) R.string.settings_overlay_granted
+          else R.string.settings_overlay_missing
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color =
+          if (mayAppearOverOtherApps) MaterialTheme.colorScheme.onSurfaceVariant
+          else MaterialTheme.colorScheme.error,
       )
-      Switch(
-        checked = state.wakeWord,
-        onCheckedChange = { wanted ->
-          if (wanted) {
-            wakePermission.launch(Manifest.permission.RECORD_AUDIO)
+      if (!mayAppearOverOtherApps) {
+        OutlinedButton(
+          onClick = { openAppearOverOtherApps(systemContext) },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Text(stringResource(R.string.settings_overlay_button))
+        }
+      }
+    }
+  }
+
+}
+
+/** What Lin may touch on the phone itself: calls, messages, the calendar, photos, music. */
+@Composable
+private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewModel) {
+  Section(R.string.settings_phone_heading) {
+    Text(
+      stringResource(R.string.settings_direct_calls),
+      style = MaterialTheme.typography.bodyLarge,
+    )
+    // Three choices rather than a switch, because the right answer is different at a desk and
+    // at 70mph: staging the call costs one tap, and that tap is the thing nobody should be
+    // doing while driving. The permission is asked for as a dialling choice is made, and a
+    // refusal leaves it on "never" - a stored yes the permission does not back would make this
+    // lie about what Lin can do.
+    val callPermission =
+      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.setDialPolicy(viewModel.wantedDialPolicy, granted = granted)
+      }
+    for (policy in DialPolicy.entries) {
+      ChoiceRow(
+        title = stringResource(dialPolicyLabel(policy)),
+        detail = stringResource(dialPolicyDetail(policy)),
+        selected = state.dialPolicy == policy,
+        onPick = {
+          if (policy == DialPolicy.NEVER) {
+            viewModel.setDialPolicy(policy, granted = false)
           } else {
-            viewModel.setWakeWord(on = false, granted = false)
-            WakeService.stop(wakeContext)
+            viewModel.wantedDialPolicy = policy
+            callPermission.launch(Manifest.permission.CALL_PHONE)
           }
         },
       )
     }
   }
 
-  Text(
-    stringResource(R.string.settings_car_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_car_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Column {
-      Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Column(modifier = Modifier.weight(1f)) {
-          Text(
-            stringResource(R.string.settings_car_notification),
-            style = MaterialTheme.typography.bodyLarge,
-          )
-          Text(
-            stringResource(R.string.settings_car_notification_detail),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-        Switch(checked = state.carNotification, onCheckedChange = viewModel::setCarNotification)
-      }
-      Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Column(modifier = Modifier.weight(1f)) {
-          Text(
-            stringResource(R.string.settings_car_locked),
-            style = MaterialTheme.typography.bodyLarge,
-          )
-          Text(
-            stringResource(R.string.settings_car_locked_detail),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-        Switch(
-          checked = state.answerWhenLocked,
-          onCheckedChange = viewModel::setAnswerWhenLocked,
-        )
-      }
-    }
-  }
-
-  // The second half of a working wake word, and the half nobody would guess at. Shown only
-  // while the wake word is on: it is not a permission to ask for otherwise.
-  if (state.wakeWord) {
+  Section(R.string.settings_messages_heading) {
     Text(
-      stringResource(
-        if (mayAppearOverOtherApps) R.string.settings_overlay_granted
-        else R.string.settings_overlay_missing
-      ),
+      stringResource(R.string.settings_messages_detail),
       style = MaterialTheme.typography.bodySmall,
-      color =
-        if (mayAppearOverOtherApps) MaterialTheme.colorScheme.onSurfaceVariant
-        else MaterialTheme.colorScheme.error,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    if (!mayAppearOverOtherApps) {
-      OutlinedButton(
-        onClick = { openAppearOverOtherApps(wakeContext) },
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Text(stringResource(R.string.settings_overlay_button))
-      }
-    }
-  }
-}
-
-/** What Lin may touch on the phone itself: calls, messages, the calendar, photos, music. */
-@Composable
-private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewModel) {
-  Text(
-    stringResource(R.string.settings_phone_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_direct_calls),
-    style = MaterialTheme.typography.bodyLarge,
-  )
-  // Three choices rather than a switch, because the right answer is different at a desk and
-  // at 70mph: staging the call costs one tap, and that tap is the thing nobody should be
-  // doing while driving. The permission is asked for as a dialling choice is made, and a
-  // refusal leaves it on "never" - a stored yes the permission does not back would make this
-  // lie about what Lin can do.
-  val callPermission =
-    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-      viewModel.setDialPolicy(viewModel.wantedDialPolicy, granted = granted)
-    }
-  for (policy in DialPolicy.entries) {
-    ChoiceRow(
-      title = stringResource(dialPolicyLabel(policy)),
-      detail = stringResource(dialPolicyDetail(policy)),
-      selected = state.dialPolicy == policy,
-      onPick = {
-        if (policy == DialPolicy.NEVER) {
-          viewModel.setDialPolicy(policy, granted = false)
-        } else {
-          viewModel.wantedDialPolicy = policy
-          callPermission.launch(Manifest.permission.CALL_PHONE)
+    val messagesContext = LocalContext.current
+    OutlinedButton(
+      onClick = {
+        // Notification access cannot be requested - only granted by the user in their own
+        // settings, which for this capability is right.
+        runCatching {
+          messagesContext.startActivity(
+            Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+              .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          )
         }
       },
-    )
-  }
-
-  Text(
-    stringResource(R.string.settings_messages_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_messages_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  val messagesContext = LocalContext.current
-  OutlinedButton(
-    onClick = {
-      // Notification access cannot be requested - only granted by the user in their own
-      // settings, which for this capability is right.
-      runCatching {
-        messagesContext.startActivity(
-          Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-      }
-    },
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    Text(stringResource(R.string.settings_notification_access))
-  }
-
-  Text(
-    stringResource(R.string.settings_calendar_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_calendar_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  val calendarPermission =
-    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-      viewModel.refreshCalendarAccess(granted)
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Text(stringResource(R.string.settings_notification_access))
     }
-  if (state.calendarPermitted) {
+  }
+
+  Section(R.string.settings_calendar_heading) {
     Text(
-      stringResource(R.string.settings_calendar_granted),
+      stringResource(R.string.settings_calendar_detail),
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-  } else {
-    OutlinedButton(
-      onClick = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) },
-      modifier = Modifier.fillMaxWidth(),
-    ) {
-      Text(stringResource(R.string.settings_calendar_allow))
+    val calendarPermission =
+      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.refreshCalendarAccess(granted)
+      }
+    if (state.calendarPermitted) {
+      Text(
+        stringResource(R.string.settings_calendar_granted),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    } else {
+      OutlinedButton(
+        onClick = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(stringResource(R.string.settings_calendar_allow))
+      }
     }
   }
 
-  Text(
-    stringResource(R.string.settings_music_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_music_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  if (state.musicApps.isEmpty()) {
+  Section(R.string.settings_music_heading) {
     Text(
-      stringResource(R.string.settings_music_none),
-      style = MaterialTheme.typography.bodyMedium,
+      stringResource(R.string.settings_music_detail),
+      style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-  }
-  for (app in state.musicApps) {
-    ChoiceRow(
-      title = app.label,
-      detail = app.packageName,
-      selected = state.musicApp == app.packageName,
-      onPick = { viewModel.useMusicApp(app.packageName) },
-    )
+    if (state.musicApps.isEmpty()) {
+      Text(
+        stringResource(R.string.settings_music_none),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    for (app in state.musicApps) {
+      ChoiceRow(
+        title = app.label,
+        detail = app.packageName,
+        selected = state.musicApp == app.packageName,
+        onPick = { viewModel.useMusicApp(app.packageName) },
+      )
+    }
   }
 
-  Text(
-    stringResource(R.string.settings_weather_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_weather_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  val weatherContext = LocalContext.current
-  var weatherAllowed by remember {
-    mutableStateOf(
-      weatherContext.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
-        PackageManager.PERMISSION_GRANTED
-    )
-  }
-  val weatherPermission =
-    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-      weatherAllowed = granted
-    }
-  if (weatherAllowed) {
+  Section(R.string.settings_weather_heading) {
     Text(
-      stringResource(R.string.settings_weather_on),
-      style = MaterialTheme.typography.bodyMedium,
+      stringResource(R.string.settings_weather_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-  } else {
-    OutlinedButton(
-      onClick = { weatherPermission.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
-      modifier = Modifier.fillMaxWidth(),
-    ) {
-      Text(stringResource(R.string.settings_weather_allow))
+    val weatherContext = LocalContext.current
+    var weatherAllowed by remember {
+      mutableStateOf(
+        weatherContext.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+          PackageManager.PERMISSION_GRANTED
+      )
+    }
+    val weatherPermission =
+      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        weatherAllowed = granted
+      }
+    if (weatherAllowed) {
+      Text(
+        stringResource(R.string.settings_weather_on),
+        style = MaterialTheme.typography.bodyMedium,
+      )
+    } else {
+      OutlinedButton(
+        onClick = { weatherPermission.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(stringResource(R.string.settings_weather_allow))
+      }
     }
   }
 
-  Text(
-    stringResource(R.string.settings_photos_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_photos_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  val photoPermission =
-    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-      viewModel.indexPhotos(granted)
-    }
-  when (val indexing = state.photoIndex) {
-    is IndexState.Running ->
-      Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (indexing.total > 0) {
-          LinearProgressIndicator(
-            progress = { indexing.done.toFloat() / indexing.total },
+  Section(R.string.settings_photos_heading) {
+    Text(
+      stringResource(R.string.settings_photos_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val photoPermission =
+      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.indexPhotos(granted)
+      }
+    when (val indexing = state.photoIndex) {
+      is IndexState.Running ->
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          if (indexing.total > 0) {
+            LinearProgressIndicator(
+              progress = { indexing.done.toFloat() / indexing.total },
+              modifier = Modifier.fillMaxWidth(),
+            )
+          } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+          }
+          Row(
             modifier = Modifier.fillMaxWidth(),
-          )
-        } else {
-          LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-          Text(
-            if (indexing.total > 0) {
-              stringResource(
-                R.string.settings_photos_progress,
-                indexing.done,
-                indexing.total,
-              )
-            } else stringResource(R.string.settings_photos_preparing),
-            style = MaterialTheme.typography.bodySmall,
-          )
-          TextButton(onClick = viewModel::stopIndexing) {
-            Text(stringResource(R.string.settings_photos_stop))
+            horizontalArrangement = Arrangement.SpaceBetween,
+          ) {
+            Text(
+              if (indexing.total > 0) {
+                stringResource(
+                  R.string.settings_photos_progress,
+                  indexing.done,
+                  indexing.total,
+                )
+              } else stringResource(R.string.settings_photos_preparing),
+              style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(onClick = viewModel::stopIndexing) {
+              Text(stringResource(R.string.settings_photos_stop))
+            }
           }
         }
-      }
-    is IndexState.Failed ->
-      Text(
-        indexing.message,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.error,
-      )
-    else -> Unit
-  }
-  Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-    OutlinedButton(
-      onClick = { photoPermission.launch(photoPermissionName()) },
-      enabled = state.photoIndex !is IndexState.Running,
-    ) {
-      Text(
-        stringResource(
-          if (state.photosIndexed > 0) R.string.settings_photos_continue
-          else R.string.settings_photos_start
+      is IndexState.Failed ->
+        Text(
+          indexing.message,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.error,
         )
-      )
+      else -> Unit
     }
-    if (state.photosIndexed > 0) {
-      TextButton(onClick = viewModel::clearPhotoIndex) {
-        Text(stringResource(R.string.settings_photos_clear))
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+      OutlinedButton(
+        onClick = { photoPermission.launch(photoPermissionName()) },
+        enabled = state.photoIndex !is IndexState.Running,
+      ) {
+        Text(
+          stringResource(
+            if (state.photosIndexed > 0) R.string.settings_photos_continue
+            else R.string.settings_photos_start
+          )
+        )
+      }
+      if (state.photosIndexed > 0) {
+        TextButton(onClick = viewModel::clearPhotoIndex) {
+          Text(stringResource(R.string.settings_photos_clear))
+        }
       }
     }
-  }
-  Text(
-    if (state.photosIndexed > 0) {
-      stringResource(R.string.settings_photos_indexed, state.photosIndexed)
-    } else stringResource(R.string.settings_photos_none),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
+    Text(
+      if (state.photosIndexed > 0) {
+        stringResource(R.string.settings_photos_indexed, state.photosIndexed)
+      } else stringResource(R.string.settings_photos_none),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
-  ScreenAccess(state, viewModel)
-  BorrowedPrivileges(viewModel)
+    ScreenAccess(state, viewModel)
+    BorrowedPrivileges(viewModel)
+  }
+
 }
 
 /**
@@ -1230,50 +1197,48 @@ private fun ColumnScope.ScreenAccess(state: SettingsState, viewModel: SettingsVi
     onDispose { lifecycle.lifecycle.removeObserver(observer) }
   }
 
-  Text(
-    stringResource(R.string.settings_screen_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 20.dp),
-  )
-  Text(
-    stringResource(R.string.settings_screen_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Text(
-    stringResource(if (granted) R.string.settings_screen_on else R.string.settings_screen_off),
-    style = MaterialTheme.typography.bodyLarge,
-    modifier = Modifier.padding(top = 8.dp),
-  )
-  // Said before the button rather than after it. What this grants is real, and somebody should
-  // read what it is while deciding rather than while undoing it.
-  Text(
-    stringResource(R.string.settings_screen_warning),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  OutlinedButton(onClick = { openAccessibilitySettings(context) }) {
-    Text(stringResource(R.string.settings_screen_grant))
-  }
+  Section(R.string.settings_screen_heading) {
+    Text(
+      stringResource(R.string.settings_screen_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+      stringResource(if (granted) R.string.settings_screen_on else R.string.settings_screen_off),
+      style = MaterialTheme.typography.bodyLarge,
+      modifier = Modifier.padding(top = 8.dp),
+    )
+    // Said before the button rather than after it. What this grants is real, and somebody should
+    // read what it is while deciding rather than while undoing it.
+    Text(
+      stringResource(R.string.settings_screen_warning),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedButton(onClick = { openAccessibilitySettings(context) }) {
+      Text(stringResource(R.string.settings_screen_grant))
+    }
 
-  Text(
-    stringResource(R.string.settings_tap_send),
-    style = MaterialTheme.typography.bodyLarge,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  for (policy in TapPolicy.entries) {
-    ChoiceRow(
-      title = stringResource(tapPolicyLabel(policy)),
-      detail = "",
-      selected = state.tapSend == policy,
-      onPick = { viewModel.setTapSend(policy) },
+    Text(
+      stringResource(R.string.settings_tap_send),
+      style = MaterialTheme.typography.bodyLarge,
+      modifier = Modifier.padding(top = 12.dp),
+    )
+    for (policy in TapPolicy.entries) {
+      ChoiceRow(
+        title = stringResource(tapPolicyLabel(policy)),
+        detail = "",
+        selected = state.tapSend == policy,
+        onPick = { viewModel.setTapSend(policy) },
+      )
+    }
+    Text(
+      stringResource(R.string.settings_tap_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
   }
-  Text(
-    stringResource(R.string.settings_tap_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
+
 }
 
 private fun tapPolicyLabel(policy: TapPolicy) =
@@ -1306,52 +1271,50 @@ private fun ColumnScope.BorrowedPrivileges(viewModel: SettingsViewModel) {
     onDispose { lifecycle.lifecycle.removeObserver(observer) }
   }
 
-  Text(
-    stringResource(R.string.settings_shell_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 20.dp),
-  )
-  Text(
-    stringResource(R.string.settings_shell_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Text(
-    stringResource(shellStateLabel(state)),
-    style = MaterialTheme.typography.bodyLarge,
-    modifier = Modifier.padding(top = 8.dp),
-  )
-  when (state) {
-    ShizukuState.READY -> Unit
-    ShizukuState.NOT_INSTALLED ->
-      OutlinedButton(onClick = { viewModel.openWhereToGetShizuku() }) {
-        Text(stringResource(R.string.settings_shell_get))
-      }
-    ShizukuState.NOT_RUNNING -> {
-      OutlinedButton(onClick = { viewModel.openShizuku() }) {
-        Text(stringResource(R.string.settings_shell_open))
-      }
-      Text(
-        stringResource(R.string.settings_shell_restart),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-    }
-    ShizukuState.NOT_PERMITTED ->
-      OutlinedButton(
-        onClick = {
-          viewModel.requestShizuku()
-          // Not read back here: the answer arrives in Shizuku's own dialog, after this
-          // returns, and the ON_RESUME above is what notices it.
+  Section(R.string.settings_shell_heading) {
+    Text(
+      stringResource(R.string.settings_shell_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+      stringResource(shellStateLabel(state)),
+      style = MaterialTheme.typography.bodyLarge,
+      modifier = Modifier.padding(top = 8.dp),
+    )
+    when (state) {
+      ShizukuState.READY -> Unit
+      ShizukuState.NOT_INSTALLED ->
+        OutlinedButton(onClick = { viewModel.openWhereToGetShizuku() }) {
+          Text(stringResource(R.string.settings_shell_get))
         }
-      ) {
-        Text(stringResource(R.string.settings_shell_ask))
+      ShizukuState.NOT_RUNNING -> {
+        OutlinedButton(onClick = { viewModel.openShizuku() }) {
+          Text(stringResource(R.string.settings_shell_open))
+        }
+        Text(
+          stringResource(R.string.settings_shell_restart),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
-    ShizukuState.REFUSED ->
-      OutlinedButton(onClick = { viewModel.openShizuku() }) {
-        Text(stringResource(R.string.settings_shell_open))
-      }
+      ShizukuState.NOT_PERMITTED ->
+        OutlinedButton(
+          onClick = {
+            viewModel.requestShizuku()
+            // Not read back here: the answer arrives in Shizuku's own dialog, after this
+            // returns, and the ON_RESUME above is what notices it.
+          }
+        ) {
+          Text(stringResource(R.string.settings_shell_ask))
+        }
+      ShizukuState.REFUSED ->
+        OutlinedButton(onClick = { viewModel.openShizuku() }) {
+          Text(stringResource(R.string.settings_shell_open))
+        }
+    }
   }
+
 }
 
 private fun shellStateLabel(state: ShizukuState) =
@@ -1378,55 +1341,53 @@ private fun shellStateLabel(state: ShizukuState) =
 private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewModel) {
   WebSearch(state, viewModel)
 
-  Text(
-    stringResource(R.string.settings_tools_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 24.dp),
-  )
-  Text(
-    stringResource(R.string.settings_tools_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Text(
-    stringResource(
-      R.string.settings_tools_count,
-      state.toolListing.size - state.disabledTools.size,
-      state.toolListing.size,
-    ),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-    modifier = Modifier.padding(top = 4.dp),
-  )
+  Section(R.string.settings_tools_heading) {
+    Text(
+      stringResource(R.string.settings_tools_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+      stringResource(
+        R.string.settings_tools_count,
+        state.toolListing.size - state.disabledTools.size,
+        state.toolListing.size,
+      ),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(top = 4.dp),
+    )
 
-  for (tool in state.toolListing) {
-    val on = tool.name !in state.disabledTools
-    val from = tool.fromServer
-    Row(
-      modifier =
-        Modifier.fillMaxWidth()
-          .clickable { viewModel.setToolEnabled(tool.name, !on) }
-          .padding(horizontal = 8.dp, vertical = 6.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-      Column(modifier = Modifier.weight(1f)) {
-        Text(tool.name, style = MaterialTheme.typography.bodyLarge)
-        Text(
-          // Said on the row rather than left to the prefix in the name: a tool that goes over
-          // the network to somebody else's server is a different thing from one that runs on
-          // the phone, and the person switching it should be able to see which it is.
-          if (from.isEmpty()) tool.description
-          else stringResource(R.string.settings_tools_remote, from, tool.description),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    for (tool in state.toolListing) {
+      val on = tool.name !in state.disabledTools
+      val from = tool.fromServer
+      Row(
+        modifier =
+          Modifier.fillMaxWidth()
+            .clickable { viewModel.setToolEnabled(tool.name, !on) }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(tool.name, style = MaterialTheme.typography.bodyLarge)
+          Text(
+            // Said on the row rather than left to the prefix in the name: a tool that goes over
+            // the network to somebody else's server is a different thing from one that runs on
+            // the phone, and the person switching it should be able to see which it is.
+            if (from.isEmpty()) tool.description
+            else stringResource(R.string.settings_tools_remote, from, tool.description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(checked = on, onCheckedChange = { viewModel.setToolEnabled(tool.name, it) })
       }
-      Switch(checked = on, onCheckedChange = { viewModel.setToolEnabled(tool.name, it) })
     }
+
+    McpServers(viewModel)
   }
 
-  McpServers(viewModel)
 }
 
 /**
@@ -1443,54 +1404,52 @@ private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewMo
  */
 @Composable
 private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewModel) {
-  Text(
-    stringResource(R.string.settings_search_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Text(
-    stringResource(R.string.settings_search_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-
-  for (provider in SearchProvider.entries) {
-    ChoiceRow(
-      title = stringResource(searchProviderLabel(provider)),
-      detail = stringResource(searchProviderDetail(provider)),
-      selected = state.searchProvider == provider,
-      onPick = { viewModel.setSearchProvider(provider) },
+  Section(R.string.settings_search_heading) {
+    Text(
+      stringResource(R.string.settings_search_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-  }
 
-  when (state.searchProvider) {
-    SearchProvider.NONE -> Unit
-    SearchProvider.SEARXNG -> {
-      OutlinedTextField(
-        value = state.searchUrl,
-        onValueChange = viewModel::onSearchUrlChanged,
-        label = { Text(stringResource(R.string.settings_search_url)) },
-        placeholder = { Text("https://searx.example.com") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-      )
-      // The misconfiguration everybody hits, said before they hit it: SearXNG serves JSON
-      // only when it is switched on, and otherwise answers 403 or an HTML page.
-      Text(
-        stringResource(R.string.settings_search_searxng_note),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    for (provider in SearchProvider.entries) {
+      ChoiceRow(
+        title = stringResource(searchProviderLabel(provider)),
+        detail = stringResource(searchProviderDetail(provider)),
+        selected = state.searchProvider == provider,
+        onPick = { viewModel.setSearchProvider(provider) },
       )
     }
-    SearchProvider.BRAVE ->
-      OutlinedTextField(
-        value = state.searchKey,
-        onValueChange = viewModel::onSearchKeyChanged,
-        label = { Text(stringResource(R.string.settings_search_key)) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-      )
+
+    when (state.searchProvider) {
+      SearchProvider.NONE -> Unit
+      SearchProvider.SEARXNG -> {
+        OutlinedTextField(
+          value = state.searchUrl,
+          onValueChange = viewModel::onSearchUrlChanged,
+          label = { Text(stringResource(R.string.settings_search_url)) },
+          placeholder = { Text("https://searx.example.com") },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
+        // The misconfiguration everybody hits, said before they hit it: SearXNG serves JSON
+        // only when it is switched on, and otherwise answers 403 or an HTML page.
+        Text(
+          stringResource(R.string.settings_search_searxng_note),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      SearchProvider.BRAVE ->
+        OutlinedTextField(
+          value = state.searchKey,
+          onValueChange = viewModel::onSearchKeyChanged,
+          label = { Text(stringResource(R.string.settings_search_key)) },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
+    }
   }
+
 }
 
 private fun searchProviderLabel(provider: SearchProvider) =
@@ -1526,112 +1485,110 @@ private fun ColumnScope.McpServers(viewModel: SettingsViewModel) {
   var url by rememberSaveable { mutableStateOf("") }
   var header by rememberSaveable { mutableStateOf("") }
 
-  Text(
-    stringResource(R.string.settings_mcp_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 24.dp),
-  )
-  Text(
-    stringResource(R.string.settings_mcp_detail),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-  Text(
-    stringResource(R.string.settings_mcp_warning),
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
-
-  if (servers.isEmpty()) {
+  Section(R.string.settings_mcp_heading) {
     Text(
-      stringResource(R.string.settings_mcp_none),
-      style = MaterialTheme.typography.bodyMedium,
-      modifier = Modifier.padding(vertical = 4.dp),
+      stringResource(R.string.settings_mcp_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-  }
+    Text(
+      stringResource(R.string.settings_mcp_warning),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
-  for (each in servers) {
-    Card(
-      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-      shape = RoundedCornerShape(18.dp),
-      modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-    ) {
-      Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(each.server.name, style = MaterialTheme.typography.bodyLarge)
-        Text(
-          each.server.url,
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-          when {
-            each.checking -> stringResource(R.string.settings_mcp_checking)
-            each.trouble.isNotEmpty() -> each.trouble
-            else -> stringResource(R.string.settings_mcp_tools, each.toolCount)
-          },
-          style = MaterialTheme.typography.bodySmall,
-          color =
-            if (each.trouble.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.error,
-        )
-        TextButton(onClick = { viewModel.removeMcpServer(each.server.url) }) {
-          Text(stringResource(R.string.settings_mcp_remove))
-        }
-      }
+    if (servers.isEmpty()) {
+      Text(
+        stringResource(R.string.settings_mcp_none),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(vertical = 4.dp),
+      )
     }
-  }
 
-  if (adding) {
-    OutlinedTextField(
-      value = url,
-      onValueChange = { url = it },
-      label = { Text(stringResource(R.string.settings_mcp_url)) },
-      placeholder = { Text("https://example.com/mcp") },
-      singleLine = true,
-      modifier = Modifier.fillMaxWidth(),
-    )
-    OutlinedTextField(
-      value = name,
-      onValueChange = { name = it },
-      label = { Text(stringResource(R.string.settings_mcp_name)) },
-      singleLine = true,
-      modifier = Modifier.fillMaxWidth(),
-    )
-    OutlinedTextField(
-      value = header,
-      onValueChange = { header = it },
-      label = { Text(stringResource(R.string.settings_mcp_header)) },
-      placeholder = { Text("Authorization: Bearer …") },
-      singleLine = true,
-      modifier = Modifier.fillMaxWidth(),
-    )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      Button(
-        onClick = {
-          viewModel.addMcpServer(name, url, header)
-          name = ""
-          url = ""
-          header = ""
-          adding = false
-        },
-        enabled = url.isNotBlank(),
+    for (each in servers) {
+      Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
       ) {
-        Text(stringResource(R.string.settings_mcp_save))
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+          Text(each.server.name, style = MaterialTheme.typography.bodyLarge)
+          Text(
+            each.server.url,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          Text(
+            when {
+              each.checking -> stringResource(R.string.settings_mcp_checking)
+              each.trouble.isNotEmpty() -> each.trouble
+              else -> stringResource(R.string.settings_mcp_tools, each.toolCount)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color =
+              if (each.trouble.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+              else MaterialTheme.colorScheme.error,
+          )
+          TextButton(onClick = { viewModel.removeMcpServer(each.server.url) }) {
+            Text(stringResource(R.string.settings_mcp_remove))
+          }
+        }
       }
-      TextButton(onClick = { adding = false }) { Text(stringResource(R.string.settings_mcp_cancel)) }
     }
-  } else {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      OutlinedButton(onClick = { adding = true }) {
-        Text(stringResource(R.string.settings_mcp_add))
+
+    if (adding) {
+      OutlinedTextField(
+        value = url,
+        onValueChange = { url = it },
+        label = { Text(stringResource(R.string.settings_mcp_url)) },
+        placeholder = { Text("https://example.com/mcp") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      OutlinedTextField(
+        value = name,
+        onValueChange = { name = it },
+        label = { Text(stringResource(R.string.settings_mcp_name)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      OutlinedTextField(
+        value = header,
+        onValueChange = { header = it },
+        label = { Text(stringResource(R.string.settings_mcp_header)) },
+        placeholder = { Text("Authorization: Bearer …") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+          onClick = {
+            viewModel.addMcpServer(name, url, header)
+            name = ""
+            url = ""
+            header = ""
+            adding = false
+          },
+          enabled = url.isNotBlank(),
+        ) {
+          Text(stringResource(R.string.settings_mcp_save))
+        }
+        TextButton(onClick = { adding = false }) { Text(stringResource(R.string.settings_mcp_cancel)) }
       }
-      if (servers.isNotEmpty()) {
-        TextButton(onClick = { viewModel.refreshMcp() }) {
-          Text(stringResource(R.string.settings_mcp_refresh))
+    } else {
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { adding = true }) {
+          Text(stringResource(R.string.settings_mcp_add))
+        }
+        if (servers.isNotEmpty()) {
+          TextButton(onClick = { viewModel.refreshMcp() }) {
+            Text(stringResource(R.string.settings_mcp_refresh))
+          }
         }
       }
     }
   }
+
 }
 
 /** What Lin keeps: memories, documents, the training copies, and a way out of all of it. */
@@ -1644,53 +1601,51 @@ private fun ColumnScope.DataTab(
   onOpenTraining: () -> Unit,
   onOpenBackup: () -> Unit,
 ) {
-  Text(
-    stringResource(R.string.settings_memory_heading),
-    style = MaterialTheme.typography.titleMedium,
-    modifier = Modifier.padding(top = 12.dp),
-  )
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          stringResource(R.string.settings_digest),
-          style = MaterialTheme.typography.bodyLarge,
-        )
-        Text(
-          stringResource(R.string.settings_digest_detail),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
+  Section(R.string.settings_memory_heading) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            stringResource(R.string.settings_digest),
+            style = MaterialTheme.typography.bodyLarge,
+          )
+          Text(
+            stringResource(R.string.settings_digest_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(
+          checked = state.digestConversations,
+          onCheckedChange = viewModel::setDigestConversations,
         )
       }
-      Switch(
-        checked = state.digestConversations,
-        onCheckedChange = viewModel::setDigestConversations,
-      )
+    }
+
+    OutlinedButton(onClick = onOpenDocuments, modifier = Modifier.fillMaxWidth()) {
+      Text(stringResource(R.string.documents_title))
+    }
+
+    OutlinedButton(onClick = onOpenTraining, modifier = Modifier.fillMaxWidth()) {
+      Text(stringResource(R.string.training_title))
+    }
+
+    OutlinedButton(onClick = onOpenBackup, modifier = Modifier.fillMaxWidth()) {
+      Text(stringResource(R.string.backup_title))
+    }
+
+    OutlinedButton(
+      onClick = onOpenMemory,
+      modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+    ) {
+      Text(stringResource(R.string.settings_open_memory))
     }
   }
 
-  OutlinedButton(onClick = onOpenDocuments, modifier = Modifier.fillMaxWidth()) {
-    Text(stringResource(R.string.documents_title))
-  }
-
-  OutlinedButton(onClick = onOpenTraining, modifier = Modifier.fillMaxWidth()) {
-    Text(stringResource(R.string.training_title))
-  }
-
-  OutlinedButton(onClick = onOpenBackup, modifier = Modifier.fillMaxWidth()) {
-    Text(stringResource(R.string.backup_title))
-  }
-
-  OutlinedButton(
-    onClick = onOpenMemory,
-    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-  ) {
-    Text(stringResource(R.string.settings_open_memory))
-  }
 }
 
 /**
@@ -1800,6 +1755,221 @@ private fun ServerModels(
 @Composable
 private fun ServerModelRow(model: ServerModel, selected: Boolean, onPick: () -> Unit) =
   ChoiceRow(title = model.name, detail = describe(model), selected = selected, onPick = onPick)
+
+/**
+ * One group of settings, in a card with its name above it.
+ *
+ * The One UI shape, and it is worth saying why it is worth the trouble. A settings tab is a
+ * list of unrelated decisions, and as one flat column the only thing separating "which model
+ * answers" from "what Lin may do to the phone" is a slightly larger line of text. Grouping
+ * them into cards makes the boundary a thing you can see without reading, which is what lets
+ * somebody find a setting by scrolling rather than by reading every line.
+ *
+ * The heading sits outside the card rather than inside it, which is the detail that makes
+ * this read as One UI rather than as a list of boxes: the label belongs to the group, and a
+ * label inside the box looks like the first row of it.
+ */
+@Composable
+private fun ColumnScope.Section(
+  @StringRes title: Int,
+  content: @Composable ColumnScope.() -> Unit,
+) {
+  Text(
+    stringResource(title),
+    style = MaterialTheme.typography.labelLarge,
+    color = MaterialTheme.colorScheme.primary,
+    modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 6.dp),
+  )
+  Surface(
+    color = MaterialTheme.colorScheme.surfaceContainerLow,
+    shape = RoundedCornerShape(24.dp),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Column(
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
+      content = content,
+    )
+  }
+}
+
+/**
+ * The questions that make Lin somebody's assistant rather than anybody's.
+ *
+ * A free-text box labelled "system prompt" would be cheaper to build and worse in every other
+ * way: most people would leave it empty, and the rest would write something that fights the
+ * half of the prompt describing what Lin can actually do. A short questionnaire asks only
+ * what the app genuinely cannot work out, and composes the rest.
+ *
+ * What is shown at the bottom is the real text, not a summary of it. Somebody handing an
+ * assistant standing instructions about themselves should be able to read exactly what it
+ * was told - and a preview that paraphrased would be the one part of this screen that could
+ * quietly lie.
+ */
+@Composable
+private fun ColumnScope.PersonaTab(state: SettingsState, viewModel: SettingsViewModel) {
+  Section(R.string.settings_persona_heading) {
+    Text(
+      stringResource(R.string.settings_persona_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+      stringResource(
+        R.string.settings_persona_progress,
+        answeredCount(state.persona),
+        Answers.entries.size,
+      ),
+      style = MaterialTheme.typography.bodyMedium,
+    )
+  }
+
+  for (question in Answers.entries) {
+    Section(questionLabel(question)) {
+      questionHint(question)?.let {
+        Text(
+          stringResource(it),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      val answered = state.persona[question.id].orEmpty()
+      when (question.kind) {
+        Answers.Kind.TEXT ->
+          OutlinedTextField(
+            value = answered.firstOrNull().orEmpty(),
+            onValueChange = { viewModel.setPersonaAnswer(question.id, listOf(it)) },
+            singleLine = question != Answers.ABOUT,
+            modifier = Modifier.fillMaxWidth(),
+          )
+        Answers.Kind.ONE_OF ->
+          for (option in question.options) {
+            ChoiceRow(
+              title = stringResource(optionLabel(question, option)),
+              detail = "",
+              selected = option in answered,
+              // Picking the chosen one again clears it, because every question here is
+              // optional and a radio group with no way back would make that untrue.
+              onPick = {
+                viewModel.setPersonaAnswer(
+                  question.id,
+                  if (option in answered) emptyList() else listOf(option),
+                )
+              },
+            )
+          }
+        Answers.Kind.ANY_OF ->
+          for (option in question.options) {
+            Row(
+              modifier =
+                Modifier.fillMaxWidth()
+                  .clickable {
+                    viewModel.setPersonaAnswer(
+                      question.id,
+                      if (option in answered) answered - option else answered + option,
+                    )
+                  }
+                  .padding(vertical = 2.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Checkbox(
+                checked = option in answered,
+                onCheckedChange = { on ->
+                  viewModel.setPersonaAnswer(
+                    question.id,
+                    if (on) answered + option else answered - option,
+                  )
+                },
+              )
+              Text(
+                stringResource(optionLabel(question, option)),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+              )
+            }
+          }
+      }
+    }
+  }
+
+  Section(R.string.settings_persona_preview_heading) {
+    val composed = personaPrompt(state.persona)
+    Text(
+      composed.ifBlank { stringResource(R.string.settings_persona_preview_empty) },
+      style = MaterialTheme.typography.bodyMedium,
+      color =
+        if (composed.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
+        else MaterialTheme.colorScheme.onSurface,
+    )
+    Text(
+      stringResource(R.string.settings_persona_preview_note),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    TextButton(onClick = { viewModel.clearPersona() }) {
+      Text(stringResource(R.string.settings_persona_clear))
+    }
+  }
+}
+
+private fun questionLabel(question: Answers) =
+  when (question) {
+    Answers.NAME -> R.string.persona_q_name
+    Answers.TONE -> R.string.persona_q_tone
+    Answers.LENGTH -> R.string.persona_q_length
+    Answers.LANGUAGE -> R.string.persona_q_language
+    Answers.PLACE -> R.string.persona_q_place
+    Answers.UNITS -> R.string.persona_q_units
+    Answers.USES -> R.string.persona_q_uses
+    Answers.ASK_FIRST -> R.string.persona_q_ask_first
+    Answers.UNSURE -> R.string.persona_q_unsure
+    Answers.ABOUT -> R.string.persona_q_about
+  }
+
+private fun questionHint(question: Answers): Int? =
+  when (question) {
+    Answers.NAME -> R.string.persona_q_name_hint
+    Answers.LANGUAGE -> R.string.persona_q_language_hint
+    Answers.PLACE -> R.string.persona_q_place_hint
+    Answers.ASK_FIRST -> R.string.persona_q_ask_first_hint
+    Answers.ABOUT -> R.string.persona_q_about_hint
+    else -> null
+  }
+
+/**
+ * The label for one option.
+ *
+ * An exhaustive `when` over the pair rather than a built resource name, so an option added
+ * in core without a label here is a compile error instead of a blank row on the screen.
+ */
+private fun optionLabel(question: Answers, option: String): Int =
+  when (question to option) {
+    Answers.TONE to "plain" -> R.string.persona_o_tone_plain
+    Answers.TONE to "warm" -> R.string.persona_o_tone_warm
+    Answers.TONE to "precise" -> R.string.persona_o_tone_precise
+    Answers.TONE to "playful" -> R.string.persona_o_tone_playful
+    Answers.LENGTH to "short" -> R.string.persona_o_length_short
+    Answers.LENGTH to "medium" -> R.string.persona_o_length_medium
+    Answers.LENGTH to "full" -> R.string.persona_o_length_full
+    Answers.UNITS to "metric" -> R.string.persona_o_units_metric
+    Answers.UNITS to "imperial" -> R.string.persona_o_units_imperial
+    Answers.USES to "messages" -> R.string.persona_o_uses_messages
+    Answers.USES to "calendar" -> R.string.persona_o_uses_calendar
+    Answers.USES to "music" -> R.string.persona_o_uses_music
+    Answers.USES to "lookups" -> R.string.persona_o_uses_lookups
+    Answers.USES to "memory" -> R.string.persona_o_uses_memory
+    Answers.USES to "phone" -> R.string.persona_o_uses_phone
+    Answers.USES to "writing" -> R.string.persona_o_uses_writing
+    Answers.ASK_FIRST to "send" -> R.string.persona_o_ask_first_send
+    Answers.ASK_FIRST to "call" -> R.string.persona_o_ask_first_call
+    Answers.ASK_FIRST to "settings" -> R.string.persona_o_ask_first_settings
+    Answers.ASK_FIRST to "play" -> R.string.persona_o_ask_first_play
+    Answers.ASK_FIRST to "open" -> R.string.persona_o_ask_first_open
+    Answers.UNSURE to "say_so" -> R.string.persona_o_unsure_say_so
+    Answers.UNSURE to "look_it_up" -> R.string.persona_o_unsure_look_it_up
+    else -> error("no label for ${question.id}=$option")
+  }
 
 /** One pickable row: a radio button, a name, and a line about what picking it means. */
 @Composable

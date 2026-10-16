@@ -50,6 +50,9 @@ class ReadScreenTool(private val context: Context) : AgentTool {
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "Use read_screen when the user asks about something on the screen they were looking at."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     if (!accessibilityGranted(context)) {
       return ToolResult.Failed(

@@ -28,6 +28,9 @@ import com.lin.agent.car.CarNotification
 import com.lin.agent.core.car.DialPolicy
 import com.lin.agent.core.car.dialPolicyNamed
 import com.lin.agent.core.privileged.ShizukuState
+import com.lin.agent.core.persona.Persona
+import com.lin.agent.core.persona.personaFrom
+import com.lin.agent.core.persona.storedPersona
 import com.lin.agent.core.tools.disabledFrom
 import com.lin.agent.engine.mcp.McpServer
 import com.lin.agent.engine.mcp.hostOf
@@ -128,6 +131,8 @@ data class SettingsState(
   val searchProvider: SearchProvider = SearchProvider.NONE,
   val searchUrl: String = "",
   val searchKey: String = "",
+  /** What the user answered about themselves. See [com.lin.agent.core.persona.Persona]. */
+  val persona: Persona = emptyMap(),
   /** Every tool Lin has, for the screen that switches them off. */
   val toolListing: List<ToolListing> = emptyList(),
   /** The ones switched off. See [com.lin.agent.core.tools.disabledFrom]. */
@@ -221,6 +226,7 @@ constructor(
           searchProvider = searchProviderNamed(settings.searchProvider.first()),
           searchUrl = settings.searchUrl.first(),
           searchKey = settings.searchKey.first(),
+          persona = personaFrom(settings.persona.first()),
           toolListing = tools.listing(),
           disabledTools = disabledFrom(settings.disabledTools.first()),
           carNotification = settings.carNotification.first(),
@@ -624,6 +630,26 @@ constructor(
   fun onSearchKeyChanged(value: String) {
     _state.update { it.copy(searchKey = value) }
     viewModelScope.launch { settings.setSearchKey(value) }
+  }
+
+  /**
+   * Records one answer, or clears it when nothing is left.
+   *
+   * Written as it is answered rather than behind a Save button. Each question is independent
+   * of the others and of anything on a server, so there is nothing to validate together -
+   * and a quiz that loses your answers because you left the screen is a quiz nobody finishes.
+   */
+  fun setPersonaAnswer(questionId: String, values: List<String>) {
+    val kept = values.map { it.trim() }.filter { it.isNotEmpty() }
+    val next = _state.value.persona.toMutableMap()
+    if (kept.isEmpty()) next.remove(questionId) else next[questionId] = kept
+    _state.update { it.copy(persona = next) }
+    viewModelScope.launch { settings.setPersona(storedPersona(next)) }
+  }
+
+  fun clearPersona() {
+    _state.update { it.copy(persona = emptyMap()) }
+    viewModelScope.launch { settings.setPersona("") }
   }
 
   fun setTapSend(policy: TapPolicy) {

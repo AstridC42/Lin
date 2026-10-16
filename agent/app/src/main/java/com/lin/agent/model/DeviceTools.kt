@@ -65,6 +65,9 @@ class ContactTool(private val context: Context) : AgentTool {
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "Use contact to look somebody up rather than recalling a number, which you do not know."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val asked = (arguments["name"] as? String)?.trim().orEmpty()
     if (asked.isEmpty()) return ToolResult.Failed("Nobody was named.")
@@ -165,6 +168,10 @@ class NavigateTool(private val context: Context, private val guard: LaunchGuard)
     )
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
+
+  override val guidance =
+      "navigate opens directions in the maps app; say navigation is open rather than " +
+      "describing a route you have not seen."
 
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val where = (arguments["destination"] as? String)?.trim().orEmpty()

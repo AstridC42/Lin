@@ -1691,6 +1691,60 @@ answer is five, and a second look at anything spent the budget on a task that
 was going fine. The wall clock and the repetition guard are still underneath
 it.
 
+### Phase 19 — A prompt that is asked for rather than written down
+
+**The capability half could not stay true.** The system prompt was a constant
+listing every tool and how to treat it, and by the time it was replaced it
+still said Lin could not change Wi-Fi — which Shizuku had made untrue phases
+earlier — and said nothing at all about the six tools added after it was
+written. Nothing enforced the correspondence; keeping it was a matter of
+remembering, and it was not remembered.
+
+So `AgentTool` gained `guidance`: a sentence or two about how to use that
+tool and what not to claim about it, living on the tool rather than in a
+paragraph somewhere else. `capabilityPrompt` assembles the prompt from the
+tools a turn is **actually** given — after the role filter and after anything
+the user switched off — so it can neither promise a tool that is not there nor
+stay silent about one that is. Sorted by name, which is not tidiness: an
+unchanged prefix is what lets a server reuse its cache of it, and a prompt
+that reshuffled itself every turn would throw that away on every question.
+
+**The personal half is asked.** A free-text "system prompt" box would be
+cheaper and worse: most people leave it empty, and the rest write something
+that fights the capability half. A ten-question quiz asks only what the app
+genuinely cannot work out — what to call them, which language, where they are,
+how much to say, what Lin must always ask about first — and composes the rest.
+
+The rule the composition turns on: **an unanswered question contributes
+nothing**. Not a default sentence. A prompt that says "answer in English" to
+somebody who never said so is a prompt making a decision on their behalf and
+hiding it in text they cannot see.
+
+The screen shows the composed text verbatim, not a summary. Somebody handing
+an assistant standing instructions about themselves should be able to read
+exactly what it was told, and a preview that paraphrased would be the one part
+of that screen able to lie quietly.
+
+Two small decisions worth keeping. Picking an already-selected radio option
+clears it, because every question is optional and a radio group with no way
+back makes that untrue. And the option labels are an exhaustive `when` over
+the question-and-option pair rather than a resource name built from strings,
+so an option added in `core` without a label is a compile error instead of a
+blank row.
+
+**Settings are cards now.** One UI's shape: each group in a rounded container
+with its name above it in the accent colour, rather than one flat column where
+the only thing separating "which model answers" from "what Lin may do to the
+phone" is a slightly larger line of text. The heading sits outside the card,
+which is the detail that makes it read as grouping rather than as a list of
+boxes.
+
+Twenty-one sections were converted by a mechanical transform rather than by
+hand. It produced three compile errors — one `val` declared in one section and
+used in another, and two missing imports — which is the argument for doing it
+that way: the compiler found every real problem, and a careful manual pass
+over two thousand lines would not have.
+
 ### Phase 11 — The design pass
 
 Four directions were drawn side by side on a canvas - a quiet page with no

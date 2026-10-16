@@ -91,6 +91,10 @@ class ReplyTool(private val relay: NotificationRelay) : AgentTool {
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "reply_to_message writes a reply onto the screen for the user to send; it does not " +
+      "send, so read the wording back and never say a message has gone."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val to = (arguments["to"] as? String)?.trim().orEmpty()
     val text = (arguments["text"] as? String)?.trim().orEmpty()

@@ -106,6 +106,11 @@ class SendMessageTool(
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "send_message types into another app's own message box. It does not press send unless " +
+      "the user has turned that on, so read its result and never say a message has gone when " +
+      "it is sitting there waiting."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val wantedApp = (arguments["app"] as? String)?.trim().orEmpty()
     val to = (arguments["to"] as? String)?.trim().orEmpty()
