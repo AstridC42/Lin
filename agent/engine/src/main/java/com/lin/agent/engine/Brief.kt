@@ -45,7 +45,17 @@ data class Budget(
 ) {
   companion object {
     const val DEFAULT_SECONDS = 120
-    const val DEFAULT_CALLS = 6
+
+    /**
+     * Raised from six when the web tools arrived.
+     *
+     * Six was generous for a turn whose tools were the torch and the calendar, and tight for
+     * one that can search and then read what it found: search, read, search again, read
+     * again and answer is five, and a second look at anything spends the budget on a task
+     * that was going fine. Ten, with the clock and the repetition guard still underneath it,
+     * leaves room for the work without leaving room for a loop.
+     */
+    const val DEFAULT_CALLS = 10
     const val DEFAULT_TOOL_CALL_RETRIES = 1
   }
 }

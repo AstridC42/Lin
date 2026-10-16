@@ -1647,6 +1647,50 @@ The OpenAI dialect is unchanged: it carries `enable_thinking` through
 `reasoning_effort` that vLLM may or may not accept would risk the whole
 request for a setting nobody asked for there.
 
+### Phase 18 — The turn that asked for the tool
+
+The bug underneath several others, and invisible from every angle except the
+wire.
+
+Tool calls were **read** out of a server's reply and never **written back**
+into the conversation sent to it. So after a tool ran, the server saw:
+
+```
+user:      search the web about doctor who lego set
+tool:      Results for "doctor who lego set" …
+```
+
+with no assistant turn in between that had asked for it. Chat templates render
+a tool result in the context of the call it answers; with no such call the
+model does not recognise it as the answer to anything. So it asks again. And
+again, until the loop's budget stops the turn. From the outside: a tool card
+saying **Done**, followed by "this is taking more steps than it should -
+stopped after 6 tool calls".
+
+It also explains a report from several phases earlier - Gemma saying "I cannot
+read the result of the last tool call because it was not executed" - which was
+read at the time as a formatting problem and partly patched as one. The model
+was describing its situation accurately.
+
+`Message` now carries `toolCalls` on an assistant turn and `toolCallId` on a
+tool result, the loop writes the asking turn into the conversation before the
+results, and both dialects render it. The one real difference between them is
+worth recording: **Ollama takes the arguments as an object, OpenAI takes them
+as a serialised string.** A server handed the wrong one either refuses the
+request or sees a call with no arguments. OpenAI additionally requires each
+tool result to name the call it answers, so the loop mints ids - a server that
+sends none still needs the pair matchable on the way back.
+
+The ids are deliberately not part of what makes two calls the same: a model
+asking twice for the same thing has asked twice, whatever the ids are.
+
+**The budget went from six to ten** in the same change. Six was generous for a
+turn whose tools were the torch and the calendar, and tight for one that can
+search and then read what it found: search, read, search again, read again and
+answer is five, and a second look at anything spent the budget on a task that
+was going fine. The wall clock and the repetition guard are still underneath
+it.
+
 ### Phase 11 — The design pass
 
 Four directions were drawn side by side on a canvas - a quiet page with no
