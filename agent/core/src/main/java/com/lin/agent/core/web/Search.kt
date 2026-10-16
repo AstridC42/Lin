@@ -24,6 +24,21 @@ enum class SearchProvider {
   NONE,
 
   /**
+   * Wikipedia's own search, and the only one here that needs nothing set up.
+   *
+   * It exists because of what a fresh install used to be: a model told it could search the
+   * web, a tool that answered "no search service is set up", and somebody who has to find an
+   * API key before Lin can tell them anything it was not trained on. Encyclopaedic search
+   * with no account is worth far more than no search at all.
+   *
+   * It is not a web search and must never be sold as one, so the results say where they came
+   * from. A price, an event, a release date and anything from this week are exactly what
+   * Wikipedia is worst at, and a model that forgets which one it is holding would answer them
+   * from an encyclopaedia.
+   */
+  WIKIPEDIA,
+
+  /**
    * The user's own SearXNG, which is the one this project is shaped for: no key, no account,
    * no third party, and they already run a server.
    */
@@ -33,8 +48,33 @@ enum class SearchProvider {
   BRAVE,
 }
 
+/**
+ * The stored name, defaulting to the one that needs no setting up.
+ *
+ * Wikipedia rather than NONE, and that is a deliberate change of mind. The first default was
+ * "nothing", on the grounds that an app should not pick a third party for somebody - but what
+ * it actually produced was an assistant that could not look anything up until its owner had
+ * found an API key, and that is a worse imposition than a Wikipedia search nobody asked for.
+ * Anybody who wants their own SearXNG or a Brave key is two taps away from it.
+ */
 fun searchProviderNamed(stored: String?): SearchProvider =
-  SearchProvider.entries.firstOrNull { it.name == stored?.trim()?.uppercase() } ?: SearchProvider.NONE
+  SearchProvider.entries.firstOrNull { it.name == stored?.trim()?.uppercase() }
+    ?: SearchProvider.WIKIPEDIA
+
+/**
+ * Where these results came from, said to the model in the result itself.
+ *
+ * Only where it changes what an honest answer looks like. A model holding six Wikipedia
+ * articles and a question about this week's prices should say what it has got, and it cannot
+ * do that unless the result says which search it was.
+ */
+fun sourceNote(provider: SearchProvider): String =
+  when (provider) {
+    SearchProvider.WIKIPEDIA ->
+      "Wikipedia only, not the whole web - say so if the question was about prices, news, " +
+        "releases or anything from the last few months"
+    else -> ""
+  }
 
 /** One result, reduced to what a model can use. */
 data class SearchHit(val title: String, val url: String, val snippet: String)
@@ -58,6 +98,11 @@ fun searchRequest(
   val escaped = urlEscape(asked)
   return when (provider) {
     SearchProvider.NONE -> null
+    // No key, no address, nothing to get wrong - which is the point of it being here.
+    SearchProvider.WIKIPEDIA ->
+      "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$escaped" +
+        "&srlimit=${count.coerceIn(1, 20)}&format=json&utf8=1" to
+        mapOf("Accept" to "application/json")
     SearchProvider.SEARXNG -> {
       val base = baseUrl.trim().trimEnd('/')
       if (base.isEmpty()) null
@@ -89,6 +134,7 @@ fun hitsFrom(provider: SearchProvider, body: String, limit: Int = 6): List<Searc
     when (provider) {
       SearchProvider.SEARXNG -> searxngHits(json)
       SearchProvider.BRAVE -> braveHits(json)
+      SearchProvider.WIKIPEDIA -> wikipediaHits(json)
       SearchProvider.NONE -> emptyList()
     }
   // Kept when it has an address *or* something to say. A SearXNG direct answer - the point
@@ -139,6 +185,48 @@ private fun searxngHits(json: JSONObject): List<SearchHit> {
   return found.filter { it.url.isNotEmpty() || it.snippet.isNotBlank() }
 }
 
+/**
+ * Wikipedia's search results.
+ *
+ * Linked by page id rather than by title. A title has to be percent-encoded, and gets it
+ * wrong for exactly the pages whose names contain the interesting characters; `?curid=` is
+ * the id the API just handed us and cannot be mangled.
+ *
+ * The snippets arrive with `<span class="searchmatch">` around every matched word, because
+ * the API is written for a web page. Left in, a model reads the markup as part of the text
+ * and repeats it.
+ */
+private fun wikipediaHits(json: JSONObject): List<SearchHit> {
+  val results = json.optJSONObject("query")?.optJSONArray("search") ?: return emptyList()
+  return (0 until results.length()).mapNotNull { index ->
+    val each = results.optJSONObject(index) ?: return@mapNotNull null
+    val title = each.optString("title")
+    if (title.isEmpty()) return@mapNotNull null
+    val id = each.optLong("pageid", 0L)
+    SearchHit(
+      title = title,
+      url = if (id > 0) "https://en.wikipedia.org/?curid=$id" else "",
+      snippet = withoutMarkup(each.optString("snippet")),
+    )
+  }
+}
+
+/** Tags out, the handful of entities that matter decoded, and the spacing tidied. */
+internal fun withoutMarkup(html: String): String =
+  html
+    .replace(Regex("<[^>]*>"), "")
+    .replace("&quot;", "\"")
+    .replace("&#39;", "'")
+    .replace("&apos;", "'")
+    .replace("&lt;", "<")
+    .replace("&gt;", ">")
+    .replace("&nbsp;", " ")
+    // Last, so that an escaped ampersand in the source does not turn the text after it into
+    // another entity: "&amp;lt;" is the characters "&lt;", not a less-than sign.
+    .replace("&amp;", "&")
+    .replace(Regex("\\s+"), " ")
+    .trim()
+
 private fun braveHits(json: JSONObject): List<SearchHit> {
   val results = json.optJSONObject("web")?.optJSONArray("results") ?: return emptyList()
   return (0 until results.length()).mapNotNull { index ->
@@ -158,10 +246,12 @@ private fun braveHits(json: JSONObject): List<SearchHit> {
  * useful-looking result is ask to read it - and a URL buried in a sentence is a URL it
  * copies out wrongly.
  */
-fun hitsInWords(query: String, hits: List<SearchHit>): String {
+fun hitsInWords(query: String, hits: List<SearchHit>, source: String = ""): String {
   if (hits.isEmpty()) return "Nothing came back for \"$query\"."
   return buildString {
-    append("Results for \"").append(query).append("\":")
+    append("Results for \"").append(query).append("\"")
+    if (source.isNotBlank()) append(" (").append(source.trim()).append(")")
+    append(":")
     hits.forEachIndexed { index, hit ->
       append("\n\n").append(index + 1).append(". ").append(hit.title.ifBlank { hit.url })
       if (hit.url.isNotEmpty()) append("\n").append(hit.url)

@@ -695,25 +695,51 @@ private fun ToolCard(run: ToolRun) {
       ToolState.FAILED -> stringResource(R.string.tool_failed_short) to colors.error
     }
 
+  // Tapped to see what the tool actually said. The model's version of a tool failure is a
+  // paraphrase, and a paraphrase of a diagnosis is not a diagnosis: "the search settings may
+  // need checking" is what the user saw, where the tool had said which of four faults it was.
+  // Folded away by default, because on a good day nobody needs it.
+  var open by rememberSaveable(run.name, run.said) { mutableStateOf(false) }
+  val canOpen = run.said.isNotBlank()
+
   Surface(
     color = colors.surfaceContainer,
     shape = RoundedCornerShape(18.dp),
-    modifier = Modifier.fillMaxWidth(),
+    modifier =
+      Modifier.fillMaxWidth().then(
+        if (canOpen) Modifier.clickable { open = !open } else Modifier
+      ),
   ) {
-    Row(
-      modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-      if (run.state == ToolState.RUNNING) {
-        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        if (run.state == ToolState.RUNNING) {
+          CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+        }
+        Text(
+          run.name.replace('_', ' '),
+          style = MaterialTheme.typography.bodyMedium,
+          modifier = Modifier.weight(1f),
+        )
+        Text(label, style = MaterialTheme.typography.labelMedium, color = tint)
       }
-      Text(
-        run.name.replace('_', ' '),
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.weight(1f),
-      )
-      Text(label, style = MaterialTheme.typography.labelMedium, color = tint)
+      if (open) {
+        Text(
+          run.said,
+          style = MaterialTheme.typography.bodySmall,
+          color = colors.onSurfaceVariant,
+          modifier = Modifier.padding(top = 8.dp),
+        )
+      } else if (canOpen) {
+        Text(
+          stringResource(R.string.tool_tap_to_see),
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.onSurfaceVariant,
+          modifier = Modifier.padding(top = 4.dp),
+        )
+      }
     }
   }
 }

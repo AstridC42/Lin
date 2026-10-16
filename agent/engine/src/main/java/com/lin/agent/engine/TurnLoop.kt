@@ -38,11 +38,21 @@ sealed interface LoopEvent {
   /** A tool is about to run. Worth showing: it is the difference between slow and stuck. */
   data class ToolStarted(val name: String) : LoopEvent
 
-  /** [shows] is anything the tool produced for the screen rather than for the model. */
+  /**
+   * [shows] is anything the tool produced for the screen rather than for the model.
+   *
+   * [said] is what the model was told, word for word, and it is carried up for one reason: a
+   * tool's own account of what went wrong is the most useful sentence in the app, and until
+   * now the only way to see it was to read whatever the model made of it. The model
+   * paraphrases, and a paraphrase of a diagnosis is not a diagnosis - "the search settings may
+   * need checking" instead of "HTTP 200, a page rather than data". The screen shows it on
+   * request; nothing summarises it on the way.
+   */
   data class ToolFinished(
     val name: String,
     val ok: Boolean,
     val shows: List<String> = emptyList(),
+    val said: String = "",
   ) : LoopEvent
 
   data class Done(val text: String) : LoopEvent
@@ -184,6 +194,11 @@ class TurnLoop(
                 name = call.name,
                 ok = result is ToolResult.Ok,
                 shows = (result as? ToolResult.Ok)?.shows.orEmpty(),
+                said =
+                  when (result) {
+                    is ToolResult.Ok -> result.text
+                    is ToolResult.Failed -> result.message
+                  },
               )
             )
             if (result is ToolResult.Ok) somethingWorked = true

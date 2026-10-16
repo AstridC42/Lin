@@ -81,7 +81,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** A tool Lin used on this turn, and how it went. */
-data class ToolRun(val name: String, val state: ToolState)
+data class ToolRun(val name: String, val state: ToolState, val said: String = "")
 
 /** The three things that can be true of a tool call, all of which the screen shows. */
 enum class ToolState {
@@ -91,11 +91,11 @@ enum class ToolState {
 }
 
 /** Marks the last still-running call of that name as finished. */
-private fun List<ToolRun>.settle(name: String, ok: Boolean): List<ToolRun> {
+private fun List<ToolRun>.settle(name: String, ok: Boolean, said: String = ""): List<ToolRun> {
   val at = indexOfLast { it.name == name && it.state == ToolState.RUNNING }
   if (at < 0) return this
   return toMutableList().also {
-    it[at] = ToolRun(name, if (ok) ToolState.DONE else ToolState.FAILED)
+    it[at] = ToolRun(name, if (ok) ToolState.DONE else ToolState.FAILED, said)
   }
 }
 
@@ -506,7 +506,7 @@ constructor(
                   it.copy(
                     // The last running one of that name becomes what it became. Matched by name
                     // rather than by position, because a turn can run two tools at once.
-                    toolRuns = it.toolRuns.settle(event.name, event.ok),
+                    toolRuns = it.toolRuns.settle(event.name, event.ok, event.said),
                     shows = it.shows + event.shows,
                     // A failure that is only a missing permission is worth one button rather
                     // than a sentence relayed through the model. Kept once set: two tools

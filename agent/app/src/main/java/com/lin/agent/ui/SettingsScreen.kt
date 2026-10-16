@@ -1483,7 +1483,9 @@ private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewM
     }
 
     when (state.searchProvider) {
-      SearchProvider.NONE -> Unit
+      // Neither needs anything filled in, which is the whole appeal of the second one.
+      SearchProvider.NONE,
+      SearchProvider.WIKIPEDIA -> Unit
       SearchProvider.SEARXNG -> {
         OutlinedTextField(
           value = state.searchUrl,
@@ -1534,6 +1536,7 @@ private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewM
 private fun searchProviderLabel(provider: SearchProvider) =
   when (provider) {
     SearchProvider.NONE -> R.string.settings_search_none
+    SearchProvider.WIKIPEDIA -> R.string.settings_search_wikipedia
     SearchProvider.SEARXNG -> R.string.settings_search_searxng
     SearchProvider.BRAVE -> R.string.settings_search_brave
   }
@@ -1541,6 +1544,7 @@ private fun searchProviderLabel(provider: SearchProvider) =
 private fun searchProviderDetail(provider: SearchProvider) =
   when (provider) {
     SearchProvider.NONE -> R.string.settings_search_none_detail
+    SearchProvider.WIKIPEDIA -> R.string.settings_search_wikipedia_detail
     SearchProvider.SEARXNG -> R.string.settings_search_searxng_detail
     SearchProvider.BRAVE -> R.string.settings_search_brave_detail
   }
