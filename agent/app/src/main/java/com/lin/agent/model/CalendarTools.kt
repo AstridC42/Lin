@@ -59,6 +59,9 @@ class CalendarTool(private val calendars: Calendars) : AgentTool {
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "Use whats_on to look at the calendar rather than guessing what the user has on."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val asked = (arguments["days"] as? Number)?.toInt() ?: DEFAULT_DAYS_AHEAD
     val days = asked.coerceIn(1, MAX_DAYS)
@@ -127,6 +130,11 @@ class AddToCalendarTool(
     )
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
+
+  override val guidance =
+      "add_to_calendar opens the calendar filled in and the user saves it, so say it is ready " +
+      "rather than saying it is in their calendar; work the date out from today's date above " +
+      "and pass it as numbers."
 
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val title = (arguments["title"] as? String)?.trim().orEmpty()
@@ -224,6 +232,10 @@ class AlarmTool(private val context: Context, private val guard: LaunchGuard) : 
     )
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
+
+  override val guidance =
+      "A timer is set straight away, but an alarm opens the clock to be confirmed - do not " +
+      "say an alarm is set."
 
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val label = (arguments["label"] as? String)?.trim().orEmpty()

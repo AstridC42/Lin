@@ -65,6 +65,11 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
 
   override val roles = setOf(AgentRole.ORCHESTRATOR, AgentRole.SUB_AGENT)
 
+  override val guidance =
+      "Use search_web when you do not know something or it may have changed since you were " +
+      "trained, then read_page on a result worth reading. Never answer a question about " +
+      "current facts, prices or events from memory alone."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val query = (arguments["query"] as? String)?.trim().orEmpty()
     if (query.isEmpty()) return ToolResult.Failed("There was nothing to search for.")

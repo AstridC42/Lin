@@ -224,6 +224,81 @@
     levels.</string>
   <string name="settings_sampling_clear">Back to the server\'s own settings</string>
 
+  <string name="standing_channel">Routines</string>
+  <string name="standing_channel_detail">Answers to the things you asked Lin to check on a
+    schedule.</string>
+  <string name="settings_standing_heading">Things Lin does on its own</string>
+  <string name="settings_standing_detail">A question you ask every day is one you should only
+    have to ask once. Lin runs it in the background and puts the answer in a notification.
+    Late by up to three hours is still delivered; later than that waits for tomorrow, because
+    a morning briefing arriving at night is the wrong message rather than a late one.</string>
+  <string name="settings_standing_none">Nothing scheduled.</string>
+  <string name="settings_standing_add">Add a routine</string>
+  <string name="settings_standing_ask">What should Lin ask itself?</string>
+  <string name="settings_standing_hour">Hour (0–23)</string>
+  <string name="settings_standing_minute">Minute</string>
+  <string name="settings_standing_days">Which days? Leave all off for every day.</string>
+  <string name="settings_standing_save">Add</string>
+  <string name="settings_standing_cancel">Cancel</string>
+  <string name="settings_standing_remove">Remove</string>
+  <string name="settings_standing_everyday">Every day</string>
+
+  <string name="settings_tab_persona">Who Lin is</string>
+
+  <string name="settings_persona_heading">Who Lin is talking to</string>
+  <string name="settings_persona_detail">Answer as much or as little as you like. Every answer
+    becomes a line in the instructions Lin is given before each question; a question you skip
+    adds nothing at all, rather than a default you never chose.</string>
+  <string name="settings_persona_progress">%1$d of %2$d answered</string>
+  <string name="settings_persona_clear">Clear all answers</string>
+  <string name="settings_persona_preview_heading">What Lin will be told</string>
+  <string name="settings_persona_preview_empty">Nothing yet. Lin will work from its abilities
+    alone.</string>
+  <string name="settings_persona_preview_note">This is added word for word, after the date and
+    before the list of what Lin can do.</string>
+
+  <string name="persona_q_name">What should Lin call you?</string>
+  <string name="persona_q_name_hint">A name, or leave it empty.</string>
+  <string name="persona_q_tone">How should Lin talk to you?</string>
+  <string name="persona_o_tone_plain">Plain and to the point</string>
+  <string name="persona_o_tone_warm">Warm and conversational</string>
+  <string name="persona_o_tone_precise">Precise, and clear about what it is unsure of</string>
+  <string name="persona_o_tone_playful">Light, with some humour</string>
+  <string name="persona_q_length">How much should it say?</string>
+  <string name="persona_o_length_short">A sentence or two</string>
+  <string name="persona_o_length_medium">A short paragraph</string>
+  <string name="persona_o_length_full">As much as the question deserves</string>
+  <string name="persona_q_language">Which language should it answer in?</string>
+  <string name="persona_q_language_hint">Leave empty to answer in whichever you asked in.</string>
+  <string name="persona_q_place">Where are you, roughly?</string>
+  <string name="persona_q_place_hint">A city or region. Used for times, dates and what counts
+    as nearby.</string>
+  <string name="persona_q_units">Which units?</string>
+  <string name="persona_o_units_metric">Metric and Celsius</string>
+  <string name="persona_o_units_imperial">Imperial and Fahrenheit</string>
+  <string name="persona_q_uses">What do you mostly use Lin for?</string>
+  <string name="persona_o_uses_messages">Messages and calls</string>
+  <string name="persona_o_uses_calendar">Calendar and reminders</string>
+  <string name="persona_o_uses_music">Music and what is playing</string>
+  <string name="persona_o_uses_lookups">Looking things up</string>
+  <string name="persona_o_uses_memory">Remembering things for me</string>
+  <string name="persona_o_uses_phone">The phone\'s own settings</string>
+  <string name="persona_o_uses_writing">Writing and drafting</string>
+  <string name="persona_q_ask_first">What must Lin always ask you about first?</string>
+  <string name="persona_q_ask_first_hint">This overrides the switches elsewhere in
+    settings.</string>
+  <string name="persona_o_ask_first_send">Sending a message</string>
+  <string name="persona_o_ask_first_call">Placing a call</string>
+  <string name="persona_o_ask_first_settings">Changing a setting on the phone</string>
+  <string name="persona_o_ask_first_play">Starting something playing</string>
+  <string name="persona_o_ask_first_open">Opening an app</string>
+  <string name="persona_q_unsure">When Lin does not know something?</string>
+  <string name="persona_o_unsure_say_so">Say so plainly</string>
+  <string name="persona_o_unsure_look_it_up">Look it up first, then say so if it still
+    cannot</string>
+  <string name="persona_q_about">Anything else Lin should always know?</string>
+  <string name="persona_q_about_hint">Free text. Goes to Lin word for word.</string>
+
   <string name="settings_tab_tools">Tools</string>
   <string name="settings_tab_data">Data</string>
   <string name="settings_server_heading">Model server</string>

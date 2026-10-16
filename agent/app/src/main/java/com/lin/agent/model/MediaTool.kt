@@ -66,6 +66,10 @@ class MediaTool(private val context: Context) : AgentTool {
 
   override val roles = setOf(AgentRole.ORCHESTRATOR)
 
+  override val guidance =
+      "Use media to see or change what is playing; check with action 'what' before saying " +
+      "what is on."
+
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val action = (arguments["action"] as? String)?.trim()?.lowercase().orEmpty().ifEmpty { "what" }
 
