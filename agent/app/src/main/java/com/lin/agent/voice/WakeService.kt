@@ -89,6 +89,7 @@ class WakeService : Service() {
     carNotificationWasUp = CarNotification.isShowing(this)
     if (carNotificationWasUp) CarNotification.show(this, false)
 
+    isListening = true
     startListening()
     // Restarted if the system kills it, because a wake word that quietly stops working is
     // worse than one that was never turned on.
@@ -97,6 +98,7 @@ class WakeService : Service() {
 
   override fun onDestroy() {
     stopping = true
+    isListening = false
     if (carNotificationWasUp) CarNotification.show(this, true)
     runCatching {
       recognizer?.stopListening()
@@ -334,6 +336,18 @@ class WakeService : Service() {
 
     /** Which wake this is, so the question goes exactly once. See Summon. */
     const val EXTRA_TOKEN = "com.lin.agent.extra.TOKEN"
+
+    /**
+     * Whether the microphone is open right now.
+     *
+     * For Lin's car screen, which has no window and so cannot watch a flow - it is drawn once
+     * and asked to redraw, and at that moment it needs to label one button either "listen" or
+     * "stop". A process-wide flag is enough for that and wrong for anything else: it says
+     * nothing after the process is killed, which is also when the service is gone.
+     */
+    @Volatile
+    var isListening: Boolean = false
+      private set
 
     fun start(context: Context) {
       runCatching {
