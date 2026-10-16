@@ -2062,6 +2062,42 @@ Two details the API forced:
   sentence and repeats them. The ampersand is decoded **last**, or `&amp;lt;` —
   the four characters `&lt;` — turns into a less-than sign.
 
+### Phase 25 — "It worked before, and nothing changed"
+
+The tap-to-see row from Phase 24 did its job on the first try. The tool had
+said:
+
+> The search service (searxng) answered with data with no results in it.
+
+Which named the provider and the shape, and still missed the fault — because
+**a SearXNG that answers with an empty list is usually not saying "no
+results".** It is saying its own upstream engines would not talk to it, and it
+says exactly which ones, in a field nothing in Lin was reading.
+
+`webutils.get_json_response` in SearXNG builds `unresponsive_engines` as a list
+of `(engine, message)` pairs. An instance whose address has been blocked
+answers 200, with an empty result list and a full list of excuses:
+`[["google","CAPTCHA"],["startpage","Suspended: CAPTCHA"]]`. That is the whole
+explanation for "it worked for weeks and then stopped with nothing changed at
+either end" — engines block the address a self-hosted instance calls from, and
+nothing on the server has to change for it to start happening.
+
+So Lin reads the field. The failure message now names the engines and says
+whose problem it is, and the settings trial leads with them —
+`HTTP 200 · 0 results · 812 bytes · engines down: google (CAPTCHA), startpage
+(Suspended: CAPTCHA)` — because once the engines are named, the first bytes of
+JSON tell nobody anything. Entries that are a bare string rather than a pair
+are accepted too: the field is in no specification, other clients have met both
+shapes, and an engine name with no reason is still worth saying.
+
+**And a fallback, because a correct diagnosis is not an answer.** When the
+chosen search returns nothing, Lin tries Wikipedia — which needs no setting up
+and was already in the app — and labels it every time: *"the searxng search
+returned nothing, so these are from Wikipedia instead — say that, and say it is
+not a web search"*. If Wikipedia is empty too, the original diagnosis is what
+the model gets. The point is that somebody whose server has been blocked by
+Google should still be able to ask their assistant a question tonight.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

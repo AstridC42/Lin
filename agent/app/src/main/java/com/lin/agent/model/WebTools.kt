@@ -112,8 +112,47 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     // back", and what the user saw was Lin saying "it's possible there aren't any official
     // Doctor Who Lego sets" - a confident claim about the world assembled out of a search
     // that did not work. An empty web search is news about the search, not about the world.
-    if (hits.isEmpty()) return ToolResult.Failed(nothingCameBack(provider, answer.body))
+    if (hits.isEmpty()) return insteadOfNothing(query, provider, answer.body)
     return ToolResult.Ok(hitsInWords(query, hits, sourceNote(provider)))
+  }
+
+  /**
+   * One more try at Wikipedia, when the chosen search came back with nothing.
+   *
+   * Because of what nothing actually means here. The report that led to this was a SearXNG
+   * whose engines had started refusing it - no change at either end, the instance simply
+   * blocked by Google and the rest - and the honest failure message, while correct, left the
+   * user with an assistant that could not look anything up until they had fixed a server.
+   * Wikipedia needs nothing and was already in the app.
+   *
+   * Labelled every time. The result says which search returned nothing, and that what came
+   * back instead is an encyclopaedia, so the model cannot pass one off as the other. If
+   * Wikipedia is empty too, the original diagnosis is what the model gets.
+   */
+  private suspend fun insteadOfNothing(
+    query: String,
+    provider: SearchProvider,
+    body: String,
+  ): ToolResult {
+    val why = nothingCameBack(provider, body)
+    if (provider == SearchProvider.WIKIPEDIA) return ToolResult.Failed(why)
+
+    val (url, headers) =
+      searchRequest(SearchProvider.WIKIPEDIA, query, baseUrl = "", apiKey = "")
+        ?: return ToolResult.Failed(why)
+    val answer = runCatching { web.get(url, headers) }.getOrNull()
+    val hits =
+      if (answer?.ok == true) hitsFrom(SearchProvider.WIKIPEDIA, answer.body) else emptyList()
+    if (hits.isEmpty()) return ToolResult.Failed(why)
+
+    return ToolResult.Ok(
+      hitsInWords(
+        query,
+        hits,
+        "the ${provider.name.lowercase()} search returned nothing, so these are from " +
+          "Wikipedia instead - say that, and say it is not a web search",
+      )
+    )
   }
 
   private fun notSetUp(provider: SearchProvider) =
