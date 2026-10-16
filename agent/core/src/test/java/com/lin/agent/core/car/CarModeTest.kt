@@ -57,3 +57,61 @@ class CarModeTest {
     assertEquals(DialPolicy.NEVER, dialPolicyNamed("yes please"))
   }
 }
+
+class CarPaneTest {
+
+  private val trouble = CarLine("No model", "Download one in Lin")
+  private val listening = CarLine("Listening", "Say \"Hey Lin\"")
+  private val reminder = CarLine("Dentist", "today at 18:30")
+  private val messages = CarLine("2 waiting", "Ben, Dana")
+  private val playing = CarLine("Playing", "Portishead")
+
+  private val everything =
+    mapOf(
+      CarInfo.PLAYING to playing,
+      CarInfo.TROUBLE to trouble,
+      CarInfo.MESSAGES to messages,
+      CarInfo.LISTENING to listening,
+      CarInfo.REMINDER to reminder,
+    )
+
+  @Test
+  fun `the order is the declared order, not the order they were put in`() {
+    assertEquals(
+      listOf(trouble, listening, reminder, messages, playing),
+      carPane(everything, limit = 5),
+    )
+  }
+
+  @Test
+  fun `room for two means the two that matter`() {
+    // Which two is the whole point: this is what Lin tells a driver when there is room for
+    // nothing else.
+    assertEquals(listOf(trouble, listening), carPane(everything, limit = 2))
+  }
+
+  @Test
+  fun `no room means the microphone and nothing else`() {
+    // The collapsed screen. Not an error - a real answer, and the one the user asked for.
+    assertEquals(emptyList<CarLine>(), carPane(everything, limit = 0))
+    assertEquals(emptyList<CarLine>(), carPane(everything, limit = -1))
+  }
+
+  @Test
+  fun `a line with nothing to say is not a line`() {
+    // "Next reminder -" costs a driver a glance and tells them nothing.
+    val thin = mapOf(CarInfo.REMINDER to CarLine("  ", "today"), CarInfo.PLAYING to playing)
+    assertEquals(listOf(playing), carPane(thin, limit = 4))
+  }
+
+  @Test
+  fun `a detail is allowed to be empty when the title says it all`() {
+    val bare = mapOf(CarInfo.MESSAGES to CarLine("2 messages waiting"))
+    assertEquals(listOf(CarLine("2 messages waiting")), carPane(bare, limit = 4))
+  }
+
+  @Test
+  fun `nothing to say is no rows`() {
+    assertEquals(emptyList<CarLine>(), carPane(emptyMap(), limit = 4))
+  }
+}

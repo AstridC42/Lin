@@ -298,6 +298,24 @@
   <string name="persona_o_unsure_say_so">Say so plainly</string>
   <string name="persona_o_unsure_look_it_up">Look it up first, then say so if it still
     cannot</string>
+  <!-- Lin's screen in Android Auto. Short, because they are read in a glance. -->
+  <string name="car_screen_listen">Listen</string>
+  <string name="car_screen_stop">Stop</string>
+  <string name="car_screen_idle">Press listen, then say "Hey Lin".</string>
+  <string name="car_screen_listening">Listening. Say "Hey Lin".</string>
+  <string name="car_screen_stopped">Stopped listening.</string>
+  <string name="car_screen_no_mic">Lin needs the microphone. Allow it on the phone.</string>
+  <string name="car_screen_use_notification">Android would not open the microphone. Tap the
+    Lin notification on the phone.</string>
+  <string name="car_screen_trouble_mic">Microphone not allowed</string>
+  <string name="car_screen_trouble_mic_detail">Allow it on the phone</string>
+  <string name="car_screen_row_listening">Listening</string>
+  <string name="car_screen_row_listening_detail">Say "Hey Lin"</string>
+  <plurals name="car_screen_waiting">
+    <item quantity="one">%1$d message waiting</item>
+    <item quantity="other">%1$d messages waiting</item>
+  </plurals>
+
   <string name="reminder_channel">Reminders</string>
   <string name="reminder_channel_detail">The reminders you asked Lin to send.</string>
   <string name="reminder_from_lin">Reminder from Lin</string>

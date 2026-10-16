@@ -147,6 +147,10 @@ dependencies {
   // ContentProvider in the manifest that Shizuku uses to find this app.
   implementation(libs.shizuku.api)
   implementation(libs.shizuku.provider)
+  // The screen Android Auto shows. `app` is the templates and the host protocol; `projected`
+  // is the Android Auto half of it, as opposed to a car with Android built in.
+  implementation(libs.androidx.car.app)
+  implementation(libs.androidx.car.app.projected)
   implementation(libs.androidx.activity.compose)
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.ui)
