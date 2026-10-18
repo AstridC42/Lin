@@ -2274,6 +2274,40 @@ thing spoken. Streamed, which is the difficulty: a tag can arrive as `<thi` then
 chunk says whether it was one. The blank line a model leaves after its thinking
 is not counted as the start of its answer.
 
+### Phase 31 — More search services, and a floor under all of them
+
+Asked for after the phone-side fallback proved itself: more ways to search, and
+the fallback built in rather than bolted on.
+
+**Three more providers.** *DuckDuckGo from the phone* is now a choice in its own
+right, and the default: it is the only keyless option that is a real web
+search. *Firecrawl* — hosted with a key, or self-hosted at the user's own
+address, which is the reason that field exists — and *Tavily*, with a key. Both
+send each result's page along with the result, so Lin uses the page it was given
+instead of fetching it, and a page Lin never fetches cannot answer Lin with a bot
+check. Request and response shapes are from each service's API reference:
+Firecrawl `POST /v2/search` with `scrapeOptions.formats = [{type: markdown}]`,
+results in `data.web` (the v1 `data` array is read too, because a self-hosted
+instance is whatever version its owner last pulled); Tavily `POST /search` with
+`include_raw_content`, results in `results`.
+
+**One key per provider.** There was one shared key field, which would have sent
+a Brave key to Tavily the moment the radio button moved. Each service now has its
+own.
+
+**A floor under every choice.** The fallback used to run only when a search came
+back empty. Now it runs for every kind of failure — not set up, unreachable,
+refusing, rate-limited or empty: the chosen service, then (if it answered with
+nothing) the same service with plainer words, then DuckDuckGo from the phone,
+then Wikipedia. Each fallback result says which search failed and why, and the
+model is asked to mention it in one line — enough for the person to know their
+chosen search is broken, without the answer becoming about the failure.
+
+A caveat recorded rather than hidden: the guards that keep a JSON `null` page from
+becoming the text "null" cannot be proven by the unit tests, because the desktop
+`org.json` they run on already returns "" there, while Android's returns "null".
+The guards are for the phone.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

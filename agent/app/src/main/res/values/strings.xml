@@ -98,6 +98,21 @@
     add <![CDATA[<tt>json</tt>]]> under <![CDATA[<tt>search: formats:</tt>]]> in its
     settings.yml, or it answers with a web page and Lin finds nothing.</string>
   <string name="settings_search_key">Brave API key</string>
+  <string name="settings_search_duckduckgo">DuckDuckGo, from the phone</string>
+  <string name="settings_search_duckduckgo_detail">A real web search with nothing to set up.
+    It searches from your phone\'s own connection, which the search engines do not block the
+    way they block servers.</string>
+  <string name="settings_search_firecrawl">Firecrawl</string>
+  <string name="settings_search_firecrawl_detail">Sends back each page already read, so Lin
+    never meets a bot check. Hosted with a key, or your own Firecrawl at its address.</string>
+  <string name="settings_search_firecrawl_key">Firecrawl API key</string>
+  <string name="settings_search_firecrawl_url">Self-hosted address (empty for hosted)</string>
+  <string name="settings_search_tavily">Tavily</string>
+  <string name="settings_search_tavily_detail">A search API made for assistants: results with
+    their page text. Needs a key.</string>
+  <string name="settings_search_tavily_key">Tavily API key</string>
+  <string name="settings_search_fallback_note">Whatever you choose, if it fails or finds nothing
+    Lin falls back to DuckDuckGo from the phone, then Wikipedia - and says when it did.</string>
 
   <string name="settings_tools_heading">What Lin can do</string>
   <string name="settings_tools_detail">Every tool Lin may reach for. Switching one off does

@@ -48,6 +48,27 @@ enum class SearchProvider {
 
   /** Brave's Web Search API, for somebody who would rather have a key than a server. */
   BRAVE,
+
+  /**
+   * DuckDuckGo, asked from the phone's own connection, with nothing to set up.
+   *
+   * The default, because it is the only keyless option that is a real web search: Wikipedia
+   * is an encyclopaedia, and a self-hosted SearXNG is refused by the engines behind it at its
+   * server's address. The phone has an address of its own. See [duckDuckGoForm].
+   */
+  DUCKDUCKGO,
+
+  /**
+   * Firecrawl's search, hosted with a key or self-hosted at the user's own address.
+   *
+   * Worth having for one reason above the others: it returns each result's page already
+   * turned into text, so Lin does not fetch the pages itself - and a page Lin does not fetch is
+   * a page that cannot answer Lin with a bot check.
+   */
+  FIRECRAWL,
+
+  /** Tavily, a search API written for this job: results with their cleaned page text. */
+  TAVILY,
 }
 
 /**
@@ -61,7 +82,7 @@ enum class SearchProvider {
  */
 fun searchProviderNamed(stored: String?): SearchProvider =
   SearchProvider.entries.firstOrNull { it.name == stored?.trim()?.uppercase() }
-    ?: SearchProvider.WIKIPEDIA
+    ?: SearchProvider.DUCKDUCKGO
 
 /**
  * Where these results came from, said to the model in the result itself.
@@ -90,7 +111,96 @@ internal const val BROWSERISH =
     "Mobile Safari/537.36 Lin/1.0"
 
 /** One result, reduced to what a model can use. */
-data class SearchHit(val title: String, val url: String, val snippet: String)
+data class SearchHit(
+  val title: String,
+  val url: String,
+  val snippet: String,
+  /**
+   * The page itself, as text, when the search service sent it along with the result -
+   * Firecrawl and Tavily both can. Empty means Lin reads the page itself.
+   */
+  val page: String = "",
+)
+
+/**
+ * One request to a search service: where, with which headers, and - for the services that
+ * take a POST - what to send.
+ *
+ * A GET has no body. Everything that is not SearXNG, Brave or Wikipedia is a POST: DuckDuckGo
+ * with a form, Firecrawl and Tavily with JSON.
+ */
+data class SearchCall(
+  val url: String,
+  val headers: Map<String, String>,
+  val body: String? = null,
+  val contentType: String = "",
+)
+
+/**
+ * The request for [provider], or null when it is not set up.
+ *
+ * [baseUrl] is the provider's own address where it has one - a SearXNG, or a self-hosted
+ * Firecrawl - and [apiKey] is the key for this provider and no other. Keys are kept per
+ * provider by the caller on purpose: switching providers must never send one company's key
+ * to another.
+ */
+fun searchCall(provider: SearchProvider, query: String, baseUrl: String, apiKey: String): SearchCall? {
+  val asked = query.trim()
+  if (asked.isEmpty()) return null
+  return when (provider) {
+    SearchProvider.NONE -> null
+    SearchProvider.WIKIPEDIA,
+    SearchProvider.SEARXNG,
+    SearchProvider.BRAVE ->
+      searchRequest(provider, asked, baseUrl, apiKey)?.let { (url, headers) -> SearchCall(url, headers) }
+    SearchProvider.DUCKDUCKGO ->
+      duckDuckGoForm(asked)?.let { (url, form) ->
+        SearchCall(url, mapOf("Accept" to "text/html"), form, "application/x-www-form-urlencoded")
+      }
+    SearchProvider.FIRECRAWL -> {
+      val base = baseUrl.trim().trimEnd('/').ifEmpty { FIRECRAWL_HOSTED }
+      val key = apiKey.trim()
+      // The hosted service needs a key; a self-hosted one may well not.
+      if (base == FIRECRAWL_HOSTED && key.isEmpty()) return null
+      val body =
+        JSONObject()
+          .put("query", asked.take(500))
+          .put("limit", RESULTS)
+          // Markdown of each result's page, which is the point of using Firecrawl at all.
+          .put("scrapeOptions", JSONObject().put("formats", JSONArray().put(JSONObject().put("type", "markdown"))))
+      SearchCall(
+        "$base/v2/search",
+        buildMap {
+          put("Accept", "application/json")
+          if (key.isNotEmpty()) put("Authorization", "Bearer $key")
+        },
+        body.toString(),
+        "application/json",
+      )
+    }
+    SearchProvider.TAVILY -> {
+      val key = apiKey.trim()
+      if (key.isEmpty()) return null
+      val body =
+        JSONObject()
+          .put("query", asked)
+          .put("max_results", RESULTS)
+          // The page text with each result, so Lin reads it without fetching it.
+          .put("include_raw_content", "text")
+      SearchCall(
+        "https://api.tavily.com/search",
+        mapOf("Accept" to "application/json", "Authorization" to "Bearer $key"),
+        body.toString(),
+        "application/json",
+      )
+    }
+  }
+}
+
+private const val FIRECRAWL_HOSTED = "https://api.firecrawl.dev"
+
+/** Results asked of the services that charge per result or per scraped page. */
+private const val RESULTS = 5
 
 /**
  * Where to send the query, and what to send with it.
@@ -110,7 +220,11 @@ fun searchRequest(
   if (asked.isEmpty()) return null
   val escaped = urlEscape(asked)
   return when (provider) {
-    SearchProvider.NONE -> null
+    // Not GETs: these are built by [searchCall], which is what callers should use.
+    SearchProvider.NONE,
+    SearchProvider.DUCKDUCKGO,
+    SearchProvider.FIRECRAWL,
+    SearchProvider.TAVILY -> null
     // No key, no address, nothing to get wrong - which is the point of it being here.
     SearchProvider.WIKIPEDIA ->
       "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$escaped" +
@@ -168,12 +282,17 @@ fun searchRequest(
  * it asked and splitting the dispatch out would only move the `when` somewhere less testable.
  */
 fun hitsFrom(provider: SearchProvider, body: String, limit: Int = 6): List<SearchHit> {
+  // The one that answers with a web page rather than data.
+  if (provider == SearchProvider.DUCKDUCKGO) return duckDuckGoHits(body, limit)
   val json = runCatching { JSONObject(body) }.getOrNull() ?: return emptyList()
   val hits =
     when (provider) {
       SearchProvider.SEARXNG -> searxngHits(json)
       SearchProvider.BRAVE -> braveHits(json)
       SearchProvider.WIKIPEDIA -> wikipediaHits(json)
+      SearchProvider.FIRECRAWL -> firecrawlHits(json)
+      SearchProvider.TAVILY -> tavilyHits(json)
+      SearchProvider.DUCKDUCKGO,
       SearchProvider.NONE -> emptyList()
     }
   // Kept when it has an address *or* something to say. A SearXNG direct answer - the point
@@ -265,6 +384,47 @@ internal fun withoutMarkup(html: String): String =
     .replace("&amp;", "&")
     .replace(Regex("\\s+"), " ")
     .trim()
+
+/**
+ * Firecrawl's results: `data.web` in its v2 API, each with `url`, `title`, `description` and -
+ * when markdown was asked for - `markdown`, the page itself.
+ *
+ * `data` as a plain array is read too. That is the v1 shape, and a self-hosted Firecrawl is
+ * whatever version its owner last pulled; refusing the older shape would make Lin's search
+ * depend on somebody else's upgrade schedule.
+ */
+private fun firecrawlHits(json: JSONObject): List<SearchHit> {
+  val data = json.opt("data")
+  val list =
+    when (data) {
+      is JSONObject -> data.optJSONArray("web")
+      is JSONArray -> data
+      else -> null
+    } ?: return emptyList()
+  return (0 until list.length()).mapNotNull { index ->
+    val each = list.optJSONObject(index) ?: return@mapNotNull null
+    SearchHit(
+      title = each.optString("title").ifEmpty { each.optJSONObject("metadata")?.optString("title").orEmpty() },
+      url = each.optString("url"),
+      snippet = each.optString("description"),
+      page = each.optString("markdown").takeUnless { it == "null" }.orEmpty(),
+    )
+  }
+}
+
+/** Tavily's results: `results`, each with `title`, `url`, `content` and, asked for, `raw_content`. */
+private fun tavilyHits(json: JSONObject): List<SearchHit> {
+  val results = json.optJSONArray("results") ?: return emptyList()
+  return (0 until results.length()).mapNotNull { index ->
+    val each = results.optJSONObject(index) ?: return@mapNotNull null
+    SearchHit(
+      title = each.optString("title"),
+      url = each.optString("url"),
+      snippet = each.optString("content"),
+      page = if (each.isNull("raw_content")) "" else each.optString("raw_content"),
+    )
+  }
+}
 
 private fun braveHits(json: JSONObject): List<SearchHit> {
   val results = json.optJSONObject("web")?.optJSONArray("results") ?: return emptyList()
