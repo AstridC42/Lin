@@ -16,6 +16,7 @@
 
 package com.lin.agent.web
 
+import com.lin.agent.core.web.SearchCall
 import com.lin.agent.core.web.readAtMost
 import java.net.HttpURLConnection
 import java.net.URL
@@ -49,7 +50,18 @@ class Web @Inject constructor() {
    * bot challenge and a POST with results. Not redirected - a search form that redirects has
    * stopped being a search form - and read the same way as [get], to the end or the cap.
    */
-  suspend fun post(url: String, form: String, headers: Map<String, String> = emptyMap()): Fetched =
+  /** One search request, whichever kind it is - see [SearchCall]. */
+  suspend fun send(call: SearchCall): Fetched {
+    val body = call.body ?: return get(call.url, call.headers)
+    return post(call.url, body, call.headers, call.contentType)
+  }
+
+  suspend fun post(
+    url: String,
+    form: String,
+    headers: Map<String, String> = emptyMap(),
+    contentType: String = "application/x-www-form-urlencoded",
+  ): Fetched =
     withContext(Dispatchers.IO) {
       val connection =
         (URL(url).openConnection() as HttpURLConnection).apply {
@@ -59,7 +71,7 @@ class Web @Inject constructor() {
           instanceFollowRedirects = false
           doOutput = true
           setRequestProperty("User-Agent", USER_AGENT)
-          setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+          setRequestProperty("Content-Type", contentType)
           headers.forEach { (name, value) -> setRequestProperty(name, value) }
         }
       try {

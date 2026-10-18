@@ -33,7 +33,7 @@ import com.lin.agent.core.web.relevantPassages
 import com.lin.agent.core.web.samePagesAgain
 import com.lin.agent.core.web.searchBriefing
 import com.lin.agent.core.web.searchProviderNamed
-import com.lin.agent.core.web.searchRequest
+import com.lin.agent.core.web.searchCall
 import com.lin.agent.core.web.sourceNote
 import com.lin.agent.engine.AgentRole
 import com.lin.agent.engine.AgentTool
@@ -97,44 +97,71 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     val query = (arguments["query"] as? String)?.trim().orEmpty()
     if (query.isEmpty()) return ToolResult.Failed("There was nothing to search for.")
 
-    val provider = searchProviderNamed(runCatching { settings.searchProvider.first() }.getOrNull())
-    val request =
-      searchRequest(
-        provider = provider,
-        query = query,
-        baseUrl = runCatching { settings.searchUrl.first() }.getOrDefault(""),
-        apiKey = runCatching { settings.searchKey.first() }.getOrDefault(""),
-      )
-        ?: return ToolResult.Failed(notSetUp(provider))
+    val chosen = searchProviderNamed(runCatching { settings.searchProvider.first() }.getOrNull())
+    val first = attempt(chosen, query)
+    if (first is Attempt.Found) return ToolResult.Ok(briefed(query, first.hits, sourceNote(chosen)))
 
-    val (url, headers) = request
+    // The question may simply have been over-worded - worth one more try with the same
+    // service, but only when it answered and found nothing. A service that is down or
+    // refusing will not be fixed by rewording.
+    if (first is Attempt.Empty) tryPlainly(query, chosen)?.let { return it }
+
+    // Then the built-in fallbacks, for every kind of failure: not set up, unreachable,
+    // refusing, or empty. Each says, in its result, which search failed and why, so neither
+    // the model nor the person reading the tool row mistakes a fallback for the real thing.
+    for (fallback in FALLBACKS) {
+      if (fallback == chosen) continue
+      val next = attempt(fallback, query)
+      if (next is Attempt.Found) {
+        return ToolResult.Ok(briefed(query, next.hits, fallbackNote(chosen, first.why, fallback)))
+      }
+    }
+
+    // Nothing found is a failure, not an answer. An empty web search is news about the
+    // search, not about the world - see nothingCameBack.
+    return ToolResult.Failed(
+      first.why + " The built-in fallbacks - DuckDuckGo from the phone, then Wikipedia - " +
+        "found nothing either."
+    )
+  }
+
+  /** What one search came to: results, an answer with nothing in it, or no answer at all. */
+  private sealed interface Attempt {
+    val why: String
+
+    data class Found(val hits: List<SearchHit>) : Attempt {
+      override val why = ""
+    }
+
+    data class Empty(override val why: String) : Attempt
+
+    data class Broken(override val why: String) : Attempt
+  }
+
+  /** One provider, asked once. Every way it can go wrong is named, never just "failed". */
+  private suspend fun attempt(provider: SearchProvider, query: String): Attempt {
+    val call =
+      searchCall(provider, query, baseUrlFor(provider), keyFor(provider))
+        ?: return Attempt.Broken(notSetUp(provider))
     val answer =
-      runCatching { web.get(url, headers) }
-        .onFailure { Log.w(TAG, "Search failed", it) }
+      runCatching { web.send(call) }
+        .onFailure { Log.w(TAG, "${provider.name} search failed", it) }
         .getOrNull()
-        ?: return ToolResult.Failed(
-          "The search service could not be reached. Say so and answer from what you know, " +
-            "making clear that you could not look it up."
-        )
-
-    if (!answer.ok) return ToolResult.Failed(whyNot(provider, answer.status))
+        ?: return Attempt.Broken("The ${label(provider)} search could not be reached.")
+    if (!answer.ok) return Attempt.Broken(whyNot(provider, answer.status))
 
     val hits = hitsFrom(provider, answer.body)
-    if (hits.isEmpty() && provider == SearchProvider.SEARXNG && !answer.body.trimStart().startsWith("{")) {
+    if (hits.isNotEmpty()) return Attempt.Found(hits)
+    if (provider == SearchProvider.SEARXNG && !answer.body.trimStart().startsWith("{")) {
       // The commonest SearXNG misconfiguration, and it answers 200 with an HTML page rather
       // than an error, so it would otherwise read as "nothing found".
-      return ToolResult.Failed(
+      return Attempt.Broken(
         "That SearXNG replied with a web page rather than data, which means the JSON format " +
           "is not switched on for it. Tell the user to add `json` under `search: formats:` in " +
           "its settings.yml."
       )
     }
-    // Nothing found is a failure, not an answer. This used to return Ok with "Nothing came
-    // back", and what the user saw was Lin saying "it's possible there aren't any official
-    // Doctor Who Lego sets" - a confident claim about the world assembled out of a search
-    // that did not work. An empty web search is news about the search, not about the world.
-    if (hits.isEmpty()) return insteadOfNothing(query, provider, answer.body, url)
-    return ToolResult.Ok(briefed(query, hits, sourceNote(provider)))
+    return Attempt.Empty(nothingCameBack(provider, answer.body, call.url))
   }
 
   /**
@@ -142,108 +169,57 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
    *
    * A model writes "NVIDIA Jetson Orin Nano specs performance 2024 2026" because that reads
    * like a thorough question; a search engine reads it as four extra constraints and can
-   * return nothing at all. One retry with the first few real words costs a second and turns
-   * that into an answer. See [plainerQuery].
+   * return nothing at all. See [plainerQuery].
    */
   private suspend fun tryPlainly(query: String, provider: SearchProvider): ToolResult? {
     val plainer = plainerQuery(query) ?: return null
-    val (url, headers) =
-      searchRequest(
-        provider = provider,
-        query = plainer,
-        baseUrl = runCatching { settings.searchUrl.first() }.getOrDefault(""),
-        apiKey = runCatching { settings.searchKey.first() }.getOrDefault(""),
-      ) ?: return null
-    val answer = runCatching { web.get(url, headers) }.getOrNull() ?: return null
-    if (!answer.ok) return null
-    val hits = hitsFrom(provider, answer.body)
-    if (hits.isEmpty()) return null
+    val found = attempt(provider, plainer) as? Attempt.Found ?: return null
     return ToolResult.Ok(
       briefed(
         plainer,
-        hits,
+        found.hits,
         "\"$query\" found nothing, so this is the same question in plainer words" +
           sourceNote(provider).let { if (it.isEmpty()) "" else "; $it" },
       )
     )
   }
 
-  /**
-   * One more try at Wikipedia, when the chosen search came back with nothing.
-   *
-   * Because of what nothing actually means here. The report that led to this was a SearXNG
-   * whose engines had started refusing it - no change at either end, the instance simply
-   * blocked by Google and the rest - and the honest failure message, while correct, left the
-   * user with an assistant that could not look anything up until they had fixed a server.
-   * Wikipedia needs nothing and was already in the app.
-   *
-   * Labelled every time. The result says which search returned nothing, and that what came
-   * back instead is an encyclopaedia, so the model cannot pass one off as the other. If
-   * Wikipedia is empty too, the original diagnosis is what the model gets.
-   */
-  private suspend fun insteadOfNothing(
-    query: String,
-    provider: SearchProvider,
-    body: String,
-    asked: String,
-  ): ToolResult {
-    // Before anything else: the question may simply have been over-worded. Cheaper than the
-    // fallback and closer to what was asked, so it goes first.
-    tryPlainly(query, provider)?.let { return it }
-
-    // Then the phone asks for itself. A self-hosted search is refused by the engines behind
-    // it at its server's address; the phone has an address of its own. A real web search, so
-    // it goes before Wikipedia, which is only an encyclopaedia.
-    tryFromThePhone(query, provider)?.let { return it }
-
-    val why = nothingCameBack(provider, body, asked)
-    if (provider == SearchProvider.WIKIPEDIA) return ToolResult.Failed(why)
-
-    val (url, headers) =
-      searchRequest(SearchProvider.WIKIPEDIA, query, baseUrl = "", apiKey = "")
-        ?: return ToolResult.Failed(why)
-    val answer = runCatching { web.get(url, headers) }.getOrNull()
-    val hits =
-      if (answer?.ok == true) hitsFrom(SearchProvider.WIKIPEDIA, answer.body) else emptyList()
-    // Said out loud, because otherwise the model is told only about the SearXNG and reports
-    // one failure where there were two - and "Wikipedia had nothing either" is the part that
-    // tells the user the question itself may need rewording.
-    if (hits.isEmpty()) {
-      return ToolResult.Failed("$why Wikipedia was tried as well and had nothing for this query.")
+  private suspend fun baseUrlFor(provider: SearchProvider): String =
+    when (provider) {
+      SearchProvider.SEARXNG -> runCatching { settings.searchUrl.first() }.getOrDefault("")
+      SearchProvider.FIRECRAWL -> runCatching { settings.firecrawlUrl.first() }.getOrDefault("")
+      else -> ""
     }
 
-    return ToolResult.Ok(
-      briefed(
-        query,
-        hits,
-        "the ${provider.name.lowercase()} search returned nothing, so these are from " +
-          "Wikipedia instead - say that, and say it is not a web search",
-      )
-    )
-  }
+  /** This provider's key and no other's - see the note on the keys in the settings. */
+  private suspend fun keyFor(provider: SearchProvider): String =
+    when (provider) {
+      SearchProvider.BRAVE -> runCatching { settings.searchKey.first() }.getOrDefault("")
+      SearchProvider.FIRECRAWL -> runCatching { settings.firecrawlKey.first() }.getOrDefault("")
+      SearchProvider.TAVILY -> runCatching { settings.tavilyKey.first() }.getOrDefault("")
+      else -> ""
+    }
 
   /**
-   * DuckDuckGo, asked from the phone's own connection, when the chosen search found nothing.
-   * See [duckDuckGoForm] for why this works where the server's search does not.
+   * What the model is told when a fallback answered: which search failed, why, and what this
+   * is instead. Asked to mention the failure in one line - enough for the person to know their
+   * chosen search is not working, without the answer becoming about the failure.
    */
-  private suspend fun tryFromThePhone(query: String, provider: SearchProvider): ToolResult? {
-    val (url, form) = duckDuckGoForm(query) ?: return null
-    val page =
-      runCatching { web.post(url, form, mapOf("Accept" to "text/html")) }
-        .onFailure { Log.w(TAG, "DuckDuckGo from the phone failed", it) }
-        .getOrNull() ?: return null
-    if (!page.ok) return null
-    val hits = duckDuckGoHits(page.body)
-    if (hits.isEmpty()) return null
-    return ToolResult.Ok(
-      briefed(
-        query,
-        hits,
-        "the ${provider.name.lowercase()} search returned nothing, so these are from " +
-          "DuckDuckGo, searched from the phone - a real web search",
-      )
-    )
-  }
+  private fun fallbackNote(chosen: SearchProvider, why: String, used: SearchProvider): String =
+    "the ${label(chosen)} search did not work, so these are from ${label(used)}" +
+      (if (used == SearchProvider.WIKIPEDIA) " - say it is not a web search" else " - a real web search") +
+      ". Mention the failure in one line. What went wrong: $why"
+
+  private fun label(provider: SearchProvider): String =
+    when (provider) {
+      SearchProvider.NONE -> "no"
+      SearchProvider.WIKIPEDIA -> "Wikipedia"
+      SearchProvider.DUCKDUCKGO -> "DuckDuckGo (searched from the phone)"
+      SearchProvider.SEARXNG -> "SearXNG"
+      SearchProvider.BRAVE -> "Brave"
+      SearchProvider.FIRECRAWL -> "Firecrawl"
+      SearchProvider.TAVILY -> "Tavily"
+    }
 
   /**
    * The results, with the top pages actually read.
@@ -274,11 +250,23 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
 
     // One more than will be used: when a page turns out to be a bot check, the next result
     // takes its place rather than the answer having one source fewer.
-    val toRead = hits.filter { it.url.startsWith("http") }.take(PAGES_READ + 1)
+    // Pages the service already sent - Firecrawl and Tavily do - are used as they are. Only
+    // the rest are fetched, and only as many as are still needed.
+    val sent =
+      hits
+        .filter { it.page.isNotBlank() && !looksLikeABotCheck(it.page) }
+        .take(PAGES_READ)
+        .associate { it.url to relevantPassages(it.page, query, PASSAGE_BUDGET) }
+    val toRead =
+      hits
+        .filter { it.url.startsWith("http") && it.url !in sent }
+        .take((PAGES_READ - sent.size).coerceAtLeast(0) + 1)
+        .takeIf { sent.size < PAGES_READ }
+        .orEmpty()
     val reader = CoroutineScope(Dispatchers.IO + SupervisorJob())
     val pending = toRead.map { hit -> hit to reader.async { runCatching { web.get(hit.url) }.getOrNull() } }
     val deadline = System.currentTimeMillis() + READ_DEADLINE_MS
-    val texts = mutableMapOf<String, String>()
+    val texts = sent.toMutableMap()
     try {
       for ((hit, job) in pending) {
         val left = deadline - System.currentTimeMillis()
@@ -304,14 +292,19 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     when (provider) {
       SearchProvider.NONE ->
         "Lin has no search service set up, so it cannot look anything up. Tell the user it is " +
-          "in settings under Tools, and that it takes either their own SearXNG address or a " +
-          "Brave API key. Then answer from what you know and say you could not check."
-      // Unreachable: Wikipedia needs nothing filled in, so its request is never null. Here
-      // because the compiler is right to insist, and a silent `else` would hide the day a
-      // fourth provider arrives without its own sentence.
-      SearchProvider.WIKIPEDIA ->
-        "The Wikipedia search could not be built, which should not happen. Say the lookup " +
-          "failed rather than guessing an answer."
+          "in settings under Tools. Then answer from what you know and say you could not check."
+      // Unreachable: neither needs anything filled in, so their requests are never null. Here
+      // because the compiler is right to insist, and a silent `else` would hide the day a new
+      // provider arrives without its own sentence.
+      SearchProvider.WIKIPEDIA,
+      SearchProvider.DUCKDUCKGO ->
+        "The ${label(provider)} search could not be built, which should not happen. Say the " +
+          "lookup failed rather than guessing an answer."
+      SearchProvider.FIRECRAWL ->
+        "Firecrawl is chosen but has no API key, and no self-hosted address is set either. Say " +
+          "one of them needs filling in under Tools."
+      SearchProvider.TAVILY ->
+        "Tavily is chosen but no API key is set. Say it needs filling in under Tools."
       SearchProvider.SEARXNG ->
         "A SearXNG is chosen but its address is empty. Say it needs filling in under Tools."
       SearchProvider.BRAVE ->
@@ -332,6 +325,13 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
 
   private companion object {
     const val TAG = "LinSearchWeb"
+
+    /**
+     * What is tried, in order, when the chosen search does not work: a real web search from
+     * the phone, then the encyclopaedia. Neither needs anything set up, which is what lets
+     * them be the floor under every other choice.
+     */
+    val FALLBACKS = listOf(SearchProvider.DUCKDUCKGO, SearchProvider.WIKIPEDIA)
 
     /** How long a search's pages count as already given: about one question's worth. */
     const val RECENT_MS = 3 * 60 * 1000L

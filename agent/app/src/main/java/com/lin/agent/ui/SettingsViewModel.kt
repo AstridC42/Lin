@@ -32,7 +32,7 @@ import com.lin.agent.core.persona.Persona
 import com.lin.agent.R
 import com.lin.agent.core.standing.StandingTask
 import com.lin.agent.core.web.hitsFrom
-import com.lin.agent.core.web.searchRequest
+import com.lin.agent.core.web.searchCall
 import com.lin.agent.core.web.searchTrialReport
 import com.lin.agent.core.standing.storedTasks
 import com.lin.agent.core.standing.tasksFrom
@@ -139,6 +139,9 @@ data class SettingsState(
   val searchProvider: SearchProvider = SearchProvider.NONE,
   val searchUrl: String = "",
   val searchKey: String = "",
+  val firecrawlKey: String = "",
+  val firecrawlUrl: String = "",
+  val tavilyKey: String = "",
   /** What a trial search actually got back, for a screen that must say facts rather than verdicts. */
   val searchTrial: String = "",
   val searchTrying: Boolean = false,
@@ -246,6 +249,9 @@ constructor(
           searchProvider = searchProviderNamed(settings.searchProvider.first()),
           searchUrl = settings.searchUrl.first(),
           searchKey = settings.searchKey.first(),
+          firecrawlKey = settings.firecrawlKey.first(),
+          firecrawlUrl = settings.firecrawlUrl.first(),
+          tavilyKey = settings.tavilyKey.first(),
           persona = personaFrom(settings.persona.first()),
           standing = tasksFrom(settings.standingTasks.first()),
           reminders = reminders.ahead(),
@@ -655,6 +661,21 @@ constructor(
     viewModelScope.launch { settings.setSearchKey(value) }
   }
 
+  fun onFirecrawlKeyChanged(value: String) {
+    _state.update { it.copy(firecrawlKey = value) }
+    viewModelScope.launch { settings.setFirecrawlKey(value) }
+  }
+
+  fun onFirecrawlUrlChanged(value: String) {
+    _state.update { it.copy(firecrawlUrl = value) }
+    viewModelScope.launch { settings.setFirecrawlUrl(value) }
+  }
+
+  fun onTavilyKeyChanged(value: String) {
+    _state.update { it.copy(tavilyKey = value) }
+    viewModelScope.launch { settings.setTavilyKey(value) }
+  }
+
   /**
    * Records one answer, or clears it when nothing is left.
    *
@@ -724,22 +745,34 @@ constructor(
     _state.update { it.copy(searchTrying = true, searchTrial = "") }
     viewModelScope.launch {
       val provider = _state.value.searchProvider
-      val request =
-        searchRequest(
+      val state = _state.value
+      // Each provider's own address and key, exactly as the search tool picks them.
+      val call =
+        searchCall(
           provider = provider,
           query = "hello world",
-          baseUrl = _state.value.searchUrl,
-          apiKey = _state.value.searchKey,
+          baseUrl =
+            when (provider) {
+              SearchProvider.SEARXNG -> state.searchUrl
+              SearchProvider.FIRECRAWL -> state.firecrawlUrl
+              else -> ""
+            },
+          apiKey =
+            when (provider) {
+              SearchProvider.BRAVE -> state.searchKey
+              SearchProvider.FIRECRAWL -> state.firecrawlKey
+              SearchProvider.TAVILY -> state.tavilyKey
+              else -> ""
+            },
         )
       val said =
-        if (request == null) {
+        if (call == null) {
           appContext.getString(R.string.settings_search_try_unset)
         } else {
-          val (url, headers) = request
-          val got = runCatching { web.get(url, headers) }
+          val got = runCatching { web.send(call) }
           got.fold(
             onSuccess = {
-              searchTrialReport(it.status, hitsFrom(provider, it.body).size, it.body, url)
+              searchTrialReport(it.status, hitsFrom(provider, it.body).size, it.body, call.url)
             },
             onFailure = {
               appContext.getString(

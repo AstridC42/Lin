@@ -1483,9 +1483,37 @@ private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewM
     }
 
     when (state.searchProvider) {
-      // Neither needs anything filled in, which is the whole appeal of the second one.
+      // None of these needs anything filled in.
       SearchProvider.NONE,
-      SearchProvider.WIKIPEDIA -> Unit
+      SearchProvider.WIKIPEDIA,
+      SearchProvider.DUCKDUCKGO -> Unit
+      SearchProvider.FIRECRAWL -> {
+        OutlinedTextField(
+          value = state.firecrawlKey,
+          onValueChange = viewModel::onFirecrawlKeyChanged,
+          label = { Text(stringResource(R.string.settings_search_firecrawl_key)) },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
+        // Empty means the hosted service. Self-hosted Firecrawl is the reason this field
+        // exists: the same people who run their own model server run their own scraper.
+        OutlinedTextField(
+          value = state.firecrawlUrl,
+          onValueChange = viewModel::onFirecrawlUrlChanged,
+          label = { Text(stringResource(R.string.settings_search_firecrawl_url)) },
+          placeholder = { Text("https://api.firecrawl.dev") },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
+      SearchProvider.TAVILY ->
+        OutlinedTextField(
+          value = state.tavilyKey,
+          onValueChange = viewModel::onTavilyKeyChanged,
+          label = { Text(stringResource(R.string.settings_search_tavily_key)) },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
       SearchProvider.SEARXNG -> {
         OutlinedTextField(
           value = state.searchUrl,
@@ -1513,6 +1541,12 @@ private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewM
         )
     }
 
+    Text(
+      stringResource(R.string.settings_search_fallback_note),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
     // One real search, and what it actually got. Four different faults all read as "I
     // couldn't find anything" in the conversation; a status and a count tell them apart.
     TextButton(onClick = viewModel::trySearch, enabled = !state.searchTrying) {
@@ -1537,6 +1571,9 @@ private fun searchProviderLabel(provider: SearchProvider) =
   when (provider) {
     SearchProvider.NONE -> R.string.settings_search_none
     SearchProvider.WIKIPEDIA -> R.string.settings_search_wikipedia
+    SearchProvider.DUCKDUCKGO -> R.string.settings_search_duckduckgo
+    SearchProvider.FIRECRAWL -> R.string.settings_search_firecrawl
+    SearchProvider.TAVILY -> R.string.settings_search_tavily
     SearchProvider.SEARXNG -> R.string.settings_search_searxng
     SearchProvider.BRAVE -> R.string.settings_search_brave
   }
@@ -1545,6 +1582,9 @@ private fun searchProviderDetail(provider: SearchProvider) =
   when (provider) {
     SearchProvider.NONE -> R.string.settings_search_none_detail
     SearchProvider.WIKIPEDIA -> R.string.settings_search_wikipedia_detail
+    SearchProvider.DUCKDUCKGO -> R.string.settings_search_duckduckgo_detail
+    SearchProvider.FIRECRAWL -> R.string.settings_search_firecrawl_detail
+    SearchProvider.TAVILY -> R.string.settings_search_tavily_detail
     SearchProvider.SEARXNG -> R.string.settings_search_searxng_detail
     SearchProvider.BRAVE -> R.string.settings_search_brave_detail
   }
