@@ -2188,6 +2188,36 @@ bare addresses both become real links on screen, with the sentence-ending full
 stop left out of the address and an address's own brackets kept. A source list
 nobody can tap is a list nobody follows.
 
+### Phase 28 — The fetcher only ever read the first chunk
+
+The page-reading screenshot settled it: under *What the page says*, Lin had
+been given `Tegra - Wikipedia` and half of a `<link rel="stylesheet"` tag. The
+same page, parsed in full, gives twelve thousand characters of article.
+
+`Web.get` read the response with **one** `reader.read(buffer, 0, MOST_CHARS)`.
+That reads as "up to the cap" and means "whatever is buffered right now" — on a
+network stream, the first few kilobytes. So since Phase 16 every page Lin read
+was its first chunk, which for most sites is the `<head>`: a title and an
+unterminated tag. It is also, almost certainly, the SearXNG fault the previous
+four phases chased: a SearXNG reply *with* results is tens of kilobytes, so Lin
+got the first part of a JSON document, which does not parse, and reported "no
+results". An empty reply is small enough to arrive whole — so the only answers
+that survived intact were the failures, which is why every diagnosis looked
+like the server's fault. Those phases were not wasted, the diagnostics are real,
+but they were downstream of this. The bug was mine, written in Phase 16.
+
+`readAtMost` now reads in a loop to the end or the cap, tested against a reader
+that hands back a thousand characters at a time — the shape of a real network
+stream, and the shape the single read could never have survived.
+
+**And the loop.** Lin searched six times in a row with reworded queries and got
+the same three pages each time. A small model does not notice it is going round,
+so the result now says so: when every page in a search was already returned
+together within the last three minutes, the pages are not fetched again and the
+model is told it has these already, not to search again, and to answer from
+them or say plainly what it could not find. A new page among old ones is
+progress and is not stopped.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
