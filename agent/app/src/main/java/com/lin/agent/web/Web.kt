@@ -44,6 +44,38 @@ data class Fetched(val status: Int, val body: String, val contentType: String) {
 @Singleton
 class Web @Inject constructor() {
 
+  /**
+   * A form post, for the one page that needs one: DuckDuckGo's lite search answers a GET with a
+   * bot challenge and a POST with results. Not redirected - a search form that redirects has
+   * stopped being a search form - and read the same way as [get], to the end or the cap.
+   */
+  suspend fun post(url: String, form: String, headers: Map<String, String> = emptyMap()): Fetched =
+    withContext(Dispatchers.IO) {
+      val connection =
+        (URL(url).openConnection() as HttpURLConnection).apply {
+          requestMethod = "POST"
+          connectTimeout = CONNECT_MS
+          readTimeout = READ_MS
+          instanceFollowRedirects = false
+          doOutput = true
+          setRequestProperty("User-Agent", USER_AGENT)
+          setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+          headers.forEach { (name, value) -> setRequestProperty(name, value) }
+        }
+      try {
+        connection.outputStream.use { it.write(form.toByteArray(Charsets.UTF_8)) }
+        val status = connection.responseCode
+        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+        Fetched(
+          status = status,
+          body = stream?.bufferedReader()?.use { reader -> readAtMost(reader, MOST_CHARS) }.orEmpty(),
+          contentType = connection.contentType.orEmpty(),
+        )
+      } finally {
+        connection.disconnect()
+      }
+    }
+
   suspend fun get(url: String, headers: Map<String, String> = emptyMap()): Fetched =
     withContext(Dispatchers.IO) {
       var address = url

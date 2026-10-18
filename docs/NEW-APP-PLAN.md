@@ -2218,6 +2218,37 @@ model is told it has these already, not to search again, and to answer from
 them or say plainly what it could not find. A new page among old ones is
 progress and is not stopped.
 
+### Phase 29 — Search from the phone, and do not read a CAPTCHA
+
+With the fetcher reading whole responses, the next answer still had no
+specifications, and its only source was Wikipedia: the SearXNG search had come
+back empty and the fallback had taken over. Whatever the instance is doing on a
+given minute, the lesson of the last several phases is that Lin cannot depend on
+it alone.
+
+**The phone searches for itself.** A self-hosted SearXNG searches from its
+server's address, and the engines behind it block that address. The phone has an
+address of its own. So when the chosen search returns nothing (after the
+plainer-words retry), Lin asks DuckDuckGo's lite page directly, from the phone,
+before falling back to Wikipedia — a real web search ahead of an encyclopaedia.
+
+Built against the live page rather than memory: the lite page answers a **GET**
+with a 202 bot challenge and a **POST** — the way its own form asks — with
+results; each result is an `<a class='result-link'>` whose `href` is the page's
+own address, with the snippet in the next `result-snippet` cell. The real page
+fetched for "orin nano super specs" is kept as a test fixture, so the parser is
+pinned to markup that exists. Its first result is NVIDIA's product page and its
+second TechPowerUp's spec database.
+
+**And a bot check is not a page.** Running the whole pipeline on those real top
+three showed TechPowerUp answering *"Automated bot check in progress… Drag the
+handle to the target"* — which Lin would have handed to the model as the page,
+and a small model will dutifully summarise a CAPTCHA. Short pages that say they
+are a challenge are now treated as unread (snippet only, marked), and one extra
+result is fetched so the next one takes its place. On the real results the
+briefing then carries NVIDIA's 67 TOPS, 102 GB/s and 1.7 GHz, and the developer
+guide's ports, M.2 slots and storage.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

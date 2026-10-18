@@ -224,3 +224,37 @@ fun goingRoundText(query: String, titles: List<String>): String =
     "Searching again with different words will not find anything new. Do not search again " +
     "for this. Answer from what those pages said, and if that does not answer the question, " +
     "tell the user plainly what you found and what you could not find."
+
+/**
+ * Whether a page is a bot check rather than the page.
+ *
+ * Seen while testing this against the real results for "Orin Nano Super specs": TechPowerUp's
+ * specification database answered with "Automated bot check in progress … Drag the handle to
+ * the target", and that went to the model as though it were the page. A small model will
+ * dutifully summarise a CAPTCHA. These pages are short and say what they are, so the test is
+ * both: a known phrase, and not much else on the page - a long article that happens to mention
+ * Cloudflare is still an article.
+ */
+fun looksLikeABotCheck(text: String): Boolean {
+  if (text.length > BOT_CHECK_LONGEST) return false
+  val lower = text.lowercase(Locale.ROOT)
+  return BOT_CHECK_PHRASES.any { lower.contains(it) }
+}
+
+private const val BOT_CHECK_LONGEST = 1_500
+
+private val BOT_CHECK_PHRASES =
+  listOf(
+    "bot check",
+    "verify you are human",
+    "verifying you are human",
+    "are you a robot",
+    "checking your browser",
+    "just a moment",
+    "enable javascript and cookies",
+    "attention required",
+    "access denied",
+    "captcha",
+    "drag the handle",
+    "unusual traffic",
+  )

@@ -522,3 +522,64 @@ class PlainerQueryTest {
     assertTrue(!searchTrialReport(200, 0, "{}").contains("asked:"))
   }
 }
+
+class DuckDuckGoTest {
+
+  // The real lite page, as fetched for "orin nano super specs" while this was written. Kept
+  // so the parser is pinned to markup that exists rather than markup somebody remembered.
+  private val real =
+    javaClass.getResource("/web/ddg_lite_orin_nano_super.html")!!.readText()
+
+  @Test
+  fun `the real page gives real results, the official page first`() {
+    val hits = duckDuckGoHits(real)
+    assertTrue("${hits.size}", hits.size >= 3)
+    assertEquals(
+      "https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/nano-super-developer-kit/",
+      hits[0].url,
+    )
+    assertEquals("Jetson Orin Nano Super Developer Kit - NVIDIA", hits[0].title)
+    assertEquals("https://www.techpowerup.com/gpu-specs/jetson-orin-nano-super.c4377", hits[1].url)
+  }
+
+  @Test
+  fun `snippets come out as text, entities decoded and bold gone`() {
+    val snippet = duckDuckGoHits(real)[0].snippet
+    assertTrue(snippet, snippet.startsWith("Jetson Orin Nano Developer Kit Gets a \"Super\" Boost"))
+    assertFalse(snippet, snippet.contains("<b>"))
+    assertFalse(snippet, snippet.contains("&quot;"))
+  }
+
+  @Test
+  fun `links back to duckduckgo are skipped`() {
+    // Adverts and the site's own furniture link to duckduckgo.com, never to the result.
+    val html =
+      """<a rel="nofollow" href="https://duckduckgo.com/y.js?ad=1" class='result-link'>Ad</a>
+         <td class='result-snippet'>buy</td>
+         <a rel="nofollow" href="https://example.com/real" class='result-link'>Real</a>
+         <td class='result-snippet'>the page</td>"""
+    assertEquals(listOf(SearchHit("Real", "https://example.com/real", "the page")), duckDuckGoHits(html))
+  }
+
+  @Test
+  fun `a challenge page is nothing rather than a wrong answer`() {
+    // What a GET gets: a 202 bot challenge with no results in it.
+    assertEquals(emptyList<SearchHit>(), duckDuckGoHits("<html><body>Unfortunately, bots use DuckDuckGo too. anomaly</body></html>"))
+  }
+
+  @Test
+  fun `each snippet belongs to its own result`() {
+    val html =
+      """<a href="https://a.example" class='result-link'>A</a>
+         <a href="https://b.example" class='result-link'>B</a>
+         <td class='result-snippet'>about B</td>"""
+    // A has no snippet of its own; it must not borrow B's.
+    assertEquals(listOf(SearchHit("A", "https://a.example", ""), SearchHit("B", "https://b.example", "about B")), duckDuckGoHits(html))
+  }
+
+  @Test
+  fun `the search is a post to the lite page with the question escaped`() {
+    assertEquals("https://lite.duckduckgo.com/lite/" to "q=orin%20nano%20super", duckDuckGoForm(" orin nano super "))
+    assertNull(duckDuckGoForm("  "))
+  }
+}
