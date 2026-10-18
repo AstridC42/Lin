@@ -16,6 +16,7 @@
 
 package com.lin.agent.web
 
+import com.lin.agent.core.web.readAtMost
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -68,11 +69,9 @@ class Web @Inject constructor() {
           }
           val stream = if (status in 200..299) connection.inputStream else connection.errorStream
           val text =
-            stream?.bufferedReader()?.use { reader ->
-              val buffer = CharArray(MOST_CHARS)
-              val read = reader.read(buffer, 0, MOST_CHARS)
-              if (read <= 0) "" else String(buffer, 0, read)
-            }
+            // Read to the end or the cap, in a loop - see readAtMost for what a single
+            // read() call did to every page and every search result before this.
+            stream?.bufferedReader()?.use { reader -> readAtMost(reader, MOST_CHARS) }
           return@withContext Fetched(
             status = status,
             body = text.orEmpty(),

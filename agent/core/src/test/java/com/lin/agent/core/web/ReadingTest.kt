@@ -157,3 +157,72 @@ class ReadingTest {
     assertTrue(said, said.startsWith("Results for \"q\" (Wikipedia only):"))
   }
 }
+
+class ReadAtMostTest {
+
+  /** A network stream: hands back a few characters at a time, however many are asked for. */
+  private class Trickle(private val text: String, private val chunk: Int) : java.io.Reader() {
+    private var at = 0
+    override fun read(buffer: CharArray, offset: Int, length: Int): Int {
+      if (at >= text.length) return -1
+      val n = minOf(chunk, length, text.length - at)
+      text.toCharArray(at, at + n).copyInto(buffer, offset)
+      at += n
+      return n
+    }
+    override fun close() = Unit
+  }
+
+  @Test
+  fun `a stream that arrives in pieces is read to the end`() {
+    // The bug: one read() call returned the first piece, so every page was its <head> and
+    // every SearXNG reply with results was half a JSON document.
+    val page = "<html><head><title>Tegra</title></head><body>" + "article text ".repeat(5_000) + "</body></html>"
+    assertEquals(page, readAtMost(Trickle(page, chunk = 1_000), limit = 1_000_000))
+  }
+
+  @Test
+  fun `the cap still holds`() {
+    assertEquals(500, readAtMost(Trickle("x".repeat(10_000), chunk = 64), limit = 500).length)
+  }
+
+  @Test
+  fun `an empty stream is an empty string`() {
+    assertEquals("", readAtMost(Trickle("", chunk = 10), limit = 100))
+  }
+}
+
+class GoingRoundTest {
+
+  private val first = setOf("https://a", "https://b", "https://c")
+
+  @Test
+  fun `the same pages again is going round`() {
+    // Six rewordings, the same three pages each time.
+    assertTrue(samePagesAgain(listOf("https://b", "https://a"), listOf(first)))
+  }
+
+  @Test
+  fun `a new page among old ones is progress`() {
+    assertFalse(samePagesAgain(listOf("https://a", "https://new"), listOf(first)))
+  }
+
+  @Test
+  fun `pages from two different earlier searches do not count as one`() {
+    // Seen before, but never together - this is a different result, not a repeat.
+    assertFalse(samePagesAgain(listOf("https://a", "https://z"), listOf(first, setOf("https://z"))))
+  }
+
+  @Test
+  fun `nothing found is never going round`() {
+    assertFalse(samePagesAgain(emptyList(), listOf(first)))
+  }
+
+  @Test
+  fun `the model is told to stop and answer`() {
+    val said = goingRoundText("orin specs table", listOf("Tegra", "CUDA"))
+    assertTrue(said, said.contains("Tegra; CUDA"))
+    assertTrue(said, said.contains("Do not search again"))
+    assertTrue(said, said.contains("what you could not find"))
+  }
+}
