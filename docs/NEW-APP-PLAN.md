@@ -2308,6 +2308,47 @@ becoming the text "null" cannot be proven by the unit tests, because the desktop
 `org.json` they run on already returns "" there, while Android's returns "null".
 The guards are for the phone.
 
+### Phase 32 — A conversation that reads like the assistants people already use
+
+Asked for after search started working: refine the experience against how
+Gemini, ChatGPT, Claude, Copilot and Perplexity behave on Android, iOS and the
+desktop. The screenshots of the previous few phases were the brief — a search
+that read four pages produced four full-width cards, and they sat *under* the
+answer they had produced.
+
+**The steps go before the answer, in one line.** A finished answer joined the
+message list while its tool cards rendered after the whole list; now the latest
+answer is held back until after its steps. The steps themselves collapse into a
+summary in plain words — *"Searched the web · Read a page ×3"*, or *"Reading a
+page…"* while it runs, with a count of anything that failed at the end — and
+expand into the per-tool cards, whose tap-to-see detail is still the diagnosis
+on a bad day. Tool names become verbs ("Searched the web", not "search web ·
+Done"); an MCP tool falls back to its own name, readable and never wrong.
+
+**Sources are chips.** Lin ends a web answer with a source list, which arrived
+as a block of long addresses at the bottom of a chat bubble. The trailing list is
+lifted off the body and shown as numbered chips with the domain — `1 nvidia.com`
+— matching the `[1]` in the text. Only a trailing list of addresses counts; a
+list with prose in it is left exactly where it was.
+
+**What every answer can do**: copy, read aloud, ask again (the latest only —
+retrying an older one would rewrite history later turns were built on, and the
+old answer is removed rather than kept beside the new one so the model is never
+shown its own contradiction), and share.
+
+**Stop.** Send becomes Stop while an answer is written, where every assistant
+puts it, and what had arrived is kept as the answer — somebody who stopped it
+half way may have had what they needed. A step running when stopped is marked as
+not finished rather than spinning forever.
+
+**Smaller things that make it feel finished:** a jump-to-latest button when
+scrolled away from a reply still streaming in, a confirming tick of haptics on
+send, stop and copy, and a greeting that uses the time of day and the person's
+name — *"Good evening, Looper."*
+
+The summary, source-splitting and greeting logic is in `core` with tests; the
+layout is compile-checked, not yet seen on a device.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

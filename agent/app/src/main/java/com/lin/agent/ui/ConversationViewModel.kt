@@ -56,6 +56,7 @@ import com.lin.agent.core.diag.describeFault
 import com.lin.agent.core.tools.disabledFrom
 import com.lin.agent.core.standing.tasksFrom
 import com.lin.agent.model.StandingWorker
+import com.lin.agent.core.persona.Answers
 import com.lin.agent.core.persona.personaFrom
 import com.lin.agent.core.persona.personaOrDefault
 import com.lin.agent.core.persona.personaPrompt
@@ -160,6 +161,8 @@ data class ConversationState(
    * and only when the permission really is missing. Empty the rest of the time.
    */
   val needsPermission: String = "",
+  /** What to call the person, for the greeting on the empty screen. Empty for no name. */
+  val name: String = "",
 )
 
 /**
@@ -315,6 +318,12 @@ constructor(
     // a battery optimiser, a restore onto another phone - and arming an alarm that is already
     // armed costs nothing.
     viewModelScope.launch { runCatching { reminders.rearm() } }
+    viewModelScope.launch {
+      runCatching {
+        val persona = personaOrDefault(personaFrom(settings.persona.first()))
+        _state.update { it.copy(name = persona[Answers.NAME.id]?.firstOrNull().orEmpty()) }
+      }
+    }
   }
 
   /**
@@ -398,6 +407,66 @@ constructor(
     }
   }
 
+  /** The turn in flight, so Stop has something to stop. */
+  private var turn: Job? = null
+
+  /**
+   * Stops the answer being written, and keeps what was written.
+   *
+   * Every assistant has this, and it matters more here than most: a small model that has
+   * started down the wrong road will go on down it for a minute, and the only alternative was
+   * to wait. What had arrived stays as the answer rather than vanishing - it was read, and
+   * somebody who stopped it half way may have stopped it because they had what they needed.
+   */
+  fun stop() {
+    if (!_state.value.inProgress) return
+    turn?.cancel()
+    turn = null
+    speaker.stop()
+    val partial = _state.value.streaming.trim()
+    val messages =
+      if (partial.isEmpty()) _state.value.messages
+      else _state.value.messages + Message(Message.Role.ASSISTANT, "$partial …")
+    _state.update {
+      it.copy(
+        messages = messages,
+        streaming = "",
+        thinking = "",
+        inProgress = false,
+        // A step that was running when stopped did not finish, and saying "running" forever
+        // would be a lie on screen.
+        toolRuns = it.toolRuns.map { run -> if (run.state == ToolState.RUNNING) run.copy(state = ToolState.FAILED) else run },
+      )
+    }
+    persist(messages)
+  }
+
+  /**
+   * Asks the last question again, in place of the answer it got.
+   *
+   * The answer is removed rather than kept beside a second one. Two answers to one question in
+   * the history would both go back to the model on the next turn, and a model shown its own
+   * contradiction tends to split the difference. Pictures that rode with the question are not
+   * re-sent - they were folded into that turn - which is said here so it is not a surprise.
+   */
+  fun retry() {
+    if (_state.value.inProgress) return
+    val messages = _state.value.messages
+    val lastAsked = messages.indexOfLast { it.role == Message.Role.USER }
+    if (lastAsked < 0) return
+    val question = messages[lastAsked].text
+    val before = messages.take(lastAsked)
+    _state.update { it.copy(messages = before, toolRuns = emptyList(), error = "") }
+    persist(before)
+    send(question)
+  }
+
+  /** Reads one answer aloud, whatever the spoken-replies setting says - it was asked for. */
+  fun readAloud(text: String) {
+    speaker.stop()
+    viewModelScope.launch { runCatching { speaker.say(text) } }
+  }
+
   fun send(text: String, spoken: Boolean = false) {
     val trimmed = text.trim()
     if (trimmed.isEmpty() || _state.value.inProgress) return
@@ -439,7 +508,7 @@ constructor(
     }
     persist(outgoing)
 
-    viewModelScope.launch {
+    turn = viewModelScope.launch {
       try {
         val readiness = backends.readiness()
         val backend =
