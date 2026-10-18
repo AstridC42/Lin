@@ -21,15 +21,17 @@ import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.core.web.ReadHit
 import com.lin.agent.core.web.SearchHit
 import com.lin.agent.core.web.SearchProvider
+import com.lin.agent.core.web.goingRoundText
 import com.lin.agent.core.web.hitsFrom
 import com.lin.agent.core.web.nothingCameBack
 import com.lin.agent.core.web.plainerQuery
-import com.lin.agent.core.web.sourceNote
 import com.lin.agent.core.web.readableText
-import com.lin.agent.core.web.searchProviderNamed
 import com.lin.agent.core.web.relevantPassages
+import com.lin.agent.core.web.samePagesAgain
 import com.lin.agent.core.web.searchBriefing
+import com.lin.agent.core.web.searchProviderNamed
 import com.lin.agent.core.web.searchRequest
+import com.lin.agent.core.web.sourceNote
 import com.lin.agent.engine.AgentRole
 import com.lin.agent.engine.AgentTool
 import com.lin.agent.engine.ParamType
@@ -59,6 +61,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Brave's documented API - and says plainly when neither is set up.
  */
 class SearchWebTool(private val settings: SettingsRepository, private val web: Web) : AgentTool {
+
+  /** What recent searches returned, so a model rewording the same search can be told so. */
+  private val recent = ArrayDeque<Pair<Long, Set<String>>>()
 
   override val name = "search_web"
 
@@ -224,6 +229,18 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
    * marked as such so the model knows the difference.
    */
   private suspend fun briefed(query: String, hits: List<SearchHit>, note: String): String {
+    // Going round in a circle is caught before any page is fetched: the model has already
+    // been given these pages, and fetching them again only makes the circle slower.
+    val urls = hits.mapNotNull { it.url.takeIf(String::isNotEmpty) }
+    val now = System.currentTimeMillis()
+    val earlier =
+      synchronized(recent) {
+        recent.removeAll { now - it.first > RECENT_MS }
+        recent.map { it.second }
+      }
+    if (samePagesAgain(urls, earlier)) return goingRoundText(query, hits.map { it.title })
+    synchronized(recent) { recent.add(now to urls.toSet()) }
+
     val toRead = hits.filter { it.url.startsWith("http") }.take(PAGES_READ)
     val reader = CoroutineScope(Dispatchers.IO + SupervisorJob())
     val pending = toRead.map { hit -> hit to reader.async { runCatching { web.get(hit.url) }.getOrNull() } }
@@ -277,6 +294,9 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
 
   private companion object {
     const val TAG = "LinSearchWeb"
+
+    /** How long a search's pages count as already given: about one question's worth. */
+    const val RECENT_MS = 3 * 60 * 1000L
 
     /** How many results are read in full. Three covers the official page and two others. */
     const val PAGES_READ = 3

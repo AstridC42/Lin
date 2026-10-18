@@ -180,3 +180,47 @@ fun searchBriefing(query: String, hits: List<ReadHit>, source: String = ""): Str
     )
   }
 }
+
+/**
+ * Everything a reader has, up to [limit] characters.
+ *
+ * In a loop, and the loop is the whole function. This used to be one `read(buffer, 0, limit)`,
+ * which reads as "up to the limit" and means "whatever is buffered right now" - on a network
+ * stream, the first few kilobytes. So every page Lin read was its first chunk: for Wikipedia
+ * that is the `<head>`, which arrived on screen as "Tegra - Wikipedia" followed by half a
+ * `<link` tag, and for a SearXNG with results it was the first part of a JSON document, which
+ * fails to parse and came out as "no results". The only answers that survived intact were the
+ * short ones - which is to say the failures. Three days of chasing a search fault were spent
+ * downstream of this.
+ */
+fun readAtMost(reader: java.io.Reader, limit: Int): String {
+  val out = StringBuilder()
+  val buffer = CharArray(8_192)
+  while (out.length < limit) {
+    val read = reader.read(buffer, 0, minOf(buffer.size, limit - out.length))
+    if (read < 0) break
+    out.appendRange(buffer, 0, read)
+  }
+  return out.toString()
+}
+
+/**
+ * Whether a search came back with nothing it had not already returned.
+ *
+ * The loop this ends: asked for specifications, Lin searched six times in a row -
+ * "specifications", "technical specifications", "specifications table", "official specs
+ * datasheet" - and got the same three pages every time, because the words changed and the
+ * index did not. A small model does not notice it is going round; the result has to say so.
+ *
+ * Every address must have been seen before, and in a single earlier result. A new page among
+ * old ones is progress and is not stopped.
+ */
+fun samePagesAgain(urls: List<String>, earlier: List<Set<String>>): Boolean =
+  urls.isNotEmpty() && earlier.any { it.containsAll(urls) }
+
+/** What the model is told when it is searching round in a circle. */
+fun goingRoundText(query: String, titles: List<String>): String =
+  "\"$query\" returned the same pages you were already given: ${titles.joinToString("; ")}. " +
+    "Searching again with different words will not find anything new. Do not search again " +
+    "for this. Answer from what those pages said, and if that does not answer the question, " +
+    "tell the user plainly what you found and what you could not find."
