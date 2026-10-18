@@ -226,3 +226,33 @@ class GoingRoundTest {
     assertTrue(said, said.contains("what you could not find"))
   }
 }
+
+class BotCheckTest {
+
+  @Test
+  fun `the challenge page TechPowerUp actually served is caught`() {
+    val served =
+      "Automated bot check in progress\n\nThis should only take a few seconds. If you have " +
+        "issues, please do contact us, we want to learn about any problems.\n\nDrag the handle to the target"
+    assertTrue(looksLikeABotCheck(served))
+  }
+
+  @Test
+  fun `the usual interstitials are caught`() {
+    assertTrue(looksLikeABotCheck("Just a moment...\nEnable JavaScript and cookies to continue"))
+    assertTrue(looksLikeABotCheck("Please verify you are human"))
+    // The slider kind, which does not always say "bot" anywhere.
+    assertTrue(looksLikeABotCheck("Security check\nDrag the handle to the target"))
+  }
+
+  @Test
+  fun `a real article that mentions a captcha is still an article`() {
+    val article = "How CAPTCHA works. " + "A long explanation of image puzzles and their history. ".repeat(60)
+    assertFalse(looksLikeABotCheck(article))
+  }
+
+  @Test
+  fun `an ordinary short page is not a bot check`() {
+    assertFalse(looksLikeABotCheck("AI Performance | 67 TOPS\nMemory | 8GB LPDDR5"))
+  }
+}
