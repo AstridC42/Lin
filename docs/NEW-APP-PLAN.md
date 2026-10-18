@@ -2146,6 +2146,48 @@ now carries **the exact URL requested**, and the settings trial prints it too, s
 the next report can be settled by pasting that URL into the other agent's
 environment rather than by anybody's reasoning.
 
+### Phase 27 — Read the pages, and keep the links
+
+Once search returned results, the next report was about what Lin did with them:
+asked for the Orin Nano's specifications, it found NVIDIA's own product page and
+answered from **its title**, with no figures and no links. "More like Google
+search without any useful info."
+
+That was structural, not a prompt problem. `search_web` handed the model titles
+and the search engine's snippets — sentences chosen to make somebody click — and
+a model that only ever sees a results page can only ever paraphrase one.
+Reading a page was a second tool call the model rarely made.
+
+**So `search_web` now reads the top three pages itself**, in parallel with a
+nine-second deadline (a page that misses it falls back to its snippet, marked
+*not read*, so the model knows the difference), and hands the model what each
+page actually says, numbered `[1]`, `[2]`, `[3]` with its link.
+
+Which part of the page is the interesting problem, because the budget is ~2,500
+characters a page to fit a small context. The top of a product page is the
+slogan; the specification table is far below. And the table's rows — `AI
+Performance | 67 TOPS` — never mention the product by name, so selecting lines
+that match the question misses exactly the figures that were asked for. What
+does match is **the heading above the table**. So each matching line brings the
+lines after it along, up to about a table's worth; that one rule is what gets
+the table in. The opening is kept too, so the answer can say what the page is.
+Lines are kept whole, so a row is never cut from its label. Table cells now
+keep a ` | ` divider, so `GPU 1024-core Ampere CPU 6-core Arm` is no longer one
+unreadable sentence. And on NVIDIA's actual page, the section menu arrived
+twice, as forty lines at the very top; bare bullets and repeated short lines
+now come out, while repeated table rows stay.
+
+Run on the real page, the result carries 67 TOPS, 102 GB/s, the 1.7 GHz CPU and
+the 1.7× improvement — the things that were asked for.
+
+**The links.** The result ends by telling the model to answer from the page text
+rather than the titles, give figures as the page gives them with `[n]` citations,
+and finish with a *Sources* list of the links it used — at the end, where a small
+model still sees it. And links are now **tappable**: markdown `[label](url)` and
+bare addresses both become real links on screen, with the sentence-ending full
+stop left out of the address and an address's own brackets kept. A source list
+nobody can tap is a list nobody follows.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

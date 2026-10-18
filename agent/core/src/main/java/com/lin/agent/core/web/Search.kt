@@ -391,7 +391,7 @@ fun plainerQuery(query: String, keep: Int = 5): String? {
  * holds only those that are nearly always noise in a query a model wrote - not ordinary
  * words that happen to be common.
  */
-private val FILLER =
+internal val FILLER =
   setOf(
     "specs",
     "spec",
