@@ -17,6 +17,14 @@
   <string name="tool_done">Done</string>
   <string name="tool_failed_short">Could not</string>
   <string name="tool_tap_to_see">Tap to see what it said</string>
+  <string name="steps_show">Show the steps</string>
+  <string name="steps_hide">Hide the steps</string>
+  <string name="answer_copy">Copy</string>
+  <string name="answer_speak">Read aloud</string>
+  <string name="answer_retry">Ask again</string>
+  <string name="answer_share">Share</string>
+  <string name="stop_answer">Stop</string>
+  <string name="to_latest">Jump to the latest</string>
   <string name="reply_not_sent">NOT SENT YET</string>
   <string name="photo_found">A photo Lin found</string>
   <string name="listening">Listening…</string>
