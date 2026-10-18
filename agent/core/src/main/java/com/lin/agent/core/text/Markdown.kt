@@ -65,6 +65,14 @@ data class Span(
   val bold: Boolean = false,
   val italic: Boolean = false,
   val code: Boolean = false,
+  /**
+   * Where this run goes when tapped, or empty for plain text.
+   *
+   * Here because an answer built from the web ends with the pages it came from, and a list of
+   * addresses nobody can tap is a list nobody will follow. The screen makes these links; the
+   * parsing stays here, where it can be tested.
+   */
+  val url: String = "",
 )
 
 /** Splits a reply into the blocks a screen can lay out. */
@@ -164,6 +172,23 @@ fun spansOf(line: String): List<Span> {
   while (i < line.length) {
     val rest = line.substring(i)
     when {
+      // A markdown link: [what it says](where it goes). Only when it is complete and goes
+      // to the web - a stray "[1]" is a footnote mark, not a link, and stays text.
+      rest.startsWith("[") && linkAt(line, i) != null -> {
+        val (label, url, end) = linkAt(line, i)!!
+        flush()
+        spans.add(Span(label, bold = bold, italic = italic, url = url))
+        i = end
+      }
+      // A bare address. Taken whole, before any other marker can see it, because addresses
+      // are full of underscores and asterisks that are not emphasis.
+      (rest.startsWith("https://") || rest.startsWith("http://")) &&
+        (i == 0 || line[i - 1].isWhitespace() || line[i - 1] == '(' || line[i - 1] == '<') -> {
+        val url = bareUrl(rest)
+        flush()
+        spans.add(Span(url, bold = bold, italic = italic, url = url))
+        i += url.length
+      }
       rest.startsWith("`") -> {
         val close = line.indexOf('`', i + 1)
         if (close < 0) {
@@ -218,6 +243,48 @@ fun spansOf(line: String): List<Span> {
   }
   flush()
   return spans
+}
+
+/**
+ * A complete `[label](http…)` starting at [at]: the label, the address, and where it ends.
+ *
+ * Null for anything less, so that "[1]" in a numbered source list, or square brackets in
+ * ordinary prose, are left exactly as written.
+ */
+internal fun linkAt(line: String, at: Int): Triple<String, String, Int>? {
+  val close = line.indexOf("](", at + 1)
+  if (close < 0) return null
+  val label = line.substring(at + 1, close)
+  if (label.isBlank() || label.contains('[') || label.contains(']')) return null
+  val end = line.indexOf(')', close + 2)
+  if (end < 0) return null
+  val url = line.substring(close + 2, end).trim()
+  if (!(url.startsWith("https://") || url.startsWith("http://")) || url.any { it.isWhitespace() }) {
+    return null
+  }
+  return Triple(label, url, end + 1)
+}
+
+/**
+ * The address at the start of [rest], without the punctuation that ends the sentence.
+ *
+ * "see https://example.com/specs." links to the page, not to "specs." - and a closing
+ * bracket only belongs to the address when the address opened one, which is how a
+ * Wikipedia page with brackets in its name survives while "(https://example.com)" does not
+ * swallow the bracket around it.
+ */
+internal fun bareUrl(rest: String): String {
+  var url = rest.takeWhile { !it.isWhitespace() && it != '<' && it != '>' && it != '"' }
+  while (url.isNotEmpty()) {
+    val last = url.last()
+    url =
+      when {
+        last in ".,;:!?'" -> url.dropLast(1)
+        last == ')' && url.count { it == '(' } < url.count { it == ')' } -> url.dropLast(1)
+        else -> break
+      }
+  }
+  return url
 }
 
 /**

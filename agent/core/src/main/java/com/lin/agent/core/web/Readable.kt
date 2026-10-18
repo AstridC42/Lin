@@ -41,6 +41,10 @@ fun readableText(html: String, limit: Int = LONGEST): String {
   // related links, and a model handed all of it answers from the sidebar.
   text = articleOf(text) ?: text
 
+  // Table cells get a divider before the rows become lines. A specification table is most of
+  // what a product page is for, and with the cells run together "GPU 1024-core NVIDIA Ampere
+  // CPU 6-core Arm" is one sentence nobody can read a figure out of.
+  text = CELL_END.replace(text, " | ")
   text = BLOCK_END.replace(text, "\n")
   text = LIST_ITEM.replace(text, "\n• ")
   text = BREAK.replace(text, "\n")
@@ -51,7 +55,7 @@ fun readableText(html: String, limit: Int = LONGEST): String {
   text =
     text
       .lines()
-      .joinToString("\n") { it.replace(SPACES, " ").trim() }
+      .joinToString("\n") { it.replace(SPACES, " ").trim().trimEnd('|', ' ').trimStart('|', ' ') }
       .replace(BLANK_RUN, "\n\n")
       .trim()
 
@@ -115,6 +119,7 @@ private val MAIN =
   Regex("<main\\b[^>]*>(.*?)</main>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
 private val BLOCK_END =
   Regex("</(p|div|h[1-6]|section|article|tr|ul|ol|blockquote|pre|table)\\s*>", RegexOption.IGNORE_CASE)
+private val CELL_END = Regex("</t[dh]\\s*>", RegexOption.IGNORE_CASE)
 private val LIST_ITEM = Regex("<li\\b[^>]*>", RegexOption.IGNORE_CASE)
 private val BREAK = Regex("<br\\s*/?>", RegexOption.IGNORE_CASE)
 private val TAG = Regex("<[^>]*>", RegexOption.DOT_MATCHES_ALL)
