@@ -45,8 +45,15 @@ class SearchTest {
   @Test
   fun `searxng asks its own address for json`() {
     val (url, headers) = searchRequest(SearchProvider.SEARXNG, "kotlin flows", "https://s.example.com/", "")!!
-    assertEquals("https://s.example.com/search?q=kotlin%20flows&format=json", url)
-    assertEquals("application/json", headers["Accept"])
+    // Pinned in full on purpose: this URL is what gets copied somewhere else to compare against
+    // another client when a search misbehaves, so a change to it should be a visible one.
+    assertEquals(
+      "https://s.example.com/search?q=kotlin%20flows&format=json&pageno=1&language=all&safesearch=0",
+      url,
+    )
+    // Asks for JSON first. It also names text/html, which was added on purpose - see
+    // SearxngRequestTest - so this is no longer an exact match.
+    assertTrue(headers["Accept"].orEmpty().startsWith("application/json"))
   }
 
   @Test
@@ -393,5 +400,125 @@ class SearxngEnginesTest {
   fun `and still shows the first bytes when there are none`() {
     val said = searchTrialReport(200, 0, "<!DOCTYPE html>")
     assertTrue(said, said.contains("starting \"<!DOCTYPE html>\""))
+  }
+}
+
+class SearxngRequestTest {
+
+  private fun searx() =
+    searchRequest(SearchProvider.SEARXNG, "orin nano super", "https://searx.example.com/", "")!!
+
+  @Test
+  fun `the request asks for what the widely used clients ask for`() {
+    // The point of the change: when somebody's own instance answers one client and not
+    // another, the first thing to rule out is the two requests being different.
+    val (url, _) = searx()
+    assertTrue(url, url.startsWith("https://searx.example.com/search?q=orin%20nano%20super"))
+    for (part in listOf("format=json", "pageno=1", "language=all", "safesearch=0")) {
+      assertTrue("$part missing from $url", url.contains(part))
+    }
+  }
+
+  @Test
+  fun `a strict safesearch default cannot empty the results`() {
+    // The instance's own default decides when nothing is sent, and a strict one quietly
+    // filters a result list to nothing - which looks exactly like the engines refusing.
+    assertTrue(searx().first.contains("safesearch=0"))
+  }
+
+  @Test
+  fun `the accept header includes html so the bot filter lets it through`() {
+    // searx/botdetection/http_accept.py rejects a request whose Accept has no text/html.
+    val accept = searx().second["Accept"].orEmpty()
+    assertTrue(accept, accept.contains("text/html"))
+    assertTrue(accept, accept.contains("application/json"))
+  }
+
+  @Test
+  fun `the user agent is shaped like a browser but says it is Lin`() {
+    // The limiter matches a list of bot agents, and Android's default is the shape it
+    // looks for. Not a pretence of being a browser - it names itself - just the right shape.
+    val agent = searx().second["User-Agent"].orEmpty()
+    assertTrue(agent, agent.startsWith("Mozilla/5.0"))
+    assertTrue(agent, agent.contains("Lin/"))
+    assertTrue(agent, !agent.contains("Dalvik"))
+  }
+
+  @Test
+  fun `no address means no request rather than one to nowhere`() {
+    assertNull(searchRequest(SearchProvider.SEARXNG, "x", "  ", ""))
+  }
+}
+
+class PlainerQueryTest {
+
+  @Test
+  fun `the over-worded question the model wrote becomes the one a person would type`() {
+    // Straight from a screenshot. Four extra constraints, and on a few engines it returns
+    // nothing at all.
+    assertEquals(
+      "NVIDIA Jetson Orin Nano",
+      plainerQuery("NVIDIA Jetson Orin Nano specs performance 2024 2026"),
+    )
+  }
+
+  @Test
+  fun `years the model added come out and other numbers stay`() {
+    assertEquals("iPhone 15 Pro", plainerQuery("iPhone 15 Pro 2024"))
+    // A model number is not a year, and neither is a four-digit number outside 1900-2099.
+    assertEquals("RTX 4090 review", plainerQuery("RTX 4090 review 2025"))
+    // 3000 is outside the range, so nothing is stripped and nothing changes - which is null,
+    // the "do not search twice for the same thing" answer, rather than the same text back.
+    assertNull(plainerQuery("Boeing 3000"))
+  }
+
+  @Test
+  fun `a question that is already plain is left alone`() {
+    // Null, so the caller never pays for a second identical search.
+    assertNull(plainerQuery("orin nano super"))
+    assertNull(plainerQuery("jetson orin nano"))
+  }
+
+  @Test
+  fun `only the first few real words are kept`() {
+    assertEquals(
+      "one two three four five",
+      plainerQuery("one two three four five six seven eight", keep = 5),
+    )
+  }
+
+  @Test
+  fun `filler that says what sort of answer is wanted comes out`() {
+    assertEquals("Orin Nano Super", plainerQuery("tell me about Orin Nano Super specs"))
+  }
+
+  @Test
+  fun `nothing left means no retry`() {
+    assertNull(plainerQuery(""))
+    assertNull(plainerQuery("   "))
+    assertNull(plainerQuery("2024 2025 about the"))
+  }
+
+  @Test
+  fun `the diagnosis carries the exact request so it can be replayed`() {
+    val url = "https://searx.example.com/search?q=orin&format=json&pageno=1"
+    val said = nothingCameBack(SearchProvider.SEARXNG, """{"results":[]}""", url)
+    assertTrue(said, said.contains("The request was: $url"))
+    val withEngines =
+      nothingCameBack(
+        SearchProvider.SEARXNG,
+        """{"results":[],"unresponsive_engines":[["google","CAPTCHA"]]}""",
+        url,
+      )
+    assertTrue(withEngines, withEngines.contains("The request was: $url"))
+    // And nothing extra when no request is known.
+    assertTrue(!nothingCameBack(SearchProvider.BRAVE, "{}").contains("The request was"))
+  }
+
+  @Test
+  fun `the settings report ends with the request on its own line`() {
+    val said = searchTrialReport(200, 0, "{}", "https://x/search?q=a")
+    assertTrue(said, said.endsWith("\nasked: https://x/search?q=a"))
+    assertTrue(!searchTrialReport(200, 0, "{}").contains("asked:"))
   }
 }

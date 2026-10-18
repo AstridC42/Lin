@@ -22,6 +22,7 @@ import com.lin.agent.core.web.SearchProvider
 import com.lin.agent.core.web.hitsFrom
 import com.lin.agent.core.web.hitsInWords
 import com.lin.agent.core.web.nothingCameBack
+import com.lin.agent.core.web.plainerQuery
 import com.lin.agent.core.web.sourceNote
 import com.lin.agent.core.web.readableText
 import com.lin.agent.core.web.searchProviderNamed
@@ -112,8 +113,39 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     // back", and what the user saw was Lin saying "it's possible there aren't any official
     // Doctor Who Lego sets" - a confident claim about the world assembled out of a search
     // that did not work. An empty web search is news about the search, not about the world.
-    if (hits.isEmpty()) return insteadOfNothing(query, provider, answer.body)
+    if (hits.isEmpty()) return insteadOfNothing(query, provider, answer.body, url)
     return ToolResult.Ok(hitsInWords(query, hits, sourceNote(provider)))
+  }
+
+  /**
+   * The same search with the question worded plainly, when the first one found nothing.
+   *
+   * A model writes "NVIDIA Jetson Orin Nano specs performance 2024 2026" because that reads
+   * like a thorough question; a search engine reads it as four extra constraints and can
+   * return nothing at all. One retry with the first few real words costs a second and turns
+   * that into an answer. See [plainerQuery].
+   */
+  private suspend fun tryPlainly(query: String, provider: SearchProvider): ToolResult? {
+    val plainer = plainerQuery(query) ?: return null
+    val (url, headers) =
+      searchRequest(
+        provider = provider,
+        query = plainer,
+        baseUrl = runCatching { settings.searchUrl.first() }.getOrDefault(""),
+        apiKey = runCatching { settings.searchKey.first() }.getOrDefault(""),
+      ) ?: return null
+    val answer = runCatching { web.get(url, headers) }.getOrNull() ?: return null
+    if (!answer.ok) return null
+    val hits = hitsFrom(provider, answer.body)
+    if (hits.isEmpty()) return null
+    return ToolResult.Ok(
+      hitsInWords(
+        plainer,
+        hits,
+        "\"$query\" found nothing, so this is the same question in plainer words" +
+          sourceNote(provider).let { if (it.isEmpty()) "" else "; $it" },
+      )
+    )
   }
 
   /**
@@ -133,8 +165,13 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     query: String,
     provider: SearchProvider,
     body: String,
+    asked: String,
   ): ToolResult {
-    val why = nothingCameBack(provider, body)
+    // Before anything else: the question may simply have been over-worded. Cheaper than the
+    // fallback and closer to what was asked, so it goes first.
+    tryPlainly(query, provider)?.let { return it }
+
+    val why = nothingCameBack(provider, body, asked)
     if (provider == SearchProvider.WIKIPEDIA) return ToolResult.Failed(why)
 
     val (url, headers) =

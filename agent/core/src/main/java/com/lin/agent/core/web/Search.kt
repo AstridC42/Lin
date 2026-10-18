@@ -16,6 +16,7 @@
 
 package com.lin.agent.core.web
 
+import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -77,6 +78,17 @@ fun sourceNote(provider: SearchProvider): String =
     else -> ""
   }
 
+/**
+ * What Lin calls itself to a SearXNG.
+ *
+ * Not a lie about being a browser - it says Lin - but shaped like a browser's, because the
+ * bot filter matches on shape. An app that says "Dalvik/2.1.0" gets 429 from an instance with
+ * the limiter on, and that is a fault nobody could diagnose from the conversation.
+ */
+internal const val BROWSERISH =
+  "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 " +
+    "Mobile Safari/537.36 Lin/1.0"
+
 /** One result, reduced to what a model can use. */
 data class SearchHit(val title: String, val url: String, val snippet: String)
 
@@ -107,7 +119,33 @@ fun searchRequest(
     SearchProvider.SEARXNG -> {
       val base = baseUrl.trim().trimEnd('/')
       if (base.isEmpty()) null
-      else "$base/search?q=$escaped&format=json" to mapOf("Accept" to "application/json")
+      else
+        // Three parameters beyond the question, each for a reason.
+        //
+        // `safesearch=0` because the instance's own default decides otherwise, and a strict
+        // default quietly filters a result list down to nothing - which arrives here as an
+        // empty search rather than as a setting, and is indistinguishable from the engines
+        // having refused. A search tool should return what is there and let the person
+        // decide; the phone is not a school network.
+        //
+        // `language=all` for the same reason: a default language narrows what engines return
+        // and is a strange thing for an app that answers in whatever language it was asked
+        // in. `pageno=1` is explicit rather than assumed.
+        //
+        // These match what the widely used SearXNG clients send, which matters: when
+        // somebody's own instance answers one client and not another, the first thing to
+        // rule out is the request being different.
+        "$base/search?q=$escaped&format=json&pageno=1&language=all&safesearch=0" to
+          mapOf(
+            // text/html as well as JSON, deliberately. SearXNG's bot detection rejects a
+            // request whose Accept header has no text/html in it
+            // (searx/botdetection/http_accept.py), and an instance running the limiter would
+            // answer 429 to an app that asked only for JSON.
+            "Accept" to "application/json, text/html;q=0.9",
+            // Likewise: the limiter matches a list of bot user agents, and the default from
+            // Android's HTTP client ("Dalvik/2.1.0 …") is exactly the shape it looks for.
+            "User-Agent" to BROWSERISH,
+          )
     }
     SearchProvider.BRAVE -> {
       val key = apiKey.trim()
@@ -289,19 +327,23 @@ fun urlEscape(text: String): String =
  * exists", and it says what actually came back so the fault can be found rather than guessed
  * at.
  */
-fun nothingCameBack(provider: SearchProvider, body: String): String {
+fun nothingCameBack(provider: SearchProvider, body: String, asked: String = ""): String {
   // A SearXNG that answers with an empty list is usually not saying "no results". It is
   // saying its own engines would not talk to it, and it says which ones - so that goes in
   // the message, because "google: CAPTCHA" is a fault somebody can act on and "nothing came
   // back" is not. This is the shape of the report that arrived from a real phone: a search
   // that had worked for weeks, with nothing changed at either end.
   val engines = enginesThatFailed(body)
+  // The exact request, because "it works for the other client" can only be settled by running
+  // the same URL somewhere else and comparing. Shown in full: it is the user's own server's
+  // address on the user's own screen, and a Brave key travels in a header, never in this.
+  val sent = if (asked.isBlank()) "" else " The request was: $asked"
   if (engines.isNotEmpty()) {
     return "The SearXNG answered, but its own search engines did not: $engines. That is the " +
       "server's problem rather than the question's - engines block the address a self-hosted " +
       "SearXNG calls from, and the fix is usually updating it or turning on other engines. " +
       "Tell the user exactly which engines failed and why, and do not say the thing they " +
-      "asked about does not exist."
+      "asked about does not exist.$sent"
   }
   val what = body.trim()
   val shape =
@@ -313,8 +355,74 @@ fun nothingCameBack(provider: SearchProvider, body: String): String {
   return "The search service (${provider.name.lowercase()}) answered with $shape, so this " +
     "lookup did not work. Tell the user the search came back empty and that its settings may " +
     "need checking under Tools - do not tell them the thing they asked about does not exist, " +
-    "because nothing here says that."
+    "because nothing here says that.$sent"
 }
+
+/**
+ * The same question, worded the way a person would have typed it, or null if it already is.
+ *
+ * A model asked to search writes "NVIDIA Jetson Orin Nano specs performance 2024 2026",
+ * because that reads like a thorough question. On a search engine it is four extra
+ * constraints, and on a small set of engines it returns nothing at all - which then arrives
+ * as "the web knows nothing about this", when the same question in three words would have
+ * worked.
+ *
+ * So: years the model added, words that describe the kind of answer wanted rather than the
+ * subject, and anything past the first few words, all come out. Null when that changes
+ * nothing, so the caller never pays for a second identical search.
+ */
+fun plainerQuery(query: String, keep: Int = 5): String? {
+  val words = query.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+  if (words.isEmpty()) return null
+  val kept =
+    words
+      .filterNot { it.trim('(', ')', ',', '.', '"').matches(Regex("(19|20)\\d{2}")) }
+      .filterNot { it.lowercase(Locale.ROOT).trim(',', '.', '?', '"') in FILLER }
+      .take(keep)
+  if (kept.isEmpty()) return null
+  val plainer = kept.joinToString(" ")
+  return plainer.takeIf { it != query.trim() }
+}
+
+/**
+ * Words that say what sort of answer is wanted rather than what it is about.
+ *
+ * Deliberately short. Every word here is one a search can no longer match on, so the list
+ * holds only those that are nearly always noise in a query a model wrote - not ordinary
+ * words that happen to be common.
+ */
+private val FILLER =
+  setOf(
+    "specs",
+    "spec",
+    "specifications",
+    "performance",
+    "benchmarks",
+    "details",
+    "detail",
+    "information",
+    "info",
+    "overview",
+    "latest",
+    "current",
+    "currently",
+    "today",
+    "modern",
+    "nowadays",
+    "about",
+    "regarding",
+    "tell",
+    "me",
+    "what",
+    "is",
+    "the",
+    "a",
+    "an",
+    "in",
+    "of",
+    "for",
+    "and",
+  )
 
 /**
  * The engines a SearXNG says would not answer, as "google (CAPTCHA), startpage (timeout)".
@@ -356,7 +464,7 @@ fun enginesThatFailed(body: String, limit: Int = 6): String {
  * circles; "HTTP 200 - 0 results - 4812 bytes starting <!DOCTYPE html>" tells them, and tells
  * anybody they show it to, exactly which of the four usual faults it is.
  */
-fun searchTrialReport(status: Int, hits: Int, body: String): String {
+fun searchTrialReport(status: Int, hits: Int, body: String, asked: String = ""): String {
   val head = body.trim().take(40).replace(Regex("\\s+"), " ")
   val engines = enginesThatFailed(body)
   return buildString {
@@ -367,5 +475,7 @@ fun searchTrialReport(status: Int, hits: Int, body: String): String {
     // that is the whole answer and nobody needs to read the JSON behind it.
     if (engines.isNotEmpty()) append(" · engines down: ").append(engines)
     else if (head.isNotEmpty()) append(" starting \"").append(head).append('"')
+    // Last and on its own line: long, and only useful for pasting somewhere else.
+    if (asked.isNotBlank()) append("\nasked: ").append(asked)
   }
 }
