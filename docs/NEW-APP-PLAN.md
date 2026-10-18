@@ -2098,6 +2098,54 @@ not a web search"*. If Wikipedia is empty too, the original diagnosis is what
 the model gets. The point is that somebody whose server has been blocked by
 Google should still be able to ask their assistant a question tonight.
 
+### Phase 26 — "The other agent worked, so it's Lin"
+
+The previous two rounds put the blame on the user's SearXNG, on the strength of
+`unresponsive_engines` naming four engines that had refused it. That is what the
+server said about its own calls, and it was true — and it was **not** an answer
+to the actual report, which was that the same instance, at the same address,
+answered another client. Defending the server twice was the wrong move; a
+report that a different client works against the same endpoint is a report
+about *the request*, and the request is the one thing Lin controls and I had
+not yet compared.
+
+So the request was compared, against the SearXNG clients people actually use
+(`mcp-searxng`'s `buildSearchUrl`) and against the instance's own bot detection
+(`searx/botdetection/`). Lin differed in four ways, each one a real way for the
+same instance to answer differently:
+
+- **No `safesearch`.** The instance default applies when nothing is sent, and a
+  strict default filters a result list to nothing — which reads exactly like the
+  engines refusing. Lin now sends `safesearch=0`. A search tool returns what is
+  there and lets the person decide.
+- **No `language`.** Same shape: a default language narrows what engines return,
+  which is an odd thing for an app that answers in whatever language it was
+  asked in. `language=all`, and `pageno=1` made explicit.
+- **`Accept: application/json` only.** `http_accept.py` rejects any request whose
+  Accept header has no `text/html` in it, so an instance running the limiter
+  would turn an app that asked only for JSON away. Lin now asks for both.
+- **A stock Android user agent.** The limiter matches a list of bot agents and
+  `Dalvik/2.1.0 …` is the shape it looks for. Lin now sends a browser-shaped one
+  that still names itself (`… Lin/1.0`) — not a pretence of being a browser.
+
+**And the question itself.** The model's queries were long — `NVIDIA Jetson Orin
+Nano specs performance 2024 2026` — because that reads as thorough. A search
+engine reads four extra constraints, and on a small set of engines that returns
+nothing. When a search comes back empty, Lin now retries once with the first few
+real words: years the model added, words that describe the kind of answer wanted
+rather than the subject, and anything past the fifth word come out. `null` when
+that changes nothing, so it never pays for a second identical search. The
+stop-word list is deliberately short, and "day" was taken off it after writing
+it: *Day of the Jackal* is a real query, and a list that mangles it is worse than
+no list.
+
+**What this does not claim.** I cannot reach the user's instance, so none of the
+four differences is *proven* to be the cause on that machine. They are the
+concrete differences from clients known to work, each fixed. The failure message
+now carries **the exact URL requested**, and the settings trial prints it too, so
+the next report can be settled by pasting that URL into the other agent's
+environment rather than by anybody's reasoning.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

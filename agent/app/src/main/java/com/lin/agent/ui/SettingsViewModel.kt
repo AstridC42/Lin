@@ -738,7 +738,9 @@ constructor(
           val (url, headers) = request
           val got = runCatching { web.get(url, headers) }
           got.fold(
-            onSuccess = { searchTrialReport(it.status, hitsFrom(provider, it.body).size, it.body) },
+            onSuccess = {
+              searchTrialReport(it.status, hitsFrom(provider, it.body).size, it.body, url)
+            },
             onFailure = {
               appContext.getString(
                 R.string.settings_search_try_unreachable,
