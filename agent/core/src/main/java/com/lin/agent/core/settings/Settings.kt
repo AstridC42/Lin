@@ -259,6 +259,26 @@ class SettingsRepository(private val context: Context) {
   suspend fun setSearchKey(value: String) = write(SEARCH_KEY, value)
 
   /**
+   * Firecrawl's key, and its address when self-hosted (empty means the hosted service).
+   *
+   * One key per provider rather than one shared field. A shared field meant switching from
+   * Brave to Tavily would send the Brave key to Tavily - one company's credential handed to
+   * another because a radio button moved.
+   */
+  val firecrawlKey: Flow<String> = read(FIRECRAWL_KEY, "")
+
+  suspend fun setFirecrawlKey(value: String) = write(FIRECRAWL_KEY, value)
+
+  val firecrawlUrl: Flow<String> = read(FIRECRAWL_URL, "")
+
+  suspend fun setFirecrawlUrl(value: String) = write(FIRECRAWL_URL, value)
+
+  /** Tavily's key. Its own field, for the same reason as Firecrawl's. */
+  val tavilyKey: Flow<String> = read(TAVILY_KEY, "")
+
+  suspend fun setTavilyKey(value: String) = write(TAVILY_KEY, value)
+
+  /**
    * The answers to the questions about who the user is, as JSON. See
    * [com.lin.agent.core.persona.personaFrom].
    *
@@ -578,6 +598,9 @@ class SettingsRepository(private val context: Context) {
     val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
     val SEARCH_URL = stringPreferencesKey("search_url")
     val SEARCH_KEY = stringPreferencesKey("search_key")
+    val FIRECRAWL_KEY = stringPreferencesKey("firecrawl_key")
+    val FIRECRAWL_URL = stringPreferencesKey("firecrawl_url")
+    val TAVILY_KEY = stringPreferencesKey("tavily_key")
     val PERSONA = stringPreferencesKey("persona")
     val STANDING_TASKS = stringPreferencesKey("standing_tasks")
     val REMINDERS = stringPreferencesKey("reminders")

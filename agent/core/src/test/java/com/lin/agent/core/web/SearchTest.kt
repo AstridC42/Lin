@@ -29,11 +29,13 @@ class SearchTest {
   fun `nothing stored means the provider that needs no setting up`() {
     // This used to expect NONE, and the expectation was the bug: a fresh phone could not look
     // anything up until its owner had found an API key. The keyless one is the default now.
-    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed(null))
-    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed(""))
+    // Wikipedia was the keyless default before; DuckDuckGo from the phone replaced it, being
+    // a real web search where Wikipedia is only an encyclopaedia.
+    assertEquals(SearchProvider.DUCKDUCKGO, searchProviderNamed(null))
+    assertEquals(SearchProvider.DUCKDUCKGO, searchProviderNamed(""))
     // A value written by a newer build and read by an older one still reads as something
     // usable rather than throwing on a screen somebody is trying to open.
-    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed("KAGI"))
+    assertEquals(SearchProvider.DUCKDUCKGO, searchProviderNamed("KAGI"))
   }
 
   @Test
@@ -320,9 +322,9 @@ class WikipediaSearchTest {
   fun `a phone with nothing chosen can still look something up`() {
     // The default used to be "nothing", and what that produced was an assistant that could
     // not look anything up until its owner had found an API key.
-    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed(null))
-    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed(""))
-    assertEquals(SearchProvider.WIKIPEDIA, searchProviderNamed("something from a newer build"))
+    assertEquals(SearchProvider.DUCKDUCKGO, searchProviderNamed(null))
+    assertEquals(SearchProvider.DUCKDUCKGO, searchProviderNamed(""))
+    assertEquals(SearchProvider.DUCKDUCKGO, searchProviderNamed("something from a newer build"))
     // But a choice that was made is still honoured, including the choice of nothing.
     assertEquals(SearchProvider.NONE, searchProviderNamed("none"))
     assertEquals(SearchProvider.BRAVE, searchProviderNamed("BRAVE"))
@@ -581,5 +583,98 @@ class DuckDuckGoTest {
   fun `the search is a post to the lite page with the question escaped`() {
     assertEquals("https://lite.duckduckgo.com/lite/" to "q=orin%20nano%20super", duckDuckGoForm(" orin nano super "))
     assertNull(duckDuckGoForm("  "))
+  }
+}
+
+
+class MoreProvidersTest {
+
+  @Test
+  fun `firecrawl posts json to v2 search and asks for each page as markdown`() {
+    val call = searchCall(SearchProvider.FIRECRAWL, "orin nano", baseUrl = "", apiKey = "fc-123")!!
+    assertEquals("https://api.firecrawl.dev/v2/search", call.url)
+    assertEquals("Bearer fc-123", call.headers["Authorization"])
+    assertEquals("application/json", call.contentType)
+    val body = org.json.JSONObject(call.body!!)
+    assertEquals("orin nano", body.getString("query"))
+    assertEquals(
+      "markdown",
+      body.getJSONObject("scrapeOptions").getJSONArray("formats").getJSONObject(0).getString("type"),
+    )
+  }
+
+  @Test
+  fun `hosted firecrawl needs a key and a self-hosted one does not`() {
+    assertNull(searchCall(SearchProvider.FIRECRAWL, "q", baseUrl = "", apiKey = ""))
+    val own = searchCall(SearchProvider.FIRECRAWL, "q", baseUrl = "http://192.168.1.5:3002/", apiKey = "")!!
+    assertEquals("http://192.168.1.5:3002/v2/search", own.url)
+    // No key, so no Authorization header at all - not an empty "Bearer ".
+    assertFalse(own.headers.containsKey("Authorization"))
+  }
+
+  @Test
+  fun `tavily posts json with its key and asks for page text`() {
+    val call = searchCall(SearchProvider.TAVILY, "orin nano", baseUrl = "", apiKey = "tvly-9")!!
+    assertEquals("https://api.tavily.com/search", call.url)
+    assertEquals("Bearer tvly-9", call.headers["Authorization"])
+    assertEquals("text", org.json.JSONObject(call.body!!).getString("include_raw_content"))
+    assertNull(searchCall(SearchProvider.TAVILY, "q", baseUrl = "", apiKey = " "))
+  }
+
+  @Test
+  fun `duckduckgo is a form post and the get-only builder declines it`() {
+    val call = searchCall(SearchProvider.DUCKDUCKGO, "orin nano", "", "")!!
+    assertEquals("https://lite.duckduckgo.com/lite/", call.url)
+    assertEquals("q=orin%20nano", call.body)
+    assertEquals("application/x-www-form-urlencoded", call.contentType)
+    // The old GET builder must not hand back a GET for a POST-only service.
+    assertNull(searchRequest(SearchProvider.DUCKDUCKGO, "orin nano", "", ""))
+  }
+
+  @Test
+  fun `the older services are still plain gets`() {
+    val call = searchCall(SearchProvider.SEARXNG, "q", "https://s.example", "")!!
+    assertNull(call.body)
+    assertTrue(call.url.startsWith("https://s.example/search?q=q"))
+  }
+
+  @Test
+  fun `firecrawl results carry the page they scraped`() {
+    val body =
+      """{"success":true,"data":{"web":[
+           {"url":"https://www.nvidia.com/orin","title":"Jetson Orin Nano Super","description":"Buy","markdown":"| AI Performance | 67 TOPS |"},
+           {"url":"https://b.example","title":"B","description":"no page","markdown":null}]}}"""
+    val hits = hitsFrom(SearchProvider.FIRECRAWL, body)
+    assertEquals(2, hits.size)
+    assertEquals("| AI Performance | 67 TOPS |", hits[0].page)
+    // A null markdown is no page, not the text "null".
+    assertEquals("", hits[1].page)
+    assertEquals("no page", hits[1].snippet)
+  }
+
+  @Test
+  fun `a self-hosted firecrawl on the older api is still read`() {
+    // v1 answered with data as a plain array. A self-hosted instance is whatever version its
+    // owner last pulled.
+    val v1 = """{"success":true,"data":[{"url":"https://a.example","title":"A","description":"d","markdown":"page"}]}"""
+    assertEquals(listOf(SearchHit("A", "https://a.example", "d", "page")), hitsFrom(SearchProvider.FIRECRAWL, v1))
+  }
+
+  @Test
+  fun `tavily results carry their raw content`() {
+    val body =
+      """{"query":"q","results":[
+           {"title":"T","url":"https://t.example","content":"short","score":0.8,"raw_content":"the whole page"},
+           {"title":"U","url":"https://u.example","content":"only this","raw_content":null}]}"""
+    val hits = hitsFrom(SearchProvider.TAVILY, body)
+    assertEquals("the whole page", hits[0].page)
+    assertEquals("", hits[1].page)
+    assertEquals("only this", hits[1].snippet)
+  }
+
+  @Test
+  fun `duckduckgo results come through the same door as the rest`() {
+    val html = """<a rel="nofollow" href="https://example.com/p" class='result-link'>Title</a><td class='result-snippet'>Snip</td>"""
+    assertEquals(listOf(SearchHit("Title", "https://example.com/p", "Snip")), hitsFrom(SearchProvider.DUCKDUCKGO, html))
   }
 }
