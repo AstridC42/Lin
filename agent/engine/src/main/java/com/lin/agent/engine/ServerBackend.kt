@@ -127,12 +127,24 @@ class ServerBackend(
         }
 
         val answer = StringBuilder()
+        val inline = InlineThinking()
         var understoodAnything = false
         try {
-          val body =
+          fun bodyFor(sendThink: Boolean) =
             if (kind.speaksOpenAi) openAiRequestBody(modelName, request, sampling)
-            else chatRequestBody(modelName, request, sampling)
-          openStream(url, headersFrom(authHeader), body).use { s ->
+            else chatRequestBody(modelName, request, sampling, sendThink)
+          val key = "$baseUrl|$modelName"
+          var stream = openStream(url, headersFrom(authHeader), bodyFor(key !in cannotThink))
+          // Asked to think and refused: once more without the question, and never again for
+          // this model. Remembered for the life of the process, which is long enough to stop
+          // every turn paying for a refusal and short enough that a model updated to declare
+          // thinking gets asked again after a restart.
+          if (!kind.speaksOpenAi && thinkingRefused(stream.status, stream.errorBody)) {
+            cannotThink.add(key)
+            stream.close()
+            stream = openStream(url, headersFrom(authHeader), bodyFor(sendThink = false))
+          }
+          stream.use { s ->
             if (s.status != HTTP_OK) {
               emit(
                 TurnEvent.Failed(describeStatus(s.status, kind), s.errorBody.take(DETAIL_CHARS))
@@ -149,16 +161,29 @@ class ServerBackend(
               }
               // Before the answer, because that is the order it was produced in.
               if (chunk.thinking.isNotEmpty()) emit(TurnEvent.Thought(chunk.thinking))
+              // Reasoning the model wrote inline goes with the server's own thinking, not into
+              // the answer. See InlineThinking.
               if (chunk.text.isNotEmpty()) {
-                answer.append(chunk.text)
-                emit(TurnEvent.Token(chunk.text))
+                val split = inline.feed(chunk.text)
+                if (split.thought.isNotEmpty()) emit(TurnEvent.Thought(split.thought))
+                if (split.text.isNotEmpty()) {
+                  answer.append(split.text)
+                  emit(TurnEvent.Token(split.text))
+                }
               }
               if (chunk.toolCalls.isNotEmpty()) emit(TurnEvent.ToolCalls(chunk.toolCalls))
               if (chunk.done) {
+                val rest = inline.finish()
+                if (rest.thought.isNotEmpty()) emit(TurnEvent.Thought(rest.thought))
+                if (rest.text.isNotEmpty()) {
+                  answer.append(rest.text)
+                  emit(TurnEvent.Token(rest.text))
+                }
                 emit(TurnEvent.Done(answer.toString()))
                 return@use
               }
             }
+            inline.finish().text.takeIf { it.isNotEmpty() }?.let { answer.append(it) }
             // The stream ended without the done flag. Keeping whatever arrived is better than
             // discarding a reply that was merely cut short.
             when {
@@ -185,6 +210,9 @@ class ServerBackend(
     }
 
   companion object {
+    /** Server and model pairs that Ollama has said cannot be asked to think. */
+    private val cannotThink: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     private const val TAG = "LinServerBackend"
     private const val HTTP_OK = 200
     private const val DETAIL_CHARS = 300
@@ -306,6 +334,7 @@ internal fun chatRequestBody(
   model: String,
   request: TurnRequest,
   sampling: Sampling = Sampling(),
+  sendThink: Boolean = true,
 ): String {
   val messages = JSONArray()
   if (request.systemPrompt.isNotBlank()) {
@@ -372,7 +401,12 @@ internal fun chatRequestBody(
   // A level rather than a boolean, and always sent. See [ollamaThink] for why both halves
   // of that matter: Brief and Thorough were the same request until this, and "off" did not
   // turn thinking off on a model that reasons by default.
-  body.put("think", ollamaThink(request.reasoning, structured = request.responseSchema != null).wire)
+  //
+  // Left out entirely for a model Ollama has already said cannot be asked - see
+  // [thinkingRefused]. Even `false` is a question it would rather not be asked.
+  if (sendThink) {
+    body.put("think", ollamaThink(request.reasoning, structured = request.responseSchema != null).wire)
+  }
 
   return body.toString()
 }

@@ -2249,6 +2249,31 @@ result is fetched so the next one takes its place. On the real results the
 briefing then carries NVIDIA's 67 TOPS, 102 GB/s and 1.7 GHz, and the developer
 guide's ports, M.2 slots and storage.
 
+### Phase 30 — A model that thinks without saying so
+
+With search working, the next turn failed outright: Ollama answered 400 —
+`"hf.co/unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL" does not support thinking`
+— for a model the user runs with visible thinking in OpenWebUI every day.
+
+Both are true. Ollama accepts `think` only for a model whose template declares
+it, and a GGUF pulled from Hugging Face can reason perfectly well without
+declaring it: the reasoning arrives inline, as `<think>…</think>` in the reply.
+OpenWebUI never sends `think`; it reads the tags. Phase 17 made Lin always send a
+level, which is right for models that declare thinking and fatal for this one.
+
+So a refusal is now a request to ask again, not a failure: on exactly that 400,
+the turn is sent once more without the field, and the server-and-model pair is
+remembered for the life of the process so no later turn pays for the refusal
+again. Any other 400 is still reported as it was.
+
+And the tags are read. `InlineThinking` takes `<think>…</think>` out of the
+streamed reply and sends it where the server's own thinking goes, so the
+model's talking-to-itself is not the first thing on the screen or the first
+thing spoken. Streamed, which is the difficulty: a tag can arrive as `<thi` then
+`nk>`, so text that could be the start of a tag is held back until the next
+chunk says whether it was one. The blank line a model leaves after its thinking
+is not counted as the start of its answer.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
