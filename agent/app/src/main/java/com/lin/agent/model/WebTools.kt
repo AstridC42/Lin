@@ -21,8 +21,11 @@ import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.core.web.ReadHit
 import com.lin.agent.core.web.SearchHit
 import com.lin.agent.core.web.SearchProvider
+import com.lin.agent.core.web.duckDuckGoForm
+import com.lin.agent.core.web.duckDuckGoHits
 import com.lin.agent.core.web.goingRoundText
 import com.lin.agent.core.web.hitsFrom
+import com.lin.agent.core.web.looksLikeABotCheck
 import com.lin.agent.core.web.nothingCameBack
 import com.lin.agent.core.web.plainerQuery
 import com.lin.agent.core.web.readableText
@@ -188,6 +191,11 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     // fallback and closer to what was asked, so it goes first.
     tryPlainly(query, provider)?.let { return it }
 
+    // Then the phone asks for itself. A self-hosted search is refused by the engines behind
+    // it at its server's address; the phone has an address of its own. A real web search, so
+    // it goes before Wikipedia, which is only an encyclopaedia.
+    tryFromThePhone(query, provider)?.let { return it }
+
     val why = nothingCameBack(provider, body, asked)
     if (provider == SearchProvider.WIKIPEDIA) return ToolResult.Failed(why)
 
@@ -210,6 +218,29 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
         hits,
         "the ${provider.name.lowercase()} search returned nothing, so these are from " +
           "Wikipedia instead - say that, and say it is not a web search",
+      )
+    )
+  }
+
+  /**
+   * DuckDuckGo, asked from the phone's own connection, when the chosen search found nothing.
+   * See [duckDuckGoForm] for why this works where the server's search does not.
+   */
+  private suspend fun tryFromThePhone(query: String, provider: SearchProvider): ToolResult? {
+    val (url, form) = duckDuckGoForm(query) ?: return null
+    val page =
+      runCatching { web.post(url, form, mapOf("Accept" to "text/html")) }
+        .onFailure { Log.w(TAG, "DuckDuckGo from the phone failed", it) }
+        .getOrNull() ?: return null
+    if (!page.ok) return null
+    val hits = duckDuckGoHits(page.body)
+    if (hits.isEmpty()) return null
+    return ToolResult.Ok(
+      briefed(
+        query,
+        hits,
+        "the ${provider.name.lowercase()} search returned nothing, so these are from " +
+          "DuckDuckGo, searched from the phone - a real web search",
       )
     )
   }
@@ -241,7 +272,9 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     if (samePagesAgain(urls, earlier)) return goingRoundText(query, hits.map { it.title })
     synchronized(recent) { recent.add(now to urls.toSet()) }
 
-    val toRead = hits.filter { it.url.startsWith("http") }.take(PAGES_READ)
+    // One more than will be used: when a page turns out to be a bot check, the next result
+    // takes its place rather than the answer having one source fewer.
+    val toRead = hits.filter { it.url.startsWith("http") }.take(PAGES_READ + 1)
     val reader = CoroutineScope(Dispatchers.IO + SupervisorJob())
     val pending = toRead.map { hit -> hit to reader.async { runCatching { web.get(hit.url) }.getOrNull() } }
     val deadline = System.currentTimeMillis() + READ_DEADLINE_MS
@@ -252,7 +285,12 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
         val page = if (left <= 0) null else withTimeoutOrNull(left) { job.await() }
         if (page == null || !page.ok) continue
         if (page.contentType.isNotEmpty() && READABLE.none { page.contentType.startsWith(it) }) continue
-        val passages = relevantPassages(readableText(page.body), query, PASSAGE_BUDGET)
+        if (texts.size >= PAGES_READ) break
+        val text = readableText(page.body)
+        // A challenge page is not the page. Left as unread, so it falls back to its snippet,
+        // marked as such - a small model will otherwise summarise a CAPTCHA.
+        if (looksLikeABotCheck(text)) continue
+        val passages = relevantPassages(text, query, PASSAGE_BUDGET)
         if (passages.isNotBlank()) texts[hit.url] = passages
       }
     } finally {

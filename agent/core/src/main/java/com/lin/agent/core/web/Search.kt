@@ -479,3 +479,54 @@ fun searchTrialReport(status: Int, hits: Int, body: String, asked: String = ""):
     if (asked.isNotBlank()) append("\nasked: ").append(asked)
   }
 }
+
+/**
+ * DuckDuckGo's lite page, asked from the phone itself: the address, and the form to post.
+ *
+ * Why this exists: a self-hosted SearXNG searches from its server's address, and the engines
+ * behind it block that address - Google denies it, DuckDuckGo shows it a CAPTCHA, Brave rate
+ * limits it - while the phone in somebody's pocket has an address of its own that none of them
+ * has any reason to refuse. So when the chosen search comes back empty, the phone asks.
+ *
+ * A POST, deliberately. The same page asked with GET answers 202 with a bot challenge; asked
+ * the way its own form asks, it answers with results. Checked against the live page before
+ * this was written, not assumed.
+ */
+fun duckDuckGoForm(query: String): Pair<String, String>? {
+  val asked = query.trim()
+  if (asked.isEmpty()) return null
+  return "https://lite.duckduckgo.com/lite/" to "q=${urlEscape(asked)}"
+}
+
+/**
+ * Results out of DuckDuckGo's lite page.
+ *
+ * Built against the real markup: each result is an `<a … class='result-link'>` holding the
+ * title, with the page's own address in `href` - not a redirect - and the snippet in the next
+ * `<td class='result-snippet'>`. Anything that links back to duckduckgo.com is the site's own
+ * furniture or an advert and is skipped. A challenge page instead of results has no
+ * result-link in it at all, and comes back as nothing rather than as a wrong answer.
+ */
+fun duckDuckGoHits(html: String, limit: Int = 6): List<SearchHit> {
+  val starts = RESULT_LINK.findAll(html).toList()
+  val out = mutableListOf<SearchHit>()
+  for ((index, link) in starts.withIndex()) {
+    val href = HREF.find(link.value)?.groupValues?.get(1)?.let(::decodeEntitiesLight).orEmpty()
+    if (!href.startsWith("http") || href.contains("duckduckgo.com")) continue
+    val title = withoutMarkup(link.groupValues[1])
+    val until = starts.getOrNull(index + 1)?.range?.first ?: html.length
+    val snippet =
+      SNIPPET.find(html.substring(link.range.last + 1, until))?.groupValues?.get(1)?.let(::withoutMarkup).orEmpty()
+    out.add(SearchHit(title = title, url = href, snippet = snippet))
+    if (out.size >= limit) break
+  }
+  return out.distinctBy { it.url }
+}
+
+private fun decodeEntitiesLight(text: String): String = text.replace("&amp;", "&")
+
+private val RESULT_LINK =
+  Regex("<a\\b[^>]*class=['\"]result-link['\"][^>]*>(.*?)</a>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+private val HREF = Regex("href=['\"]([^'\"]+)['\"]", RegexOption.IGNORE_CASE)
+private val SNIPPET =
+  Regex("<td\\b[^>]*class=['\"]result-snippet['\"][^>]*>(.*?)</td>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
