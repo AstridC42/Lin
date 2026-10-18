@@ -18,14 +18,17 @@ package com.lin.agent.model
 
 import android.util.Log
 import com.lin.agent.core.settings.SettingsRepository
+import com.lin.agent.core.web.ReadHit
+import com.lin.agent.core.web.SearchHit
 import com.lin.agent.core.web.SearchProvider
 import com.lin.agent.core.web.hitsFrom
-import com.lin.agent.core.web.hitsInWords
 import com.lin.agent.core.web.nothingCameBack
 import com.lin.agent.core.web.plainerQuery
 import com.lin.agent.core.web.sourceNote
 import com.lin.agent.core.web.readableText
 import com.lin.agent.core.web.searchProviderNamed
+import com.lin.agent.core.web.relevantPassages
+import com.lin.agent.core.web.searchBriefing
 import com.lin.agent.core.web.searchRequest
 import com.lin.agent.engine.AgentRole
 import com.lin.agent.engine.AgentTool
@@ -33,7 +36,13 @@ import com.lin.agent.engine.ParamType
 import com.lin.agent.engine.ToolParameter
 import com.lin.agent.engine.ToolResult
 import com.lin.agent.web.Web
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Looking something up.
@@ -70,8 +79,11 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
 
   override val guidance =
       "Use search_web when you do not know something or it may have changed since you were " +
-      "trained, then read_page on a result worth reading. Never answer a question about " +
-      "current facts, prices or events from memory alone."
+      "trained. It reads the top pages for you and gives you what they say: answer from that " +
+      "text, not from the titles, and give figures exactly as the pages do. Use read_page " +
+      "only for a result it could not read. Always end a web answer with a Sources list of " +
+      "the links you used. Never answer a question about current facts, prices or events " +
+      "from memory alone."
 
   override suspend fun run(arguments: Map<String, Any?>): ToolResult {
     val query = (arguments["query"] as? String)?.trim().orEmpty()
@@ -114,7 +126,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     // Doctor Who Lego sets" - a confident claim about the world assembled out of a search
     // that did not work. An empty web search is news about the search, not about the world.
     if (hits.isEmpty()) return insteadOfNothing(query, provider, answer.body, url)
-    return ToolResult.Ok(hitsInWords(query, hits, sourceNote(provider)))
+    return ToolResult.Ok(briefed(query, hits, sourceNote(provider)))
   }
 
   /**
@@ -139,7 +151,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     val hits = hitsFrom(provider, answer.body)
     if (hits.isEmpty()) return null
     return ToolResult.Ok(
-      hitsInWords(
+      briefed(
         plainer,
         hits,
         "\"$query\" found nothing, so this is the same question in plainer words" +
@@ -188,13 +200,49 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     }
 
     return ToolResult.Ok(
-      hitsInWords(
+      briefed(
         query,
         hits,
         "the ${provider.name.lowercase()} search returned nothing, so these are from " +
           "Wikipedia instead - say that, and say it is not a web search",
       )
     )
+  }
+
+  /**
+   * The results, with the top pages actually read.
+   *
+   * The complaint that led here: asked for the Orin Nano's specifications, Lin found NVIDIA's
+   * own product page and answered from its title. The search engine's snippet is a sentence
+   * chosen to make somebody click, not the answer, and a model that only sees titles and
+   * snippets can only ever paraphrase a results page. So the top few are fetched, reduced to
+   * their text, and narrowed to the parts that answer the question - see [relevantPassages].
+   *
+   * In parallel and with a deadline. Three pages one after another is most of a minute on a
+   * slow site, and one page that never answers must not hold the whole answer hostage: what
+   * has arrived by the deadline is used, and a page that missed it falls back to its snippet,
+   * marked as such so the model knows the difference.
+   */
+  private suspend fun briefed(query: String, hits: List<SearchHit>, note: String): String {
+    val toRead = hits.filter { it.url.startsWith("http") }.take(PAGES_READ)
+    val reader = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    val pending = toRead.map { hit -> hit to reader.async { runCatching { web.get(hit.url) }.getOrNull() } }
+    val deadline = System.currentTimeMillis() + READ_DEADLINE_MS
+    val texts = mutableMapOf<String, String>()
+    try {
+      for ((hit, job) in pending) {
+        val left = deadline - System.currentTimeMillis()
+        val page = if (left <= 0) null else withTimeoutOrNull(left) { job.await() }
+        if (page == null || !page.ok) continue
+        if (page.contentType.isNotEmpty() && READABLE.none { page.contentType.startsWith(it) }) continue
+        val passages = relevantPassages(readableText(page.body), query, PASSAGE_BUDGET)
+        if (passages.isNotBlank()) texts[hit.url] = passages
+      }
+    } finally {
+      // Stragglers are abandoned rather than waited for: their answer is no longer wanted.
+      reader.cancel()
+    }
+    return searchBriefing(query, hits.map { ReadHit(it, texts[it.url].orEmpty()) }, note)
   }
 
   private fun notSetUp(provider: SearchProvider) =
@@ -229,6 +277,20 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
 
   private companion object {
     const val TAG = "LinSearchWeb"
+
+    /** How many results are read in full. Three covers the official page and two others. */
+    const val PAGES_READ = 3
+
+    /**
+     * Characters kept from each page. Three of these is under two thousand tokens, which
+     * leaves a 4k context room for the conversation as well.
+     */
+    const val PASSAGE_BUDGET = 2_500
+
+    /** How long the pages get, all together, before the answer goes ahead without them. */
+    const val READ_DEADLINE_MS = 9_000L
+
+    val READABLE = listOf("text/", "application/xhtml", "application/xml")
   }
 }
 

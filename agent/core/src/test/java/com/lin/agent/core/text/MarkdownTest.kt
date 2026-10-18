@@ -163,3 +163,52 @@ class MarkdownTest {
     }
   }
 }
+
+class MarkdownLinkTest {
+
+  @Test
+  fun `a markdown link becomes a tappable run with its own words`() {
+    val spans = spansOf("See [the product page](https://www.nvidia.com/orin) for more.")
+    assertEquals(
+      listOf(
+        Span("See "),
+        Span("the product page", url = "https://www.nvidia.com/orin"),
+        Span(" for more."),
+      ),
+      spans,
+    )
+  }
+
+  @Test
+  fun `a bare address is a link, without the full stop that ends the sentence`() {
+    val spans = spansOf("1. https://www.nvidia.com/en-us/autonomous-machines/.")
+    assertEquals("https://www.nvidia.com/en-us/autonomous-machines/", spans.single { it.url.isNotEmpty() }.url)
+    assertEquals(".", spans.last().text)
+  }
+
+  @Test
+  fun `underscores and stars inside an address are not emphasis`() {
+    val url = "https://example.com/a_b_c*d"
+    val spans = spansOf("go to $url now")
+    assertEquals(url, spans.single { it.url.isNotEmpty() }.text)
+    assertTrue(spans.none { it.italic || it.bold })
+  }
+
+  @Test
+  fun `a bracket belongs to the address only when the address opened one`() {
+    assertEquals("https://en.wikipedia.org/wiki/Tegra_(chip)", bareUrl("https://en.wikipedia.org/wiki/Tegra_(chip)"))
+    assertEquals("https://example.com", bareUrl("https://example.com)"))
+  }
+
+  @Test
+  fun `a footnote mark is not a link`() {
+    // "[1]" in a numbered source list, or brackets in ordinary prose, stay text.
+    assertEquals(listOf(Span("[1] Jetson [beta]")), spansOf("[1] Jetson [beta]"))
+    assertEquals(listOf(Span("[label](not a link)")), spansOf("[label](not a link)"))
+  }
+
+  @Test
+  fun `an address in the middle of a word is left alone`() {
+    assertTrue(spansOf("xhttps://example.com").none { it.url.isNotEmpty() })
+  }
+}

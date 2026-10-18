@@ -152,3 +152,15 @@ class ReadableTest {
     assertEquals("Just a sentence.", readableText("Just a sentence."))
   }
 }
+
+class ReadableTableTest {
+
+  @Test
+  fun `table cells keep a divider so a figure keeps its label`() {
+    // Run together, "GPU 1024-core Ampere CPU 6-core Arm" is one sentence nobody can read a
+    // figure out of.
+    val html =
+      "<table><tr><th>GPU</th><td>1024-core Ampere</td></tr><tr><td>CPU</td><td>6-core Arm</td></tr></table>"
+    assertEquals("GPU | 1024-core Ampere\nCPU | 6-core Arm", readableText(html))
+  }
+}

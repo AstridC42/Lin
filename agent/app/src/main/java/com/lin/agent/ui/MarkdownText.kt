@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -120,6 +121,7 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun List<Span>.annotated(): AnnotatedString {
   val codeBackground = MaterialTheme.colorScheme.surfaceContainerHighest
+  val linkColour = MaterialTheme.colorScheme.primary
   return buildAnnotatedString {
     for (span in this@annotated) {
       val style =
@@ -129,7 +131,26 @@ private fun List<Span>.annotated(): AnnotatedString {
           fontFamily = if (span.code) FontFamily.Monospace else null,
           background = if (span.code) codeBackground else androidx.compose.ui.graphics.Color.Unspecified,
         )
-      withStyle(style) { append(span.text) }
+      if (span.url.isEmpty()) {
+        withStyle(style) { append(span.text) }
+      } else {
+        // A real link, opened by the system, so it goes to whatever the person uses for the
+        // web. Coloured and underlined, because a source list that does not look tappable
+        // will not be tapped.
+        withLink(
+          androidx.compose.ui.text.LinkAnnotation.Url(
+            span.url,
+            androidx.compose.ui.text.TextLinkStyles(
+              style.copy(
+                color = linkColour,
+                textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+              )
+            ),
+          )
+        ) {
+          append(span.text)
+        }
+      }
     }
   }
 }
