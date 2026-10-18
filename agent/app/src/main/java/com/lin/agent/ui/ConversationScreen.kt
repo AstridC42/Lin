@@ -22,6 +22,7 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +32,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -45,8 +48,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -59,8 +62,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -74,6 +83,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -85,6 +95,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,12 +103,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -108,8 +125,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.R
 import com.lin.agent.core.fold.splitAcrossTheCrease
 import com.lin.agent.core.media.PhotoLibrary
+import com.lin.agent.core.text.Step
+import com.lin.agent.core.text.domainOf
+import com.lin.agent.core.text.greetingFor
+import com.lin.agent.core.text.splitSources
+import com.lin.agent.core.text.stepsSummary
 import com.lin.agent.core.voice.Launch
 import com.lin.agent.engine.Message
+import kotlinx.coroutines.launch
 
 /**
  * The conversation, full screen.
@@ -372,6 +395,7 @@ private fun ColumnScope.ConversationBody(
     )
   }
   val listState = rememberLazyListState()
+  val scope = rememberCoroutineScope()
 
   // Follow the reply as it arrives, and the new message when one is sent.
   val lastIndex = state.messages.size
@@ -393,34 +417,81 @@ private fun ColumnScope.ConversationBody(
     )
   }
 
-  LazyColumn(
-    state = listState,
+  // The answer this turn's steps belong to goes after them, not before - the work is how the
+  // answer was reached, which is the order every polished assistant shows it in. Until this,
+  // a finished answer joined the message list and its steps rendered under the whole list,
+  // so a search's tool cards sat below the reply they produced.
+  val answerAfterSteps =
+    !state.inProgress && state.toolRuns.isNotEmpty() &&
+      state.messages.lastOrNull()?.role == Message.Role.ASSISTANT
+  val shown = if (answerAfterSteps) state.messages.dropLast(1) else state.messages
+  val haptics = LocalHapticFeedback.current
+  val clipboard = LocalClipboardManager.current
+  val actionContext = LocalContext.current
+  val lastAnswer = state.messages.indexOfLast { it.role == Message.Role.ASSISTANT }
+  val actionsFor: (Int, Message) -> AnswerActions? = { index, message ->
+    if (message.role != Message.Role.ASSISTANT || state.inProgress) null
+    else
+      AnswerActions(
+        onCopy = {
+          clipboard.setText(AnnotatedString(splitSources(message.text).body))
+          haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+        },
+        onSpeak = { viewModel.readAloud(splitSources(message.text).body) },
+        onShare = {
+          val send =
+            android.content.Intent(android.content.Intent.ACTION_SEND)
+              .setType("text/plain")
+              .putExtra(android.content.Intent.EXTRA_TEXT, message.text)
+          actionContext.startActivity(android.content.Intent.createChooser(send, null))
+        },
+        // Only the latest answer can be asked again: retrying an older one would rewrite
+        // history the later turns were built on.
+        onRetry = if (index == lastAnswer) ({ viewModel.retry() }) else null,
+      )
+  }
+
+  Box(
     modifier =
       (if (halfHeight) Modifier.fillMaxHeight(0.5f) else Modifier.weight(1f, fill = fillHeight))
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp),
+        .fillMaxWidth(),
+    propagateMinConstraints = true,
+  ) {
+  LazyColumn(
+    state = listState,
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     // The first thing anybody sees, and until this redesign it was a title bar and a text
     // box. Only when there is genuinely nothing: a half-finished turn is not an empty screen.
     if (state.messages.isEmpty() && state.streaming.isEmpty() && state.missingModel == null) {
-      item { NothingYet(onPick = { viewModel.send(it) }) }
+      item {
+        NothingYet(
+          greeting = greetingFor(java.time.LocalTime.now().hour, state.name),
+          onPick = { viewModel.send(it) },
+        )
+      }
     }
 
-    itemsIndexed(state.messages) { _, message -> Said(message) }
+    itemsIndexed(shown) { index, message -> Said(message, actionsFor(index, message)) }
 
     // Before the answer, collapsed, and visibly not the answer. Thinking contradicts itself
     // and abandons approaches on the way to being right, so it is offered rather than shown.
     if (state.thinking.isNotEmpty()) {
       item { Thinking(state.thinking, inProgress = state.inProgress) }
     }
+
+    // What Lin did, in one line, before the answer. See Steps.
+    if (state.toolRuns.isNotEmpty()) {
+      item { Steps(state.toolRuns) }
+    }
+
     if (state.streaming.isNotEmpty()) {
       item { Said(Message(Message.Role.ASSISTANT, state.streaming)) }
     }
-
-    // What Lin did, as cards rather than as grey lines: running, done, and could not are
-    // three different things and the screen now shows which.
-    items(state.toolRuns) { run -> ToolCard(run) }
+    if (answerAfterSteps) {
+      item { Said(state.messages.last(), actionsFor(state.messages.lastIndex, state.messages.last())) }
+    }
 
     // The pictures themselves, not a description of them. A model that cannot see an image
     // has nothing true to say about it, so the screen shows and the model stays quiet.
@@ -488,6 +559,21 @@ private fun ColumnScope.ConversationBody(
         }
       }
     }
+  }
+
+  // Back to the latest, when scrolled away from it - the button every chat app has, because
+  // a long answer streaming in below the fold is otherwise invisible.
+  if (listState.canScrollForward && (state.messages.isNotEmpty() || state.streaming.isNotEmpty())) {
+    Box(modifier = Modifier.matchParentSize(), contentAlignment = Alignment.BottomCenter) {
+      SmallFloatingActionButton(
+        onClick = { scope.launch { listState.animateScrollToItem(maxOf(0, listState.layoutInfo.totalItemsCount - 1)) } },
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.padding(bottom = 8.dp),
+      ) {
+        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.to_latest))
+      }
+    }
+  }
   }
 
   // The reply, in full, with the button that sends it. The model wrote these words; the
@@ -596,13 +682,13 @@ private fun ColumnScope.ConversationBody(
  * nothing here is a special path that could work when the real one does not.
  */
 @Composable
-private fun NothingYet(onPick: (String) -> Unit) {
+private fun NothingYet(greeting: String, onPick: (String) -> Unit) {
   Column(
     modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
     Text(
-      stringResource(R.string.empty_greeting),
+      greeting,
       style = MaterialTheme.typography.headlineMedium,
       fontWeight = FontWeight.SemiBold,
       modifier = Modifier.padding(horizontal = 4.dp),
@@ -641,9 +727,17 @@ private fun NothingYet(onPick: (String) -> Unit) {
   }
 }
 
+/** What can be done with one answer: the row under it. Retry is only for the latest. */
+private class AnswerActions(
+  val onCopy: () -> Unit,
+  val onSpeak: () -> Unit,
+  val onShare: () -> Unit,
+  val onRetry: (() -> Unit)?,
+)
+
 /** One turn. The person gets a bubble; Lin gets a card, because Lin's answers are longer. */
 @Composable
-private fun Said(message: Message) {
+private fun Said(message: Message, actions: AnswerActions? = null) {
   val fromUser = message.role == Message.Role.USER
   Row(
     modifier = Modifier.fillMaxWidth(),
@@ -663,16 +757,135 @@ private fun Said(message: Message) {
         )
       }
     } else {
-      Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 22.dp, bottomStart = 8.dp),
+      // The source list comes off the end and becomes chips - see splitSources.
+      val sourced = remember(message.text) { splitSources(message.text) }
+      Column(
         // Capped, not stretched: on a Fold's inner screen a line of text running the full
         // width is unreadable, and the same cap works folded and open.
         modifier = Modifier.widthIn(max = 560.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        // Markdown, laid out as what it meant rather than shown as what it typed.
-        MarkdownText(message.text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        Surface(
+          color = MaterialTheme.colorScheme.surfaceContainer,
+          shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 22.dp, bottomStart = 8.dp),
+        ) {
+          // Markdown, laid out as what it meant rather than shown as what it typed.
+          MarkdownText(sourced.body, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        }
+        if (sourced.sources.isNotEmpty()) Sources(sourced.sources)
+        actions?.let { AnswerRow(it) }
       }
+    }
+  }
+}
+
+/**
+ * The pages an answer came from, as chips with their domain - the way Perplexity, ChatGPT and
+ * Gemini show them - rather than a block of long addresses at the bottom of a chat message.
+ * Numbered, so "[2]" in the answer can be matched to a chip.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Sources(urls: List<String>) {
+  val opener = LocalUriHandler.current
+  FlowRow(
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+    verticalArrangement = Arrangement.spacedBy(2.dp),
+    modifier = Modifier.padding(horizontal = 4.dp),
+  ) {
+    urls.forEachIndexed { index, url ->
+      AssistChip(
+        onClick = { runCatching { opener.openUri(url) } },
+        label = {
+          Text(
+            "${index + 1}  ${domainOf(url)}",
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+          )
+        },
+        shape = RoundedCornerShape(12.dp),
+      )
+    }
+  }
+}
+
+/** Copy, read aloud, ask again, share: small and quiet, under the answer they act on. */
+@Composable
+private fun AnswerRow(actions: AnswerActions) {
+  val tint = MaterialTheme.colorScheme.onSurfaceVariant
+  Row(horizontalArrangement = Arrangement.spacedBy(0.dp), modifier = Modifier.padding(start = 2.dp)) {
+    QuietIcon(painterResource(R.drawable.ic_copy), stringResource(R.string.answer_copy), tint, actions.onCopy)
+    QuietIcon(painterResource(R.drawable.ic_volume), stringResource(R.string.answer_speak), tint, actions.onSpeak)
+    actions.onRetry?.let {
+      QuietIcon(rememberVectorPainter(Icons.Filled.Refresh), stringResource(R.string.answer_retry), tint, it)
+    }
+    QuietIcon(rememberVectorPainter(Icons.Filled.Share), stringResource(R.string.answer_share), tint, actions.onShare)
+  }
+}
+
+@Composable
+private fun QuietIcon(
+  painter: androidx.compose.ui.graphics.painter.Painter,
+  description: String,
+  tint: Color,
+  onClick: () -> Unit,
+) {
+  IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+    Icon(painter, contentDescription = description, tint = tint, modifier = Modifier.size(18.dp))
+  }
+}
+
+/**
+ * The turn's work, in one line, before the answer: "Searched the web · Read a page ×3".
+ *
+ * Collapsed by default, because on a good day nobody needs the detail - and expanded into the
+ * per-tool cards with one tap, because on a bad day the detail is the diagnosis. While a step
+ * runs, the line says what it is doing now. See stepsSummary.
+ */
+@Composable
+private fun Steps(runs: List<ToolRun>) {
+  var open by rememberSaveable { mutableStateOf(false) }
+  val running = runs.any { it.state == ToolState.RUNNING }
+  val failed = runs.any { it.state == ToolState.FAILED }
+  val summary =
+    stepsSummary(
+      runs.map { Step(it.name, running = it.state == ToolState.RUNNING, failed = it.state == ToolState.FAILED) }
+    )
+  val colors = MaterialTheme.colorScheme
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Surface(
+      onClick = { open = !open },
+      shape = RoundedCornerShape(16.dp),
+      color = colors.surfaceContainerLow,
+      modifier = Modifier.widthIn(max = 560.dp),
+    ) {
+      Row(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+      ) {
+        when {
+          running -> CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+          failed -> Icon(Icons.Filled.Warning, null, tint = colors.error, modifier = Modifier.size(16.dp))
+          else -> Icon(Icons.Filled.Check, null, tint = colors.tertiary, modifier = Modifier.size(16.dp))
+        }
+        Text(
+          summary,
+          style = MaterialTheme.typography.bodyMedium,
+          color = colors.onSurfaceVariant,
+          maxLines = 2,
+          modifier = Modifier.weight(1f, fill = false),
+        )
+        Icon(
+          if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+          contentDescription = stringResource(if (open) R.string.steps_hide else R.string.steps_show),
+          tint = colors.onSurfaceVariant,
+          modifier = Modifier.size(18.dp),
+        )
+      }
+    }
+    AnimatedVisibility(visible = open) {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { runs.forEach { ToolCard(it) } }
     }
   }
 }
@@ -907,30 +1120,49 @@ private fun ColumnScope.Composer(
       }
     }
 
+    // Send, or Stop while an answer is being written - the same place every assistant puts
+    // it, because the moment somebody wants to stop is the moment their thumb is on Send.
+    val haptics = LocalHapticFeedback.current
+    val stoppable = state.inProgress
     Surface(
       onClick = {
-        if (sendable) {
-          viewModel.send(draft)
-          onSent()
+        when {
+          stoppable -> {
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            viewModel.stop()
+          }
+          sendable -> {
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            viewModel.send(draft)
+            onSent()
+          }
         }
       },
       shape = CircleShape,
       // Dimmed rather than hidden when there is nothing to send: a button that comes and
       // goes is one somebody has to learn, and this one has to be obvious.
       color =
-        if (sendable) MaterialTheme.colorScheme.primary
+        if (sendable || stoppable) MaterialTheme.colorScheme.primary
         else MaterialTheme.colorScheme.surfaceContainer,
       contentColor =
-        if (sendable) MaterialTheme.colorScheme.onPrimary
+        if (sendable || stoppable) MaterialTheme.colorScheme.onPrimary
         else MaterialTheme.colorScheme.onSurfaceVariant,
       modifier = Modifier.size(48.dp),
     ) {
       Box(contentAlignment = Alignment.Center) {
-        Icon(
-          Icons.AutoMirrored.Filled.Send,
-          contentDescription = stringResource(R.string.send),
-          modifier = Modifier.size(20.dp),
-        )
+        if (stoppable) {
+          Icon(
+            painterResource(R.drawable.ic_stop),
+            contentDescription = stringResource(R.string.stop_answer),
+            modifier = Modifier.size(18.dp),
+          )
+        } else {
+          Icon(
+            Icons.AutoMirrored.Filled.Send,
+            contentDescription = stringResource(R.string.send),
+            modifier = Modifier.size(20.dp),
+          )
+        }
       }
     }
   }
