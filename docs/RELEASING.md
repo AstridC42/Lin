@@ -4,9 +4,11 @@ All builds are made by GitHub Actions; nothing is built by hand.
 
 | | Rolling build | Numbered release |
 | --- | --- | --- |
-| Tag | `lin-dev`, moved to each new build | `lin-v0.2.0`, permanent |
+| Tag | `lin-0.1.0-dev.<run>`, one per build | `lin-v0.2.0`, permanent |
 | When | every push to `main` that changes the app | when you run the workflow with a version |
 | Version name | `0.1.0-dev.<run>` | what you typed |
+
+Each build is its own release because the repository uses immutable releases: a release is created as a draft, its files are attached, and only then is it published, after which it cannot change. The newest three test builds are kept; older ones are removed automatically.
 
 Both come from [`release_lin.yml`](../.github/workflows/release_lin.yml). It runs the unit tests,
 builds release APKs for each ABI plus a universal one, writes `SHA256SUMS.txt`, and publishes them

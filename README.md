@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/tag/lin-dev">Download</a> ·
+  <a href="../../releases/latest">Download</a> ·
   <a href="docs/INSTALL.md">Install guide</a> ·
   <a href="docs/ARCHITECTURE.md">How it works</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
@@ -75,7 +75,7 @@ on-phone model, then your main model.
 
 ## Install
 
-Grab `lin-…-arm64-v8a.apk` from the [latest build](../../releases/tag/lin-dev) and open it on the
+Grab `lin-…-arm64-v8a.apk` from the [latest build](../../releases/latest) and open it on the
 phone. Android 12 or newer. The [install guide](docs/INSTALL.md) covers the warnings Android and
 Samsung show for apps from outside the Play Store, and the first-run setup.
 
