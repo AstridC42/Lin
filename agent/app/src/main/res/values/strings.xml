@@ -349,6 +349,11 @@
     address or key first.</string>
   <string name="settings_search_try_unreachable">Could not reach it: %1$s</string>
 
+  <string name="memory_learning">Learn from conversations</string>
+  <string name="memory_learning_detail">After a conversation, Lin notes lasting facts about you
+    here. Off until you turn it on.</string>
+  <string name="memory_last_digest_none">Nothing learned yet.</string>
+
   <string name="reminder_channel">Reminders</string>
   <string name="reminder_channel_detail">The reminders you asked Lin to send.</string>
   <string name="reminder_from_lin">Reminder from Lin</string>
