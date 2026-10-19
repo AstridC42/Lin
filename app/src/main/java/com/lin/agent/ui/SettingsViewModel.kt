@@ -178,6 +178,10 @@ data class SettingsState(
   /** Whether the microphone reopens after Lin has finished speaking. */
   val voiceChat: Boolean = false,
   val backgroundVoice: Boolean = false,
+  val ownVoice: Boolean = true,
+  val linVoice: String = "Piper Amy",
+  val linHearing: String = "Moonshine Tiny",
+  val kokoroSpeaker: String = "af_sarah",
   /** Whether Lin is listening for its name. Off by default; it holds the microphone. */
   val wakeWord: Boolean = false,
   /** The downloaded chat model the user picked, or empty to let the phone decide. */
@@ -277,6 +281,10 @@ constructor(
           speechPitch = settings.speechPitch.first(),
           voiceChat = settings.voiceChat.first(),
           backgroundVoice = settings.backgroundVoice.first(),
+          ownVoice = settings.ownVoice.first(),
+          linVoice = settings.linVoice.first(),
+          linHearing = settings.linHearing.first(),
+          kokoroSpeaker = settings.kokoroSpeaker.first(),
           wakeWord = settings.wakeWord.first(),
           chatModel = settings.chatModelName.first(),
           musicApp = settings.musicApp.first(),
@@ -298,6 +306,9 @@ constructor(
                   ModelRole.EMBED -> "embedding"
                   ModelRole.ACTIONS -> "quick actions · needs a Hugging Face token"
                   ModelRole.SEGMENT -> "photo cut-out"
+                  ModelRole.VOICE -> "Lin's voice"
+                  ModelRole.HEARING -> "Lin's hearing"
+                  ModelRole.SPEECH_DETECTOR -> "hears when you stop talking"
                 }
               val fit =
                 when {
@@ -890,6 +901,37 @@ constructor(
       settings.setVoiceName(name)
       speaker.preview(name, sample)
     }
+  }
+
+  fun setOwnVoice(on: Boolean) {
+    _state.update { it.copy(ownVoice = on) }
+    viewModelScope.launch { settings.setOwnVoice(on) }
+  }
+
+  fun setLinVoice(name: String) {
+    _state.update { it.copy(linVoice = name) }
+    viewModelScope.launch { settings.setLinVoice(name) }
+  }
+
+  fun setLinHearing(name: String) {
+    _state.update { it.copy(linHearing = name) }
+    viewModelScope.launch { settings.setLinHearing(name) }
+  }
+
+  fun setKokoroSpeaker(id: String) {
+    _state.update { it.copy(kokoroSpeaker = id) }
+    viewModelScope.launch { settings.setKokoroSpeaker(id) }
+  }
+
+  /** A hearing model and the speech detector it cannot work without, together. */
+  fun downloadHearing(model: CatalogModel) {
+    downloads.start(model)
+    if (!store.isPresent(ModelCatalog.SILERO_VAD)) downloads.start(ModelCatalog.SILERO_VAD)
+  }
+
+  /** Says a sample in one of Lin's own voices. */
+  fun tryOwnVoice(model: CatalogModel, sample: String) {
+    viewModelScope.launch { speaker.previewOwn(model, _state.value.kokoroSpeaker.takeIf { model == ModelCatalog.KOKORO }, sample) }
   }
 
   fun setBackgroundVoice(on: Boolean) {

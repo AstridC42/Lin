@@ -52,6 +52,8 @@ class Speaker
 constructor(
   @ApplicationContext private val context: Context,
   private val settings: SettingsRepository,
+  /** Lin's own voice, used instead of the phone's whenever it is on and downloaded. */
+  private val linVoice: LinVoice,
 ) {
 
   @Volatile private var engine: TextToSpeech? = null
@@ -83,6 +85,9 @@ constructor(
       whenDone?.invoke()
       return
     }
+    // Lin's own voice first; the phone's text-to-speech only when Lin has none of its own yet.
+    runCatching { engine?.stop() }
+    if (runCatching { linVoice.say(text, whenDone) }.getOrDefault(false)) return
 
     val live = awaitEngine()
     if (live == null) {
@@ -191,7 +196,12 @@ constructor(
   fun stop() {
     onFinished = null
     runCatching { engine?.stop() }
+    linVoice.stop()
   }
+
+  /** A sample in one of Lin's own voices, for the settings screen. False if it is not downloaded. */
+  suspend fun previewOwn(model: com.lin.agent.core.models.CatalogModel, speaker: String?, sample: String): Boolean =
+    runCatching { linVoice.say(sample, null, override = model, speaker = speaker) }.getOrDefault(false)
 
   fun shutdown() {
     runCatching {

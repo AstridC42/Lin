@@ -31,6 +31,15 @@ enum class ModelRole {
 
   /** Finds the object at a tapped point in a photo, for cutting it out. */
   SEGMENT,
+
+  /** Lin's own voice: text to speech on the phone. */
+  VOICE,
+
+  /** Lin's own hearing: speech to text on the phone. */
+  HEARING,
+
+  /** Hears when somebody starts and stops talking, for [HEARING]. */
+  SPEECH_DETECTOR,
 }
 
 /**
@@ -97,6 +106,10 @@ data class CatalogModel(
    */
   fun buildFor(socModel: String): ModelBuild = portable
 
+  /** Downloaded as one archive and unpacked into a folder, rather than used as a single file. */
+  val isArchive: Boolean
+    get() = portable.file.endsWith(ARCHIVE_SUFFIX)
+
   /** The build to download and load on this device. */
   val build: ModelBuild
     get() = buildFor(currentSocModel())
@@ -105,6 +118,9 @@ data class CatalogModel(
 /** `Build.SOC_MODEL` where the platform has it, empty below API 31. */
 fun currentSocModel(): String =
   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL.orEmpty() else ""
+
+/** What an archive model's download ends in. */
+const val ARCHIVE_SUFFIX = ".tar.bz2"
 
 object ModelCatalog {
 
@@ -237,7 +253,76 @@ object ModelCatalog {
         "https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/1/interactive_segmentation.task",
     )
 
-  val all = listOf(GEMMA_4_E2B, GEMMA_4_E4B, EMBEDDING_GEMMA_2, MOBILE_ACTIONS, MAGIC_TOUCH)
+  // Lin's own voice and hearing: sherpa-onnx's packaged models, from its official releases.
+
+  /** Piper's Amy: clear and fast - the default voice. */
+  val PIPER_AMY =
+    CatalogModel(
+      name = "Piper Amy",
+      role = ModelRole.VOICE,
+      repoId = "",
+      portable = ModelBuild("vits-piper-en_US-amy-medium.tar.bz2", 67_223_746),
+      minMemoryGb = 2,
+      contextTokens = 0,
+      directUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-medium.tar.bz2",
+    )
+
+  /** Kokoro: the most natural of the voices, with eleven to choose from, and slower. */
+  val KOKORO =
+    CatalogModel(
+      name = "Kokoro",
+      role = ModelRole.VOICE,
+      repoId = "",
+      portable = ModelBuild("kokoro-int8-en-v0_19.tar.bz2", 103_248_205),
+      minMemoryGb = 4,
+      contextTokens = 0,
+      directUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-en-v0_19.tar.bz2",
+    )
+
+  /** Moonshine Tiny: English, and fast enough to show words as they are said - the default. */
+  val MOONSHINE_TINY =
+    CatalogModel(
+      name = "Moonshine Tiny",
+      role = ModelRole.HEARING,
+      repoId = "",
+      portable = ModelBuild("sherpa-onnx-moonshine-tiny-en-int8.tar.bz2", 107_600_538),
+      minMemoryGb = 2,
+      contextTokens = 0,
+      directUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-tiny-en-int8.tar.bz2",
+    )
+
+  /** Whisper Base: many languages, at about twice the size. */
+  val WHISPER_BASE =
+    CatalogModel(
+      name = "Whisper Base",
+      role = ModelRole.HEARING,
+      repoId = "",
+      portable = ModelBuild("sherpa-onnx-whisper-base.tar.bz2", 207_557_382),
+      minMemoryGb = 3,
+      contextTokens = 0,
+      directUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-base.tar.bz2",
+    )
+
+  /** Silero: hears when somebody starts and stops talking. Fetched with whichever hearing. */
+  val SILERO_VAD =
+    CatalogModel(
+      name = "Silero VAD",
+      role = ModelRole.SPEECH_DETECTOR,
+      repoId = "",
+      portable = ModelBuild("silero_vad.onnx", 643_854),
+      minMemoryGb = 1,
+      contextTokens = 0,
+      directUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+    )
+
+  val voices = listOf(PIPER_AMY, KOKORO)
+  val hearings = listOf(MOONSHINE_TINY, WHISPER_BASE)
+
+  val all =
+    listOf(
+      GEMMA_4_E2B, GEMMA_4_E4B, EMBEDDING_GEMMA_2, MOBILE_ACTIONS, MAGIC_TOUCH,
+      PIPER_AMY, KOKORO, MOONSHINE_TINY, WHISPER_BASE, SILERO_VAD,
+    )
 
   val chatModels = all.filter { it.role == ModelRole.CHAT }
 

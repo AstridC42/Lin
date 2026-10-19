@@ -89,8 +89,8 @@ object AppModule {
     PhotoLibrary(context)
 
   @Provides @Singleton
-  fun provideDictation(@ApplicationContext context: Context): Dictation =
-    Dictation(context)
+  fun provideDictation(@ApplicationContext context: Context, ears: com.lin.agent.voice.LinEars): Dictation =
+    Dictation(context, ears)
 
   @Provides @Singleton
   fun provideConversationLog(@ApplicationContext context: Context): ConversationLog =

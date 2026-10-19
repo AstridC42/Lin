@@ -33,8 +33,13 @@ class ModelStore(private val context: Context) {
   /** Where a model file belongs. */
   fun fileFor(model: CatalogModel): File = File(directory(), model.build.file)
 
+  /** Where an archive model is unpacked: the folder the archive itself holds. */
+  fun folderFor(model: CatalogModel): File = File(directory(), model.build.file.removeSuffix(ARCHIVE_SUFFIX))
+
   /** Whether the file is there and is not obviously a partial download. */
   fun isPresent(model: CatalogModel): Boolean {
+    // An archive is ready once it has been unpacked to the end, which is when the mark is written.
+    if (model.isArchive) return File(folderFor(model), UNPACKED_MARK).exists()
     val file = fileFor(model)
     if (!file.exists()) return false
     // A file much smaller than advertised is an interrupted download rather than a model, and
@@ -119,3 +124,6 @@ internal fun clearStrayPartsIn(directory: File): Long {
   }
   return freed
 }
+
+/** Written last into an unpacked archive's folder: its presence means every file is there. */
+const val UNPACKED_MARK = ".unpacked"

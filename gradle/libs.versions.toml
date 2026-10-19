@@ -34,6 +34,9 @@ concurrentFutures = "1.3.0"
 fragment = "1.9.1"
 # Home screen widgets.
 glance = "1.2.0"
+# Lin's own voice and hearing, and unpacking their model archives.
+sherpaOnnx = "v1.13.8"
+commonsCompress = "1.28.0"
 
 [libraries]
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version = "2.0.27.0" }
@@ -73,6 +76,8 @@ wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-fou
 wear-input = { group = "androidx.wear", name = "wear-input", version.ref = "wearInput" }
 wear-tiles = { group = "androidx.wear.tiles", name = "tiles", version.ref = "wearTiles" }
 wear-protolayout = { group = "androidx.wear.protolayout", name = "protolayout", version.ref = "wearProtolayout" }
+sherpa-onnx = { group = "com.github.k2-fsa.sherpa-onnx", name = "sherpa-onnx", version.ref = "sherpaOnnx" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }

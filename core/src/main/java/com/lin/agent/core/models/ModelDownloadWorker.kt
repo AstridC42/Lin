@@ -130,6 +130,22 @@ class ModelDownloadWorker(private val context: Context, params: WorkerParameters
     // for the rest of the day is its own bug.
     runCatching { notificationManager()?.cancel(NOTIFICATION_ID) }
 
+    // A voice or hearing pack arrives as one archive: unpacked here, so the model is ready to
+    // load the moment the download says it is done, and the archive's space is given back.
+    if (outcome is DownloadOutcome.Done && model.isArchive) {
+      val archive = store.fileFor(model)
+      val unpacked =
+        runCatching { Archives.unpack(archive, store.directory(), store.folderFor(model)) }
+          .onFailure { Log.w(TAG, "Could not unpack ${model.name}", it) }
+      archive.delete()
+      if (unpacked.isFailure) {
+        store.folderFor(model).deleteRecursively()
+        return Result.failure(
+          workDataOf(KEY_MODEL to model.name, KEY_ERROR to "The download finished but could not be unpacked.")
+        )
+      }
+    }
+
     return when (outcome) {
       is DownloadOutcome.Done -> Result.success()
       is DownloadOutcome.Failed -> {

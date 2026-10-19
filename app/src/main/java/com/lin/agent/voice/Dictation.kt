@@ -26,6 +26,7 @@ import android.speech.SpeechRecognizer
 import android.util.Log
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 
@@ -49,9 +50,22 @@ sealed interface Heard {
  * exists the platform falls back on its own, which is worth knowing about and is why the
  * setting screen says so rather than claiming more than it can.
  */
-class Dictation(private val context: Context) {
+class Dictation(
+  private val context: Context,
+  /** Lin's own hearing, used instead of the phone's whenever it is on and downloaded. */
+  private val ears: LinEars,
+) {
 
   fun available(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
+
+  /**
+   * Lin's own hearing when it is on and downloaded; the phone's speech recognition otherwise,
+   * until it is.
+   */
+  fun listen(): Flow<Heard> = kotlinx.coroutines.flow.flow {
+    val own = runCatching { ears.chosen() }.getOrNull()
+    if (own != null) emitAll(ears.listen(own)) else emitAll(listenWithPhone())
+  }
 
   /**
    * Listens until the speaker stops, emitting words as they are recognised.
@@ -60,7 +74,7 @@ class Dictation(private val context: Context) {
    * recogniser, which is the behaviour the UI needs when somebody navigates away mid-sentence
    * and the behaviour a microphone must have regardless.
    */
-  fun listen(): Flow<Heard> {
+  private fun listenWithPhone(): Flow<Heard> {
     if (!available()) {
       return flow { emit(Heard.Failed("This phone has no speech recogniser available.")) }
     }

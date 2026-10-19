@@ -70,6 +70,8 @@ dependencies {
   implementation(libs.androidx.datastore.preferences)
   // Downloads that survive the app being backgrounded, and process death.
   api(libs.androidx.work.runtime)
+  // Unpacking voice and hearing packs, which come as .tar.bz2. See Archives.
+  implementation(libs.commons.compress)
 
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)

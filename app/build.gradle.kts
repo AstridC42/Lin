@@ -85,6 +85,11 @@ android {
   // One APK per ABI, plus a universal fallback. The LiteRT native libraries dominate the download
   // - the universal APK is around 87 MB and a device-matched one is closer to 40 - and on a phone
   // connection that difference is worth the extra build time.
+  // Lin's APKs are arm64, armeabi-v7a and x86_64 (below). The speech library also carries
+  // 32-bit x86, which no split wants and which would add 37 MB to the universal APK.
+  // Compressed inside the APK: a much smaller download, unpacked once at install.
+  packaging { jniLibs { excludes += "lib/x86/**"; useLegacyPackaging = true } }
+
   splits {
     abi {
       isEnable = true
@@ -136,6 +141,8 @@ dependencies {
   implementation(libs.kotlinx.coroutines.play.services)
   // Home screen widgets. See widget/.
   implementation(libs.glance.appwidget)
+  // Lin's own voice and hearing, on the phone. See voice/LinVoice and voice/LinEars.
+  implementation(libs.sherpa.onnx)
   implementation(libs.glance.material3)
 
   implementation(libs.androidx.core.ktx)
