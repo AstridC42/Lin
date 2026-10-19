@@ -3,12 +3,12 @@
 # Two modes, one workflow, because the signing arrangement below is long and having two copies of
 # it is how they drift apart:
 #
-#   * every push to main that touches agent/ updates a rolling `lin-dev` pre-release, so the
+#   * every push to main that touches the app's code updates a rolling `lin-dev` pre-release, so the
 #     newest build always has a stable download link;
 #   * run by hand with a version, it publishes `lin-v<version>` as a real release.
 #
 # Release assets rather than Actions artifacts, deliberately. Artifacts count against a 500 MB
-# allowance that the previous app filled, after which every upload failed silently and there was
+# allowance that the first version filled, after which every upload failed silently and there was
 # no way to install anything. Release assets have no such limit, and a link that does not change
 # is easier to use from a phone than digging into a workflow run.
 name: Release Lin
@@ -17,7 +17,12 @@ on:
   push:
     branches: ['main']
     paths:
-      - 'agent/**'
+      - 'app/**'
+      - 'core/**'
+      - 'engine/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
       - '.github/workflows/release_lin.yml'
   workflow_dispatch:
     inputs:
@@ -71,9 +76,9 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-agent-${{ runner.os }}-${{ hashFiles('agent/**/*.gradle.kts', 'agent/gradle/libs.versions.toml') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
           restore-keys: |
-            gradle-agent-${{ runner.os }}-
+            gradle-${{ runner.os }}-
 
       - name: Work out the version
         id: version
@@ -176,11 +181,9 @@ jobs:
 
       # Before the build, so a broken test stops a release rather than being noticed after it.
       - name: Run the unit tests
-        working-directory: agent
         run: ./gradlew --no-daemon :core:testDebugUnitTest :engine:testDebugUnitTest --console=plain
 
       - name: Build the release APKs
-        working-directory: agent
         env:
           LIN_VERSION_NAME: ${{ steps.version.outputs.name }}
           LIN_VERSION_CODE: ${{ steps.version.outputs.code }}
@@ -197,7 +200,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           shopt -s nullglob
-          for apk in agent/app/build/outputs/apk/release/*.apk; do
+          for apk in app/build/outputs/apk/release/*.apk; do
             base="$(basename "$apk" .apk)"
             # app-arm64-v8a-release -> arm64-v8a
             abi="${base#app-}"

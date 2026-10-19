@@ -24,8 +24,6 @@ name: Own the signing key
 # it is ever lost, builds get a fresh key and stop installing over the ones already on a phone,
 # which for this app means an uninstall and a two-and-a-half gigabyte model re-download.
 #
-# Un-archived when the release pipeline moved to the new app: the fork no longer needs it, Lin
-# does.
 on:
   schedule:
     # Mondays and Thursdays, so the longest gap is four days against a seven-day deadline. Not on

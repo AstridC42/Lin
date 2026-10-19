@@ -1,178 +1,97 @@
-# Architecture
+# How Lin works
 
-A map of what this fork owns, written because the fork is now large enough that
-"where does X live" is not answerable by reading the directory names.
+A map of the code for people who want to change it. For why things are the way they are, the
+comments in the code say it at the point it matters, and [the development log](history/BUILD-LOG.md)
+has the longer story.
 
-The Kotlin package is still `com.google.ai.edge.gallery`, deliberately: it keeps
-upstream changes mergeable without a rename in every file. So the package name
-tells you nothing about who wrote a file — this document does.
+## Modules
 
-## The shape of it
+| Module | What lives there | Depends on |
+| --- | --- | --- |
+| `core/` | Plain logic, most of it pure functions with JVM unit tests: web search and page reading, memory, persona, settings (DataStore), reminders, history, model catalog and downloads, text helpers, the instant-command matcher. | Android only where it must be (settings, files). |
+| `engine/` | The turn loop and everything that talks to a model: on-device LiteRT-LM, Ollama and OpenAI-compatible servers, tool calling, reasoning, delegation, the MCP protocol. | `core` |
+| `app/` | The Android app: Compose UI, the tools, voice, notifications, Android Auto, background workers, Hilt wiring. | `core`, `engine` |
 
-Upstream Edge Gallery is a gallery of demos: one screen per capability, each
-with its own model list, its own prompt, its own tools. Lin puts a
-single conversation in front of all of them. That one decision is what every
-directory below exists to serve.
+Package names follow the modules: `com.lin.agent.core.*`, `com.lin.agent.engine.*`,
+`com.lin.agent.*` (app).
 
-The assistant is a `CustomTask` — the same extension point upstream uses for
-Agent Chat and Tiny Garden — so the model manager, chat history, benchmarks and
-the gallery work on it unchanged. What is different is that it is also the app's
-start destination, and that every general-purpose model in the allowlist is
-attached to it.
+## What happens when you send a message
 
-## Directories this fork owns
+`ui/ConversationViewModel.send()`:
 
-```
-Android/src/app/src/main/java/com/google/ai/edge/gallery/
-├── assistant/        the screen, and everything that configures it
-├── memory/           the vault: notes, conversation digests, cold storage
-├── net/              what counts as the user's own network
-├── tools/            what the model can actually do  (shared with upstream)
-├── voice/            being summoned, listening, speaking, the pop-up
-├── car/              Android Auto
-├── search/           SearXNG
-├── weather/          Open-Meteo
-├── smarthome/        Home Assistant
-├── calendar/         reading the time out of what a model wrote
-├── messaging/        which messaging app was meant, and whether a number is safe
-├── media/            which app music goes to
-├── notifications/    the notification listener  (shared with upstream)
-├── reminders/        the alarm that delivers a reminder
-├── widget/           the home-screen widget
-└── intents/          share targets and the assist intent  (shared with upstream)
-```
+1. **Instant commands.** `core/tools/quickCommand` matches plain commands ("flashlight on", "open
+   camera") and the tool runs at once, with no model.
+2. **The small model.** If MobileActions 270M is downloaded, `model/QuickActions` asks it, but only
+   when the words point at one of its actions (`core/tools/MobileActions`). Its pick is translated
+   into a Lin tool or discarded.
+3. **The main model.** `model/ChatBackends.readiness()` picks the backend: the configured server
+   if it answers, otherwise the on-device model. A `TurnLoop` (engine) then runs the conversation:
+   the model streams text, asks for tools, the loop runs them and feeds the results back, until
+   the model answers. Events (`LoopEvent`) drive the screen: tokens, thinking, tool cards, pictures.
+4. The conversation is saved into the history (`history/ChatHistory`, a JSON file in app storage).
 
-### `assistant/`
+The system prompt is built per turn (`promptForToday`): today's date, the person's quiz answers
+(`core/persona`), and a description generated from the tools actually on offer
+(`engine/capabilityPrompt`), so the prompt cannot promise a tool that is not there.
 
-The screen and its settings. The parts worth knowing about:
+## Tools
 
-| File | What it is |
-|---|---|
-| `AssistantTask.kt` | The `CustomTask`. Builds the system prompt, owns the executor. |
-| `AssistantPrompts.kt` | The system prompt. **The highest-leverage file in the fork** — see below. |
-| `AssistantScreen.kt` | The chat, the mode bar, the dialogs. Wraps upstream's `AgentChatScreen`. |
-| `AssistantRoute.kt` | What is shown before the chat: loading, crash, memory warning, no models. |
-| `AssistantTools.kt` | Which tools exist right now. Reads settings, so the set changes with them. |
-| `AssistantMode.kt` | The modes, as prompt fragments. A mode is a bias, not a different screen. |
-| `AssistantManual.kt` | The Guide panel: what the app can do, and the buttons that set it up. |
-| `AssistantSpeaker.kt` | Text to speech, markdown stripped, with reliable completion. |
-| `VoiceCatalog.kt` | Making engine voice names (`en-us-x-sfg#male_1-local`) readable. |
-| `CrashReport.kt` | Records the exception that killed the app, for the next launch to show. |
+Each tool is an `AgentTool` (engine): a name, a description and parameters for the model,
+`guidance` (a sentence of prompt about how to use it), and `run()`. The app's tools are in
+`app/.../model/` and are collected in `model/Tools.kt`, together with tools from connected MCP
+servers. People can switch any tool off in Settings → What Lin can do.
 
-`AssistantPrompts.kt` deserves the warning. The prompt shares a token budget
-with the tool schemas and the conversation, on a model whose whole budget is
-around 4,000 tokens. Two separate bugs have lived in that file: one where the
-prompt was long enough to leave nothing for the conversation, and one where the
-skill list was positioned where a small model had stopped reading. Both looked
-like the model being stupid. `SystemPromptBudgetTest` guards the first; the
-ordering assertions in `AssistantPromptsTest` guard the second.
+Conventions every tool follows:
 
-### `memory/`
+- **Staged, not done**, for anything that reaches another person or is hard to undo: messages are
+  drafted and wait for Send, calls open the dialer, calendar events open the calendar filled in.
+- **Results tell the truth.** A tool that only opened a panel says so, and the model is told not to
+  claim more. `ToolResult.Ok.text` is for the model; `shows` is for the screen.
+- **Missing permissions are offered as a button** by the screen, not explained by the model.
 
-Three layers, which is the whole design, and they exist because they have different costs.
+## Backends
 
-**Notes** are what Lin knows about the user. A couple of hundred may be stored; a selection of
-around two dozen goes into the system prompt on every turn, chosen by `MemoryRetention.forPrompt`
-and capped at `MAX_PROMPT_CHARS`. That cap is the load-bearing number in this directory: every
-character is charged against the same budget as the tool schemas and the conversation, so the
-prompt gets what is worth saying and nothing else.
+- `engine/OnDeviceBackend`: LiteRT-LM, trying GPU, then CPU (NPU builds where available).
+- `engine/ServerBackend`: Ollama's API or OpenAI-compatible (vLLM, Unsloth, others). Handles
+  thinking (`think`, inline `<think>` tags), retries without `think` on models that refuse it.
+- `model/DelegateTool`: when on-device answers but a server exists, big jobs can be handed to it.
 
-Notes cool. A note not said, implied or acted on inside its window is flagged cold - never
-deleted - and drops out of the prompt while staying searchable. Windows run from three weeks for
-passing context to a year for identity, and `MINIMUM_WARM_DAYS` is the floor nothing falls below.
-Confirmation resets the clock and adds a week per repetition; what the user wrote themselves, and
-anything pinned, never cools.
+## Background work
 
-**Digests** are one paragraph per conversation, with links in both directions: to the notes it
-produced, and to the transcript it came from. This is the index, and it is cheap enough to keep
-hundreds of.
+| What | Where |
+| --- | --- |
+| Model downloads (resumable, foreground) | `core/models/ModelDownloadWorker` |
+| Learning from finished conversations | `model/DigestWorker` |
+| Routines ("Things Lin does on its own") | `model/StandingWorker` |
+| Photo index for search by meaning | `model/PhotoIndexWorker` |
+| Answering a reply from Android Auto | `car/CarChatWorker` |
+| Reminders | `remind/ReminderBook` (AlarmManager) |
 
-**The archive** is every conversation in full, as Markdown under `files/memory/archive`. Cold by
-design: nothing reads it until a tool asks. Files rather than the proto store, because the store
-is rewritten whole on every change and transcripts only grow.
+## Where data lives
 
-`MemoryDigestWorker` is the background half. After a conversation ends it writes the transcript,
-borrows the loaded engine through a *scratch conversation* - never the user's own, which would
-append a summarisation request to the chat they come back to - extracts notes, and files the
-digest. With no engine loaded it writes an extractive placeholder and marks it, so a later pass
-can replace it: a conversation is never only in the queue.
+All in the app's private storage; nothing is uploaded.
 
-### `tools/`
+| Data | Where |
+| --- | --- |
+| Settings, quiz answers, keys you enter | DataStore (`core/settings`) |
+| Conversation history | `files/history.json` |
+| Memories and their vectors | `core/memory/MemoryStore` |
+| Downloaded models | `files/models/` |
+| Documents Lin writes | `files/` (see `core/documents`) |
 
-One class per capability, each a LiteRT-LM `ToolSet` whose `@Tool` methods are
-discovered by reflection. `AssistantTools` decides which are registered.
+## Android integrations
 
-Two patterns here are load-bearing and easy to undo by accident:
+- **Assistant role**: `AssistActivity` and the `ASSIST` intent; `voice/` has dictation, speech and
+  the optional "Hey Lin" wake word service.
+- **Notifications**: `notifications/` reads notifications (with permission) and sends staged replies.
+- **Screen**: `screen/LinAccessibility` reads the screen and types into other apps when allowed.
+- **Shizuku**: `privileged/` sets switches Android keeps from ordinary apps.
+- **Android Auto**: `car/LinCarService` (a templated car screen) and `car/CarChat` (a messaging
+  conversation the car reads aloud).
 
-**A missing permission is not an empty result.** Every tool that can be refused
-reports the refusal and says how to fix it, separately from "there is nothing
-there". Collapse the two and the model cheerfully reports an empty notification
-shade to someone who simply has not granted access.
+## Conventions
 
-**A tool that cannot work is sometimes better present than absent.** When web
-search has no instance configured, `WebSearchSetupTool` stands in under the same
-name and explains what is missing. The alternative — leaving it out — was tried,
-and produced a model that answered from memory with nothing anywhere to say a
-search had not happened. `NotificationAccessSetupTool` does the same for
-notifications, collapsing five tools into one while they cannot work, because
-every schema is charged against that same budget.
-
-### `voice/`
-
-Everything about being talked to. `LinVoiceInteractionService` and its session
-are what make the app selectable as the phone's assistant; the session is the
-pop-up that appears when the power button is held. `WakeWordService` is the
-always-listening option, kept separate and explicit because it holds the
-microphone open and that is a real cost.
-
-The session is plain Android views, not Compose. A voice interaction session is
-not a lifecycle owner, so a `ComposeView` needs a hand-written owner shim before
-it renders at all — and that failure would land on the one surface that has to
-work when the phone is locked or in a car mount.
-
-## Upstream files that were changed
-
-Kept as few as possible. The ones that matter:
-
-| File | Change |
-|---|---|
-| `customtasks/agentchat/AgentChatScreen.kt` | Gained optional parameters so the assistant can reuse it instead of forking 800 lines. Defaults keep upstream's screen identical. |
-| `ui/modelmanager/ModelManagerViewModel.kt` | Attaches every general-purpose model to the assistant task; validates that a downloaded file is actually a model; pins the allowlist version. |
-| `ui/navigation/GalleryNavGraph.kt` | The assistant is the start destination; the gallery is one tap away. |
-| `skills/SkillExtensions.kt` | The skill list is written as the call that loads it, one line each. |
-| `tools/LoadSkillTool.kt` | A description that says when to use it. "Loads a skill" did not. |
-| `data/DataStoreRepository.kt` | The four Lin settings readers share one snapshot instead of going to disk on every call. |
-| `proto/settings.proto` | `AssistantSettings`, `WebSearchSettings`, `SmartHomeSettings`, `Reminders`. |
-
-## Tests
-
-Unit tests only — no instrumentation, because CI has no device. That shapes what
-is testable: the pure decision in the middle of a feature is extracted and
-tested, and the Android plumbing around it is not.
-
-What that looks like in practice: `WeatherCodes.describe` is tested and
-`WeatherClient` is not; `CalendarTime.parse` is tested and `CalendarTool` is
-not; `MessagingApps.whatsAppNumber` is tested and the intent that uses it is
-not. In each case the extracted function is where being wrong is silent and
-expensive — a forecast about different weather, an appointment on the wrong day,
-a message written to a stranger who shares a phone number.
-
-`MemoryRetentionTest` and `NoteMergeTest` hold the two halves of remembering, both of which fail
-silently: forget too eagerly and the assistant stops knowing you with no error anywhere; select
-too generously and every turn carries a recitation out of the budget the conversation needed.
-`DigestParserTest` covers what comes back from a small model asked for structured output in the
-background, where a mis-parse becomes something Lin believes about somebody for ever.
-
-Run them with `./gradlew :app:testReleaseUnitTest` from `Android/src`. The release variant
-is the only one with unit tests: AGP 9 builds them for a single variant, and `testBuildType`
-names the one that ships.
-
-## Releases
-
-Every push to `main` rebuilds and replaces one rolling pre-release tagged `dev`,
-with four ABI-split APKs. It clears the previous build's files first — left
-alone they accumulated to seventy APKs across eighteen versions.
-
-Builds are signed with a key that lives only in the Actions cache, so they
-install over each other. `RELEASING.md` has the detail, including how to make
-the key permanent.
+- Kotlin, 2-space indent, Compose for all UI, Hilt for injection.
+- Logic that can be pure goes in `core/` with a test.
+- Comments explain *why*, not what. If a decision was bought with a bug, say which.
+- User-facing text goes in `app/src/main/res/values/strings.xml`.

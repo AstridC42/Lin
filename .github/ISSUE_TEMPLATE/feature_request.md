@@ -1,20 +1,16 @@
 ---
-name: ✨ Feature request
-about: Suggest an idea for this project
+name: Feature request
+about: An idea for something Lin should do
 title: ''
-labels: ''
+labels: enhancement
 assignees: ''
-
 ---
 
-**Is your feature request related to a problem? Please describe.**    
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**What would you like Lin to do?**
+Describe it from the point of view of using it, for example: "When I say ..., Lin should ...".
 
-**Describe the solution you'd like**       
-A clear and concise description of what you want to happen.
+**Why**
+What it would make easier, or what you do today instead.
 
-**Describe alternatives you've considered**     
-A clear and concise description of any alternative solutions or features you've considered.
-
-**Additional context**     
-Add any other context or screenshots about the feature request here.
+**Anything else**
+Apps or assistants that already do this well, links, sketches.

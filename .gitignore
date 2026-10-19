@@ -1,14 +1,18 @@
+# OS and editor
 .DS_Store
+.idea/
+*.iml
 
-# Local Android SDK location.
+# Local Android SDK location
 local.properties
 
-# Signing material — never commit these.
+# Signing material - never commit these
 keystore.properties
 *.jks
 *.keystore
 
-# The new app's Gradle output.
-agent/build/
-agent/*/build/
-agent/.gradle/
+# Gradle output
+build/
+.gradle/
+.kotlin/
+captures/
