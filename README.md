@@ -86,8 +86,8 @@ Samsung show for apps from outside the Play Store, and the first-run setup.
 ## Build from source
 
 ```bash
-git clone https://github.com/AstridC42/Star-Storyteller-.git lin
-cd lin
+git clone https://github.com/AstridC42/Lin.git
+cd Lin
 ./gradlew :app:assembleDebug
 ```
 
