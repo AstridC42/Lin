@@ -27,7 +27,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release, without the leading v (e.g. 0.2.0). Empty updates lin-dev.'
+        description: 'Version to release, without the leading v (e.g. 1.0). Empty makes a test build.'
+        required: false
+        default: ''
+        type: string
+      title:
+        description: 'Release title (e.g. Lin_V1.0). Empty uses "Lin <version>".'
         required: false
         default: ''
         type: string
@@ -37,7 +42,9 @@ permissions:
 
 concurrency:
   # Run level, so a newer push supersedes an in-flight build of an older one.
-  group: release-lin-${{ github.ref }}
+  # Per trigger, so a release run by hand is never cancelled by - and never cancels - the test
+  # build a push starts.
+  group: release-lin-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -249,7 +256,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: Lin ${{ steps.version.outputs.name }}
+          name: ${{ inputs.title != '' && inputs.title || format('Lin {0}', steps.version.outputs.name) }}
           body_path: release-notes.md
           draft: true
           prerelease: ${{ steps.version.outputs.prerelease }}

@@ -16,7 +16,7 @@ with notes listing the recent commits and the signing certificate's fingerprint.
 
 ## Cutting a numbered release
 
-**Actions → Release Lin → Run workflow**, type the version (for example `0.2.0`), run. About
+**Actions → Release Lin → Run workflow**, type the version (for example `1.0`) and, if you like, a title (for example `Lin_V1.0`), run. About
 15–25 minutes.
 
 ## Versions
