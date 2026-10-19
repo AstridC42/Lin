@@ -343,6 +343,24 @@ private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewM
         }
       }
     }
+    // Only once it is here: a switch for a model that is not downloaded does nothing.
+    if (state.models.any { it.present && it.model.role == ModelRole.ACTIONS }) {
+      Row(
+        modifier = Modifier.fillMaxWidth().clickable { viewModel.setQuickActionsModel(!state.quickActionsModel) }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(stringResource(R.string.settings_quick_actions), style = MaterialTheme.typography.bodyLarge)
+          Text(
+            stringResource(R.string.settings_quick_actions_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(checked = state.quickActionsModel, onCheckedChange = viewModel::setQuickActionsModel)
+      }
+    }
     // This phone's own token, so an APK handed to somebody else downloads on their account.
     var tokenShown by rememberSaveable { mutableStateOf(false) }
     OutlinedTextField(
