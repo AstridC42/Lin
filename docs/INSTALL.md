@@ -4,7 +4,7 @@ No computer needed: everything below works from a phone. Lin needs **Android 12 
 
 ## Get the APK
 
-Open the [latest build](../../../releases/tag/lin-dev) on the phone and tap the APK for your
+Open the [latest build](../../../releases/latest) on the phone and tap the APK for your
 phone:
 
 | File | For |
@@ -14,7 +14,8 @@ phone:
 | `lin-…-armeabi-v7a.apk` | Older 32-bit phones. |
 | `lin-…-x86_64.apk` | Emulators and x86 tablets. |
 
-`lin-dev` is rebuilt from `main` after every change. Numbered releases (`lin-v…`) appear on the
+Every change to `main` publishes a new build (`lin-0.1.0-dev.…`); the newest three are kept.
+Numbered releases (`lin-v…`) appear on the
 same page when a version is worth naming. Each release lists the signing certificate's SHA-256
 and a `SHA256SUMS.txt` to check the download against.
 

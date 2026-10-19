@@ -92,8 +92,10 @@ jobs:
             prerelease=false
           else
             name="0.1.0-dev.${GITHUB_RUN_NUMBER}"
-            tag="lin-dev"
-            prerelease=true
+            # One release per build. The repository uses immutable releases, which freeze a
+            # release once it is published, so a single rolling release cannot be refilled.
+            tag="lin-${name}"
+            prerelease=false
           fi
           # The run number, which only ever goes up across every run of this workflow. Deriving a
           # code from the semantic version instead invites two builds sharing one, and Android
@@ -240,63 +242,44 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
-      # action-gh-release creates a missing tag but will not move one that already exists, and the
-      # rolling tag has to follow main.
-      #
-      # Through the git data API rather than `git push`: GitHub refuses a push from this token when
-      # the commit touches workflow files, and GITHUB_TOKEN cannot ask for that permission. The
-      # APKs would build fine and simply never reach the Releases page, which is the one failure
-      # this workflow exists to prevent.
-      #
-      # Never fatal. A finished build is worth publishing even against a tag left pointing at an
-      # older commit - the notes name the real commit either way.
-      - name: Point the rolling tag at this commit
-        if: ${{ steps.version.outputs.tag == 'lin-dev' }}
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -uo pipefail
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/git/refs"
-          code="$(curl -sS -o /tmp/ref.json -w '%{http_code}' -X PATCH \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "${api}/tags/lin-dev" \
-            -d "{\"sha\":\"${GITHUB_SHA}\",\"force\":true}")"
-          # 404/422 is the tag not existing yet, which is the normal first run - the publish step
-          # creates it.
-          if [ "$code" = "422" ] || [ "$code" = "404" ]; then
-            echo "lin-dev does not exist yet; the release will create it."
-          elif [ "$code" != "200" ]; then
-            echo "::warning::Could not move lin-dev (HTTP $code); publishing anyway."
-            cat /tmp/ref.json || true
-          fi
-
-      # A rolling release accumulates assets otherwise: the previous version's APKs stay attached
-      # beside the new ones, and the names differ because they carry the version, so nothing
-      # overwrites anything.
-      - name: Clear the rolling release's old assets
-        if: ${{ steps.version.outputs.tag == 'lin-dev' }}
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ids=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/lin-dev" --jq '.assets[].id' 2>/dev/null || true)
-          for id in $ids; do
-            echo "Removing asset $id"
-            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/$id" || true
-          done
-
-      - name: Publish
+      # Draft first, then publish. With immutable releases, assets can only be attached while a
+      # release is still a draft; once published it is frozen, assets and tag included.
+      - name: Create the release as a draft, with its files
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: Lin ${{ steps.version.outputs.name }}
           body_path: release-notes.md
+          draft: true
           prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             dist/*.apk
             dist/SHA256SUMS.txt
+
+      - name: Publish it as the latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+      # Only the newest few test builds are kept, so the Releases page stays short. Numbered
+      # releases are never touched. Never fatal: a build that published is a success.
+      - name: Remove older test builds
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
+            --jq '.[] | select(.draft | not) | "\(.created_at) \(.id) \(.tag_name)"')"
+          # The old rolling release, which immutable releases left empty, goes at once.
+          echo "$releases" | awk '$3 == "lin-dev"' | while read -r _ id tag; do
+            echo "Removing $tag"; gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id" || true
+          done
+          # Of the per-build test releases, the newest three stay.
+          echo "$releases" | awk '$3 ~ /^lin-0\.1\.0-dev\./' | sort -r | tail -n +4 | while read -r _ id tag; do
+            echo "Removing $tag"; gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id" || true
+          done
 
       - name: Say where it went
         run: |
