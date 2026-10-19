@@ -641,4 +641,8 @@
   <string name="history_delete">Delete conversation</string>
   <string name="history_delete_title">Delete this conversation?</string>
   <string name="history_delete_confirm">Delete</string>
+  <string name="settings_hf_token">Hugging Face token (optional)</string>
+  <string name="settings_hf_token_help">Used only for model downloads from huggingface.co, and only from this phone. Needed for gated models. Create one at huggingface.co/settings/tokens (Read access is enough).</string>
+  <string name="settings_show">Show</string>
+  <string name="settings_hide">Hide</string>
 </resources>

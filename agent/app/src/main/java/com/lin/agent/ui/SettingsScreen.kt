@@ -343,6 +343,25 @@ private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewM
         }
       }
     }
+    // This phone's own token, so an APK handed to somebody else downloads on their account.
+    var tokenShown by rememberSaveable { mutableStateOf(false) }
+    OutlinedTextField(
+      value = state.hfToken,
+      onValueChange = viewModel::onHfTokenChanged,
+      label = { Text(stringResource(R.string.settings_hf_token)) },
+      placeholder = { Text("hf_…") },
+      supportingText = { Text(stringResource(R.string.settings_hf_token_help)) },
+      singleLine = true,
+      visualTransformation =
+        if (tokenShown) androidx.compose.ui.text.input.VisualTransformation.None
+        else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+      trailingIcon = {
+        TextButton(onClick = { tokenShown = !tokenShown }) {
+          Text(stringResource(if (tokenShown) R.string.settings_hide else R.string.settings_show))
+        }
+      },
+      modifier = Modifier.fillMaxWidth(),
+    )
     // Still shown now that downloading works, because copying a file in is the one way to
     // avoid spending two and a half gigabytes of somebody's allowance twice.
     Text(

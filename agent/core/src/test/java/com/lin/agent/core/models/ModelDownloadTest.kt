@@ -217,4 +217,18 @@ class ModelDownloadTest {
     assertEquals("length", expected.size, actual.size)
     assertTrue("contents differ", expected.contentEquals(actual))
   }
+
+  @Test
+  fun `a Hugging Face token goes to Hugging Face and nowhere else`() {
+    val hf = "https://huggingface.co/google/gemma/resolve/main/model.litertlm"
+    assertEquals("Authorization" to "Bearer hf_abc", ModelDownload.authFor(hf, "  hf_abc \n"))
+    assertEquals("Authorization" to "Bearer hf_abc", ModelDownload.authFor("https://cdn.huggingface.co/x", "hf_abc"))
+    // No token, no header - not an empty "Bearer ".
+    assertEquals(null, ModelDownload.authFor(hf, "  "))
+    // Never in the clear, and never to a host that only looks like it.
+    assertEquals(null, ModelDownload.authFor("http://huggingface.co/x", "hf_abc"))
+    assertEquals(null, ModelDownload.authFor("https://huggingface.co.evil.example/x", "hf_abc"))
+    assertEquals(null, ModelDownload.authFor("https://evilhuggingface.co/x", "hf_abc"))
+    assertEquals(null, ModelDownload.authFor("https://example.com/model.bin", "hf_abc"))
+  }
 }
