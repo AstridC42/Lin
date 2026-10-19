@@ -2394,6 +2394,28 @@ writes one line, and the memory screen shows it, beside the switch that allows
 learning at all. That switch is off by default, and this is the screen somebody
 opens when Lin has remembered nothing, so it belongs here as well as in settings.
 
+### Phase 35 — The redesign you can see
+
+"I don't see any of the UX/UI improvements I asked for." Phase 32 changed what
+happens inside a conversation — steps, sources, actions, Stop — but the screen
+that opens looked the same. This phase changes the frame, after Gemini, ChatGPT
+and Claude:
+
+- **Conversation history.** A drawer from the left (menu button) lists past
+  conversations under Today, Yesterday, Previous 7 days and Older, with search,
+  New chat, tap to reopen and delete (asks first). Before this a conversation
+  vanished when the next began, after half an hour away or on New chat. Kept in
+  one file on the phone (`history.json`, the latest 200), titled by the first
+  question; only what either side said is kept, not tool output.
+- **Header.** Menu, "Lin" and a short model chip ("gemma-4-12B · server")
+  instead of the full download path under the name.
+- **Answers on the page.** Lin's answers are no longer in a box; a small Lin
+  mark sits beside them, with sources and actions aligned under the text. The
+  person's messages stay as bubbles.
+- **One pill composer.** Attach inside on the left, microphone and send inside
+  on the right, instead of four separate shapes.
+- **Suggestion cards with icons**, each in its own colour.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
