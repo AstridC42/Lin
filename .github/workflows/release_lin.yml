@@ -102,7 +102,8 @@ jobs:
             # One release per build. The repository uses immutable releases, which freeze a
             # release once it is published, so a single rolling release cannot be refilled.
             tag="lin-${name}"
-            prerelease=false
+            # A pre-release, so the newest numbered release stays the "latest" download.
+            prerelease=true
           fi
           # The run number, which only ever goes up across every run of this workflow. Deriving a
           # code from the semantic version instead invites two builds sharing one, and Android
@@ -264,11 +265,18 @@ jobs:
             dist/*.apk
             dist/SHA256SUMS.txt
 
-      - name: Publish it as the latest release
+      - name: Publish it
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
-        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          # Numbered releases become the "latest" download; test builds do not.
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          else
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          fi
 
       # Only the newest few test builds are kept, so the Releases page stays short. Numbered
       # releases are never touched. Never fatal: a build that published is a success.
