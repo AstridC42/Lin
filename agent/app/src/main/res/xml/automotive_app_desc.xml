@@ -17,4 +17,6 @@
 <!-- Tells Android Auto that Lin has a car screen built from the Car App Library templates. -->
 <automotiveApp>
     <uses name="template" />
+    <!-- Lin's conversation in the car arrives as messaging notifications. See CarChat. -->
+    <uses name="notification" />
 </automotiveApp>

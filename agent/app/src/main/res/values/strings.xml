@@ -645,4 +645,14 @@
   <string name="settings_hf_token_help">Used only for model downloads from huggingface.co, and only from this phone. Needed for gated models. Create one at huggingface.co/settings/tokens (Read access is enough).</string>
   <string name="settings_show">Show</string>
   <string name="settings_hide">Hide</string>
+  <string name="settings_car_chat">Chat with Lin in Android Auto</string>
+  <string name="settings_car_chat_detail">Lin shows up in the car as a conversation. Say “Hey Google, read my messages” or tap Lin’s message, then reply by voice. Lin answers and the car reads it out. Android Auto turns what you say into text.</string>
+  <string name="car_chat_channel">Lin in the car</string>
+  <string name="car_chat_greeting">Hi, it’s Lin. Reply to ask me anything.</string>
+  <string name="car_chat_you">You</string>
+  <string name="car_chat_reply">Reply</string>
+  <string name="car_chat_read">Mark as read</string>
+  <string name="car_chat_thinking">Lin is answering…</string>
+  <string name="car_chat_failed">Sorry, that didn’t work. Try asking again.</string>
+  <string name="car_chat_no_model">I can’t reach a model right now. Check Lin’s settings when you’ve stopped.</string>
 </resources>
