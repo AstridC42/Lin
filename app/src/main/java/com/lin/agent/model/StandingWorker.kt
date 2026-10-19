@@ -191,7 +191,7 @@ class StandingWorker(private val context: Context, params: WorkerParameters) :
     manager.notify(
       task.id.hashCode(),
       NotificationCompat.Builder(context, CHANNEL)
-        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(task.ask)
         .setContentText(answer.lineSequence().firstOrNull().orEmpty())
         // The whole answer, because the point of a routine is not having to open anything.

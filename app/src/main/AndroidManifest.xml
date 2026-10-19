@@ -420,7 +420,7 @@
             android:name=".car.LinCarService"
             android:exported="true"
             android:label="@string/app_name"
-            android:icon="@drawable/lin_mark_mono">
+            android:icon="@drawable/ic_notification">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.IOT" />

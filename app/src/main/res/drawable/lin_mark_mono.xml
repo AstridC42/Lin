@@ -1,44 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
- Copyright 2026 The Lin Authors
+  Copyright 2026 The Lin Authors
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
-     http://www.apache.org/licenses/LICENSE-2.0
+      http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 -->
 <!--
-  Lin's mark: an L drawn as one stroke, with a dot above its foot.
-
-  Everything here is sized to the adaptive icon safe zone. The canvas is 108dp and launchers mask
-  it to a circle, a squircle or a rounded square depending on the device, keeping only the central
-  66dp - so the mark lives well inside it and nothing can be cropped by a mask shape this build
-  will never see.
-
-  Strokes rather than filled outlines, with round caps, so it stays legible when the launcher
-  renders it at 48px and when the system tints the monochrome layer flat.
+  The same mark in one colour, for Android's themed icons. Only the alpha matters there.
 -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-  <!-- The L: down, then right. -->
-  <path
-      android:pathData="M40,36 L40,71 L68,71"
-      android:strokeColor="#FF000000"
-      android:strokeWidth="10"
-      android:strokeLineCap="round"
-      android:strokeLineJoin="round" />
-  <!-- The dot: what it is holding on to. -->
-  <path
-      android:pathData="M68,42 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0"
-      android:fillColor="#FF000000" />
+  <group android:pivotX="54" android:pivotY="54" android:scaleX="0.667" android:scaleY="0.667">
+    <path android:pathData="M87.91,51.56 L87.91,56.44 L82.17,58.33 L81.26,62.32 L85.61,66.52 L83.50,70.91 L77.50,70.13 L74.95,73.32 L77.05,78.99 L73.24,82.03 L68.18,78.72 L64.49,80.50 L63.92,86.52 L59.17,87.60 L56.04,82.43 L51.96,82.43 L48.83,87.60 L44.08,86.52 L43.51,80.50 L39.82,78.72 L34.76,82.03 L30.95,78.99 L33.05,73.32 L30.50,70.13 L24.50,70.91 L22.39,66.52 L26.74,62.32 L25.83,58.33 L20.09,56.44 L20.09,51.56 L25.83,49.67 L26.74,45.68 L22.39,41.48 L24.50,37.09 L30.50,37.87 L33.05,34.68 L30.95,29.01 L34.76,25.97 L39.82,29.28 L43.51,27.50 L44.08,21.48 L48.83,20.40 L51.96,25.57 L56.04,25.57 L59.17,20.40 L63.92,21.48 L64.49,27.50 L68.18,29.28 L73.24,25.97 L77.05,29.01 L74.95,34.68 L77.50,37.87 L83.50,37.09 L85.61,41.48 L81.26,45.68 L82.17,49.67 Z M32.00,54 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0 Z" android:fillColor="#FFFFFFFF" android:fillType="evenOdd" />
+    <path android:pathData="M68.40,54.0 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 ZM51.40,71.0 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 ZM34.40,54.0 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 ZM51.40,37.0 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M54,54 L54,40 M54,54 L68,54" android:strokeColor="#FFFFFFFF" android:strokeWidth="5.5" android:strokeLineCap="round" />
+  </group>
 </vector>

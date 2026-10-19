@@ -1,5 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="128" height="128" role="img" aria-label="Lin">
-  <rect width="108" height="108" rx="26" fill="#3F37C9"/>
-  <path d="M40,36 L40,71 L68,71" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="68" cy="42" r="6" fill="#FFFFFF"/>
+  <defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2C14E"/><stop offset="1" stop-color="#A8741A"/></linearGradient></defs>
+  <rect width="108" height="108" rx="30" fill="#2A1F3D"/>
+  <path d="M87.91,51.56 L87.91,56.44 L82.17,58.33 L81.26,62.32 L85.61,66.52 L83.50,70.91 L77.50,70.13 L74.95,73.32 L77.05,78.99 L73.24,82.03 L68.18,78.72 L64.49,80.50 L63.92,86.52 L59.17,87.60 L56.04,82.43 L51.96,82.43 L48.83,87.60 L44.08,86.52 L43.51,80.50 L39.82,78.72 L34.76,82.03 L30.95,78.99 L33.05,73.32 L30.50,70.13 L24.50,70.91 L22.39,66.52 L26.74,62.32 L25.83,58.33 L20.09,56.44 L20.09,51.56 L25.83,49.67 L26.74,45.68 L22.39,41.48 L24.50,37.09 L30.50,37.87 L33.05,34.68 L30.95,29.01 L34.76,25.97 L39.82,29.28 L43.51,27.50 L44.08,21.48 L48.83,20.40 L51.96,25.57 L56.04,25.57 L59.17,20.40 L63.92,21.48 L64.49,27.50 L68.18,29.28 L73.24,25.97 L77.05,29.01 L74.95,34.68 L77.50,37.87 L83.50,37.09 L85.61,41.48 L81.26,45.68 L82.17,49.67 Z" fill="url(#gold)"/>
+  <circle cx="54" cy="54" r="22" fill="#FBF3E2"/><circle cx="71.0" cy="54.0" r="2.6" fill="#6B4E1F"/><circle cx="54.0" cy="71.0" r="2.6" fill="#6B4E1F"/><circle cx="37.0" cy="54.0" r="2.6" fill="#6B4E1F"/><circle cx="54.0" cy="37.0" r="2.6" fill="#6B4E1F"/>
+  <path d="M54 54 V40" stroke="#2A2F96" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M54 54 H68" stroke="#FF6A1A" stroke-width="5.5" stroke-linecap="round"/>
+  <circle cx="54" cy="54" r="3.3" fill="#1C150E"/>
 </svg>

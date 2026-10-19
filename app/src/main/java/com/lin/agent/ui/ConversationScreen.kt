@@ -847,7 +847,7 @@ private fun Said(message: Message, actions: AnswerActions? = null) {
         // a sixth of a phone's width on every line.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           Image(
-            painterResource(R.drawable.lin_mark),
+            painterResource(R.drawable.lin_logo),
             contentDescription = null,
             modifier = Modifier.padding(top = 2.dp).size(22.dp),
           )
@@ -1355,7 +1355,7 @@ private fun HistoryDrawer(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 12.dp),
       ) {
-        Image(painterResource(R.drawable.lin_mark), contentDescription = null, modifier = Modifier.size(28.dp))
+        Image(painterResource(R.drawable.lin_logo), contentDescription = null, modifier = Modifier.size(28.dp))
         Text(
           stringResource(R.string.app_name),
           style = MaterialTheme.typography.titleLarge,

@@ -157,7 +157,7 @@ class CarChatWorker(private val context: Context, params: WorkerParameters) :
     )
     val notification =
       NotificationCompat.Builder(context, WORKING_CHANNEL)
-        .setSmallIcon(R.drawable.lin_mark_mono)
+        .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(context.getString(R.string.car_chat_thinking))
         .setSilent(true)
         .build()
