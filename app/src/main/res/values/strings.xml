@@ -681,4 +681,8 @@
   <string name="cutout_model_get">Download</string>
   <string name="cutout_model_retry">Try again</string>
   <string name="attach_cutout">Cut out from a photo</string>
+  <string name="watch_channel">Lin on the watch</string>
+  <string name="watch_thinking">Answering your watch…</string>
+  <string name="watch_no_model">Lin has no model on the phone yet. Open Lin on the phone to get one.</string>
+  <string name="watch_failed">Sorry, that didn’t work. Try asking again.</string>
 </resources>

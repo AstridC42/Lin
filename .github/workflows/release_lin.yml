@@ -20,6 +20,7 @@ on:
       - 'app/**'
       - 'core/**'
       - 'engine/**'
+      - 'wear/**'
       - 'gradle/**'
       - '*.gradle.kts'
       - 'gradle.properties'
@@ -201,7 +202,9 @@ jobs:
           LIN_KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.password }}
           LIN_KEY_ALIAS: ${{ steps.keystore.outputs.alias }}
           LIN_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
-        run: ./gradlew --no-daemon :app:assembleRelease --console=plain
+        # The phone app and the watch app, signed with the same key - which is what lets the two
+        # find each other over Wear OS.
+        run: ./gradlew --no-daemon :app:assembleRelease :wear:assembleRelease --console=plain
 
       - name: Collect and rename the APKs
         env:
@@ -217,6 +220,9 @@ jobs:
             abi="${abi%-release}"
             cp "$apk" "dist/lin-${VERSION}-${abi}.apk"
           done
+          if [ -f wear/build/outputs/apk/release/wear-release.apk ]; then
+            cp wear/build/outputs/apk/release/wear-release.apk "dist/lin-${VERSION}-wear.apk"
+          fi
           if [ -z "$(ls -A dist)" ]; then
             echo "::error::No APKs were produced"
             exit 1
@@ -236,6 +242,9 @@ jobs:
             echo "**Take \`lin-${VERSION}-arm64-v8a.apk\`** unless you know your phone is"
             echo "something else. The universal APK works everywhere and is about half again as"
             echo "large."
+            echo
+            echo "**On a Wear OS watch** (Galaxy Watch 4 or newer, Pixel Watch): install"
+            echo "\`lin-${VERSION}-wear.apk\` on the watch. It needs this version of Lin (or newer) on the phone."
             echo
             echo "Lin needs a model, and fetches it itself: open the app, tap **Get a model**,"
             echo "then Download. Gemma 4 E2B is about 2.6 GB, so start it on Wi-Fi. There is no"

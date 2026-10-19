@@ -44,3 +44,4 @@ rootProject.name = "Lin"
 include(":app")
 include(":core")
 include(":engine")
+include(":wear")

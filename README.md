@@ -58,6 +58,8 @@ a company's cloud unless you point it there.
 
 **Everywhere**
 - Android Auto: a car screen with a mic button, and a hands-free chat through the car's messaging.
+- Wear OS (Galaxy Watch 4 and newer, Pixel Watch): ask from your wrist by voice or keyboard, with
+  a Tile for one-tap access. The phone does the thinking; the watch shows the answer and reads it out.
 - Routines: questions Lin asks itself on a schedule and notifies you with the answer.
 - MCP client: connect Lin to any Model Context Protocol server for more tools.
 - Optional Shizuku integration for switches Android normally keeps from apps.
@@ -106,6 +108,7 @@ Needs JDK 21 and the Android SDK (platform 37). See [docs/BUILDING.md](docs/BUIL
 ```
 app/      Android app: UI (Jetpack Compose), tools, voice, car, notifications, DI (Hilt)
 engine/   The turn loop, on-device (LiteRT-LM) and server backends, tool calling, MCP
+wear/     The Wear OS watch app: a remote for Lin on the phone
 core/     Plain Kotlin logic with unit tests: search, reading, memory, persona, settings, …
 docs/     Install, building, architecture, releasing, and the development log
 ```

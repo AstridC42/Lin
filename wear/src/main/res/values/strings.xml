@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="app_name">Lin</string>
+  <string name="ask_prompt">Ask Lin</string>
+  <string name="hint">Ask by voice or type. Lin on your phone answers.</string>
+  <string name="speak">Speak</string>
+  <string name="type">Type</string>
+  <string name="read_aloud">Read aloud</string>
+  <string name="sending">Sending to your phone…</string>
+  <string name="thinking">Lin is thinking…</string>
+  <string name="no_phone">Can\'t reach your phone. Make sure it\'s connected and Lin is installed and up to date on it.</string>
+  <string name="no_answer">No answer from your phone yet. Try again in a moment.</string>
+  <string name="channel_answers">Answers</string>
+  <string name="tile_ask">Ask Lin</string>
+</resources>

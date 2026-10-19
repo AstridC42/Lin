@@ -35,24 +35,13 @@ import com.lin.agent.R
 import com.lin.agent.core.car.CAR_CHAT_PREFIX
 import com.lin.agent.core.car.CAR_CHAT_PROMPT
 import com.lin.agent.core.car.carChatToContinue
-import com.lin.agent.core.calendar.todayLine
 import com.lin.agent.core.history.SavedChat
 import com.lin.agent.core.history.SavedLine
 import com.lin.agent.core.history.chatTitle
-import com.lin.agent.core.persona.personaFrom
-import com.lin.agent.core.persona.personaOrDefault
-import com.lin.agent.core.persona.personaPrompt
 import com.lin.agent.core.settings.SettingsRepository
-import com.lin.agent.core.tools.disabledFrom
-import com.lin.agent.engine.AgentRole
-import com.lin.agent.engine.LoopEvent
-import com.lin.agent.engine.Message
-import com.lin.agent.engine.TurnLoop
-import com.lin.agent.engine.capabilityPrompt
 import com.lin.agent.history.ChatHistory
 import com.lin.agent.model.ChatBackends
-import com.lin.agent.model.ChatReadiness
-import com.lin.agent.model.DelegateTool
+import com.lin.agent.model.HeadlessTurn
 import com.lin.agent.model.Tools
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -60,8 +49,6 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.toList
 
 /**
  * Answers one reply from the car, with the app closed if need be.
@@ -114,40 +101,12 @@ class CarChatWorker(private val context: Context, params: WorkerParameters) :
     return Result.success()
   }
 
-  private suspend fun answer(deps: Deps, lines: List<SavedLine>): String? {
-    val backend = (deps.backends().readiness() as? ChatReadiness.Ready)?.backend
-      ?: return context.getString(R.string.car_chat_no_model)
-    val settings = deps.settings()
-    val registry = deps.tools().registry.value
-    // No delegation: a server round trip on top of the answer is too long to wait through
-    // while driving, and the backend chosen is already the best one reachable.
-    val withheld = disabledFrom(settings.disabledTools.first()) + DelegateTool.NAME
-    val offered = registry.forRole(AgentRole.ORCHESTRATOR).filterNot { it.name in withheld }
-    val who = personaPrompt(personaOrDefault(personaFrom(settings.persona.first())))
-    val prompt = buildString {
-      append(todayLine(System.currentTimeMillis()))
-      append(" This is the real date; use it and never a date you remember from elsewhere. ")
-      append("You are Lin, an assistant running on this phone. ")
-      append(CAR_CHAT_PROMPT)
-      if (who.isNotBlank()) append(who).append(' ')
-      append(capabilityPrompt(offered))
+  private suspend fun answer(deps: Deps, lines: List<SavedLine>): String? =
+    when (val reply = HeadlessTurn(deps.backends(), deps.tools(), deps.settings()).answer(lines, CAR_CHAT_PROMPT)) {
+      is HeadlessTurn.Reply.Answered -> reply.text
+      HeadlessTurn.Reply.NoModel -> context.getString(R.string.car_chat_no_model)
+      HeadlessTurn.Reply.Empty -> null
     }
-    val messages =
-      lines.takeLast(CONTEXT_LINES).map {
-        Message(if (it.fromUser) Message.Role.USER else Message.Role.ASSISTANT, it.text)
-      }
-    val events =
-      TurnLoop(
-          backend = backend,
-          registry = registry,
-          role = AgentRole.ORCHESTRATOR,
-          systemPrompt = prompt,
-          withhold = withheld,
-        )
-        .run(messages)
-        .toList()
-    return events.filterIsInstance<LoopEvent.Done>().lastOrNull()?.text?.takeIf { it.isNotBlank() }
-  }
 
   /** Only used before Android 12, where expedited work runs as a foreground service. */
   override suspend fun getForegroundInfo(): ForegroundInfo {
@@ -174,8 +133,6 @@ class CarChatWorker(private val context: Context, params: WorkerParameters) :
     private const val WORK = "car-chat"
     private const val WORKING_CHANNEL = "lin-car-chat-working"
     private const val WORKING_ID = 46
-    /** How much of the drive's conversation goes back to the model with each reply. */
-    private const val CONTEXT_LINES = 12
 
     fun enqueue(context: Context, said: String) {
       WorkManager.getInstance(context)

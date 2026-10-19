@@ -69,9 +69,15 @@ fun forTheCar(answer: String, longest: Int = 600): String {
  * The car conversation a reply continues: the most recent one, if it was used in the last half
  * hour. Otherwise a new one begins - the same boundary the phone's conversations use.
  */
-fun carChatToContinue(chats: List<SavedChat>, now: Long): SavedChat? =
+fun carChatToContinue(chats: List<SavedChat>, now: Long): SavedChat? = chatToContinue(chats, CAR_CHAT_PREFIX, now)
+
+/**
+ * The most recent conversation whose id starts with [prefix], if it was used in the last half
+ * hour. Shared by the car and the watch, which each keep their own thread.
+ */
+fun chatToContinue(chats: List<SavedChat>, prefix: String, now: Long): SavedChat? =
   chats
-    .filter { it.id.startsWith(CAR_CHAT_PREFIX) }
+    .filter { it.id.startsWith(prefix) }
     .maxByOrNull { it.updatedAt }
     ?.takeUnless { TrainingData.startsNewConversation(it.updatedAt, now) }
 
