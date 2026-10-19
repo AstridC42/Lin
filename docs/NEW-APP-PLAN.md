@@ -2416,6 +2416,15 @@ and Claude:
   on the right, instead of four separate shapes.
 - **Suggestion cards with icons**, each in its own colour.
 
+### Phase 36 — Android Auto could not see Lin
+
+The car screen from Phase 30 never appeared. Android Auto only binds a Car App
+Library service after it finds the `com.google.android.gms.car.application`
+meta-data pointing at an `automotive_app_desc.xml` that declares
+`<uses name="template"/>`. Lin had the service and not the declaration, so the
+host never looked. Now added. A build installed from outside the Play Store also
+needs Android Auto's developer settings → "Unknown sources" turned on.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
