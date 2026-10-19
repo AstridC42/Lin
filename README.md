@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  Built by <a href="https://github.com/AstridC42"><b>AstridC42</b></a>
+</p>
+
+<p align="center">
   <a href="../../releases/tag/lin-dev">Download</a> ·
   <a href="docs/INSTALL.md">Install guide</a> ·
   <a href="docs/ARCHITECTURE.md">How it works</a> ·
@@ -112,6 +116,10 @@ Contributions are welcome: bug reports, ideas and pull requests. Start with
 Lin is licensed under the [Apache License 2.0](LICENSE). Models are downloaded by you from their
 publishers and are covered by their own terms (for Gemma, the
 [Gemma Terms of Use](https://ai.google.dev/gemma/terms)).
+
+## Author
+
+Lin is created and maintained by [AstridC42](https://github.com/AstridC42).
 
 ## Thanks
 
