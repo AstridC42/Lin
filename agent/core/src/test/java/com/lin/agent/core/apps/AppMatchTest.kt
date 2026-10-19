@@ -94,3 +94,46 @@ class AppMatchTest {
     assertNull(appNamed("tidal", emptyList()))
   }
 }
+
+class AppRoleTest {
+
+  @Test
+  fun `the kinds of app every phone has are found by kind`() {
+    // The two that failed on a phone that had both.
+    assertEquals(AppRole.GALLERY, appRoleFor("gallery"))
+    assertEquals(AppRole.CLOCK, appRoleFor("clock"))
+    assertEquals(AppRole.CLOCK, appRoleFor("open the clock app"))
+    assertEquals(AppRole.GALLERY, appRoleFor("my photos"))
+    assertEquals(AppRole.CAMERA, appRoleFor("Camera"))
+    assertEquals(AppRole.STORE, appRoleFor("play store"))
+  }
+
+  @Test
+  fun `an app with the word in its name is not hijacked`() {
+    // Somebody's "Clock Widget Pro" is their app, not the system clock.
+    assertEquals(null, appRoleFor("clock widget pro"))
+    assertEquals(null, appRoleFor("spotify"))
+    assertEquals(null, appRoleFor("the app"))
+  }
+
+  @Test
+  fun `an exact name is exact`() {
+    val apps = listOf(InstalledApp("Gallery", "com.sec.gallery"), InstalledApp("Gallery Vault", "com.vault"))
+    assertEquals("com.sec.gallery", appNamedExactly("gallery", apps)?.packageName)
+    assertEquals(null, appNamedExactly("galler", apps))
+  }
+
+  @Test
+  fun `a near miss names the nearest apps`() {
+    val apps =
+      listOf(
+        InstalledApp("Gallery", "a"),
+        InstalledApp("Galaxy Store", "b"),
+        InstalledApp("Spotify", "c"),
+        InstalledApp("Clock", "d"),
+      )
+    assertEquals("Gallery", closestApps("galery", apps).first())
+    assertEquals(2, closestApps("galery", apps, count = 2).size)
+    assertEquals(emptyList<String>(), closestApps(" ", apps))
+  }
+}

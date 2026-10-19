@@ -2349,6 +2349,31 @@ name — *"Good evening, Sam."*
 The summary, source-splitting and greeting logic is in `core` with tests; the
 layout is compile-checked, not yet seen on a device.
 
+### Phase 33 — Open the gallery, whatever it is called
+
+"Open gallery" and "open clock" still failed after Phase 23's fix to the app
+list. Matching by name was always going to be fragile for the apps every phone
+has: the gallery is "Gallery" on one phone, "Samsung Gallery" on another,
+"Photos" on a third and "גלריה" on any phone set to Hebrew.
+
+Android already knows which app does each of these jobs. So `open_app` now goes:
+an app called exactly what was said first (somebody's own app named "Clock" is
+the one they mean); then the **kind** of app — gallery, clock, camera, settings,
+calendar, calculator, contacts, messages, email, maps, browser, music, files,
+phone, store — opened with the standard request every Android phone answers
+(`makeMainSelectorActivity` with `CATEGORY_APP_GALLERY` and friends,
+`AlarmClock.ACTION_SHOW_ALARMS`, `INTENT_ACTION_STILL_IMAGE_CAMERA`,
+`Settings.ACTION_SETTINGS`), which picks the person's own default and involves no
+label at all; and only then the looser name matching. A kind is only recognised
+when it is the whole request — "clock widget pro" is somebody's app and is not
+hijacked into the system clock.
+
+A failure now says what Lin can see — how many apps, and the nearest names by
+edit distance — so a phone where Lin can see almost nothing shows up as that
+rather than as "there is no such app". And the tool says outright that opening
+the gallery is its job, because "open gallery" reads to a small model like a
+request about photos and it reached for the photo search instead.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
