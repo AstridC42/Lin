@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -81,6 +82,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -140,6 +142,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.R
+import com.lin.agent.core.fold.listPaneWidth
 import com.lin.agent.core.fold.splitAcrossTheCrease
 import com.lin.agent.core.history.SavedChat
 import com.lin.agent.core.history.When
@@ -185,31 +188,80 @@ fun ConversationScreen(
   val chats by viewModel.chats.collectAsStateWithLifecycle()
   val drawer = rememberDrawerState(DrawerValue.Closed)
   val drawerScope = rememberCoroutineScope()
+  val posture by rememberPosture()
+  val hinge by rememberHingeLeftDp()
 
-  // Past conversations in a drawer from the left, where Gemini, ChatGPT and Claude all keep
-  // them. Before this a conversation was gone the moment another began.
-  ModalNavigationDrawer(
-    drawerState = drawer,
-    drawerContent = {
-      HistoryDrawer(
-        chats = chats,
-        currentId = viewModel.currentChatId,
-        onNew = {
-          viewModel.startNewConversation()
-          drawerScope.launch { drawer.close() }
+  BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    // Unfolded, or on any screen wide enough, the list of conversations stays beside the
+    // conversation - the layout Gmail, Messages and every list-and-detail app use on a Fold.
+    // On a phone it lives in a drawer. See listPaneWidth.
+    val listWidth = listPaneWidth(maxWidth.value.toInt(), posture, hinge)
+    if (listWidth != null) {
+      Row(modifier = Modifier.fillMaxSize()) {
+        Surface(
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          modifier = Modifier.width(listWidth.dp).fillMaxHeight(),
+        ) {
+          HistoryList(
+            chats = chats,
+            currentId = viewModel.currentChatId,
+            onNew = viewModel::startNewConversation,
+            onOpen = viewModel::openChat,
+            onDelete = viewModel::deleteChat,
+            onSettings = onOpenSettings,
+          )
+        }
+        VerticalDivider()
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+          ConversationFrame(state, launch, spoken, token, onOpenSettings, onGetModel, viewModel, onMenu = null)
+        }
+      }
+    } else {
+      // Past conversations in a drawer from the left, where Gemini, ChatGPT and Claude all keep
+      // them. Before this a conversation was gone the moment another began.
+      ModalNavigationDrawer(
+        drawerState = drawer,
+        drawerContent = {
+          HistoryDrawer(
+            chats = chats,
+            currentId = viewModel.currentChatId,
+            onNew = {
+              viewModel.startNewConversation()
+              drawerScope.launch { drawer.close() }
+            },
+            onOpen = { id ->
+              viewModel.openChat(id)
+              drawerScope.launch { drawer.close() }
+            },
+            onDelete = viewModel::deleteChat,
+            onSettings = {
+              drawerScope.launch { drawer.close() }
+              onOpenSettings()
+            },
+          )
         },
-        onOpen = { id ->
-          viewModel.openChat(id)
-          drawerScope.launch { drawer.close() }
-        },
-        onDelete = viewModel::deleteChat,
-        onSettings = {
-          drawerScope.launch { drawer.close() }
-          onOpenSettings()
-        },
-      )
-    },
-  ) {
+      ) {
+        ConversationFrame(
+          state, launch, spoken, token, onOpenSettings, onGetModel, viewModel,
+          onMenu = { drawerScope.launch { drawer.open() } },
+        )
+      }
+    }
+  }
+}
+
+/** The conversation with its header: the same in a drawer layout and beside the list. */
+@Composable
+private fun ConversationFrame(
+  state: ConversationState,
+  launch: Launch,
+  spoken: String,
+  token: String,
+  onOpenSettings: () -> Unit,
+  onGetModel: () -> Unit,
+  viewModel: ConversationViewModel,
+  onMenu: (() -> Unit)?,
+) {
   Scaffold(
     topBar = {
       Row(
@@ -222,8 +274,13 @@ fun ConversationScreen(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
       ) {
-        IconButton(onClick = { drawerScope.launch { drawer.open() } }) {
-          Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.open_history))
+        // The menu only when the list is in a drawer; beside the conversation it is already open.
+        if (onMenu != null) {
+          IconButton(onClick = onMenu) {
+            Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.open_history))
+          }
+        } else {
+          Spacer(modifier = Modifier.width(12.dp))
         }
         Text(
           stringResource(R.string.app_name),
@@ -284,7 +341,6 @@ fun ConversationScreen(
         viewModel = viewModel,
       )
     }
-  }
   }
 }
 
@@ -1108,6 +1164,13 @@ private fun ColumnScope.Composer(
       if (granted) viewModel.startListening()
     }
   var choosing by remember { mutableStateOf(false) }
+  // A photo being cut out, while the cut-out screen is open over the conversation.
+  var cutting by rememberSaveable { mutableStateOf<android.net.Uri?>(null) }
+  val cutPicker =
+    rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> cutting = uri }
+  cutting?.let { photo ->
+    CutOutScreen(photo = photo, onClose = { cutting = null }, onAsk = viewModel::attachPicture)
+  }
 
   // One pill holding everything, the way Gemini, ChatGPT and Claude all draw it: attach on the
   // left inside it, speak and send on the right inside it. Four separate shapes in a row read
@@ -1137,6 +1200,13 @@ private fun ColumnScope.Composer(
             // The photo picker, not a storage permission: it hands over the one picture
             // that was chosen and needs nothing granted.
             photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+          },
+        )
+        DropdownMenuItem(
+          text = { Text(stringResource(R.string.attach_cutout)) },
+          onClick = {
+            choosing = false
+            cutPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
           },
         )
         DropdownMenuItem(
@@ -1341,6 +1411,21 @@ private fun HistoryDrawer(
   onDelete: (String) -> Unit,
   onSettings: () -> Unit,
 ) {
+  ModalDrawerSheet(modifier = Modifier.widthIn(max = 320.dp)) {
+    HistoryList(chats, currentId, onNew, onOpen, onDelete, onSettings)
+  }
+}
+
+/** The list of past conversations, for the drawer and for the pane beside the conversation. */
+@Composable
+private fun HistoryList(
+  chats: List<SavedChat>,
+  currentId: String?,
+  onNew: () -> Unit,
+  onOpen: (String) -> Unit,
+  onDelete: (String) -> Unit,
+  onSettings: () -> Unit,
+) {
   var query by rememberSaveable { mutableStateOf("") }
   var deleting by remember { mutableStateOf<SavedChat?>(null) }
   val zone = remember { java.time.ZoneId.systemDefault() }
@@ -1348,7 +1433,7 @@ private fun HistoryDrawer(
   val shown = remember(chats, query) { searchChats(chats, query) }
   val grouped = remember(shown, now) { shown.groupBy { whenHeading(it.updatedAt, now, zone) } }
 
-  ModalDrawerSheet(modifier = Modifier.widthIn(max = 320.dp)) {
+  run {
     Column(modifier = Modifier.fillMaxHeight().statusBarsPadding().padding(horizontal = 12.dp)) {
       Row(
         verticalAlignment = Alignment.CenterVertically,

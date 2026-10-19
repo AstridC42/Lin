@@ -22,6 +22,8 @@ coroutines = "1.10.2"
 carApp = "1.7.0"
 # Matched to the archived fork, where this version is known to work with these models.
 litertlm = "0.18.0"
+# Interactive segmentation (photo cut-out). 1.1.1 is built on the same LiteRT-LM as above.
+tasksVision = "1.1.1"
 
 [libraries]
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version = "2.0.27.0" }
@@ -54,6 +56,7 @@ androidx-splashscreen = { group = "androidx.core", name = "core-splashscreen", v
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigation" }
+tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision", version.ref = "tasksVision" }
 litertlm = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }

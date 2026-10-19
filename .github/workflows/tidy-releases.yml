@@ -1,0 +1,60 @@
+# Clears the Releases page down to what people should download.
+#
+# Run by hand: Actions -> Tidy releases -> Run workflow. It keeps the newest numbered release
+# (lin-v...), deletes every other release - test builds included - and deletes tags that no
+# release uses any more, like the old app's v0.x and the retired lin-dev. Tags that GitHub has
+# locked to a published immutable release cannot be deleted, and are skipped with a note.
+name: Tidy releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_test_builds:
+        description: 'How many of the newest test builds to keep (0 removes them all)'
+        required: false
+        default: '0'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  tidy:
+    name: Tidy releases and tags
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      KEEP_TEST: ${{ inputs.keep_test_builds }}
+    steps:
+      - name: Delete old releases
+        run: |
+          set -uo pipefail
+          releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
+            --jq '.[] | select(.draft | not) | "\(.created_at) \(.id) \(.tag_name) \(.prerelease)"' | sort -r)"
+          echo "$releases"
+          # The newest numbered release stays; older numbered ones go.
+          echo "$releases" | awk '$3 ~ /^lin-v/' | tail -n +2 | while read -r _ id tag _; do
+            echo "Deleting release $tag"; gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id" || echo "::warning::Could not delete $tag"
+          done
+          # Test builds: keep the newest KEEP_TEST of them.
+          echo "$releases" | awk '$3 !~ /^lin-v/' | tail -n +$(( ${KEEP_TEST:-0} + 1 )) | while read -r _ id tag _; do
+            echo "Deleting release $tag"; gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id" || echo "::warning::Could not delete $tag"
+          done
+
+      - name: Delete tags no release uses
+        run: |
+          set -uo pipefail
+          kept="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate --jq '.[].tag_name')"
+          for tag in $(gh api "repos/${GITHUB_REPOSITORY}/tags?per_page=100" --paginate --jq '.[].name'); do
+            if echo "$kept" | grep -qx "$tag"; then continue; fi
+            echo "Deleting tag $tag"
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/$tag" \
+              || echo "::notice::$tag is locked (it belonged to a published immutable release) and stays."
+          done
+
+      - name: What is left
+        run: |
+          {
+            echo "### Releases"; gh api "repos/${GITHUB_REPOSITORY}/releases" --jq '.[] | "- \(.name) (`\(.tag_name)`)"'
+            echo; echo "### Tags"; gh api "repos/${GITHUB_REPOSITORY}/tags" --jq '.[] | "- `\(.name)`"'
+          } >> "$GITHUB_STEP_SUMMARY"

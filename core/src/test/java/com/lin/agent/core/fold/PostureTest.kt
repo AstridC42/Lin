@@ -50,4 +50,27 @@ class PostureTest {
     assertFalse(splitAcrossTheCrease(Posture.BOOK))
     assertFalse(splitAcrossTheCrease(Posture.FLAT))
   }
+
+  @Test
+  fun `a phone gets one pane, with the list in the drawer`() {
+    assertEquals(null, listPaneWidth(411, Posture.FLAT))
+    assertEquals(null, listPaneWidth(599, Posture.BOOK, hingeLeftDp = 300))
+  }
+
+  @Test
+  fun `an unfolded screen keeps the list beside the conversation, about a third wide`() {
+    // A Fold's inner screen, flat open: the hinge is ignored.
+    assertEquals(299, listPaneWidth(882, Posture.FLAT, hingeLeftDp = 441))
+    // Narrow two-pane windows keep the list readable; wide ones do not let it sprawl.
+    assertEquals(260, listPaneWidth(600, Posture.FLAT))
+    assertEquals(380, listPaneWidth(1280, Posture.FLAT))
+  }
+
+  @Test
+  fun `half open like a book, the split sits on the hinge`() {
+    assertEquals(441, listPaneWidth(882, Posture.BOOK, hingeLeftDp = 441))
+    // A hinge that would leave either side unusably narrow is not followed.
+    assertEquals(299, listPaneWidth(882, Posture.BOOK, hingeLeftDp = 100))
+    assertEquals(299, listPaneWidth(882, Posture.BOOK, hingeLeftDp = null))
+  }
 }

@@ -105,5 +105,8 @@ Two ways past:
   sources**). Then add Lin to the car launcher, and/or turn on Settings → In the car → **Chat with
   Lin in Android Auto** to talk to it through the car's messaging ("Hey Google, read my
   messages", then reply).
+- **Photo cut-out:** + → **Cut out from a photo**. The first time, Lin downloads Google's Magic
+  Touch model (30 MB). Tap the object; switch to **Remove** to take parts away. Saved cut-outs go
+  to Pictures/Lin.
 - **More switches with Shizuku:** with [Shizuku](https://shizuku.rikka.app/) running, Lin can set
   Wi-Fi, Bluetooth, NFC and airplane mode directly instead of opening their panels.

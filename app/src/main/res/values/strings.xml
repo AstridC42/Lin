@@ -660,4 +660,25 @@
   <string name="web_image">Picture from a search result</string>
   <string name="settings_quick_actions">Quick actions on the phone first</string>
   <string name="settings_quick_actions_detail">MobileActions 270M handles short commands (flashlight, calendar events, maps) on the phone in a fraction of a second. Everything else goes to your server or main model.</string>
+  <string name="cutout_title">Cut out</string>
+  <string name="cutout_close">Close</string>
+  <string name="cutout_undo">Undo</string>
+  <string name="cutout_mode_select">Select</string>
+  <string name="cutout_mode_remove">Remove</string>
+  <string name="cutout_hint">Tap the thing you want to cut out.</string>
+  <string name="cutout_hint_more">Tap more to add to it, or switch to Remove.</string>
+  <string name="cutout_save">Save cut-out</string>
+  <string name="cutout_blur">Blur background</string>
+  <string name="cutout_share">Share</string>
+  <string name="cutout_ask">Ask Lin about it</string>
+  <string name="cutout_saved">Saved to Pictures/Lin.</string>
+  <string name="cutout_blur_saved">Saved to Pictures/Lin, with the background blurred.</string>
+  <string name="cutout_save_failed">That could not be saved.</string>
+  <string name="cutout_failed">Lin could not outline that. Try tapping nearer the middle of it.</string>
+  <string name="cutout_open_failed">That photo could not be opened.</string>
+  <string name="cutout_model_title">One download first</string>
+  <string name="cutout_model_detail">Cutting out uses Google\'s Magic Touch model (30 MB). It runs on this phone; your photos are not uploaded.</string>
+  <string name="cutout_model_get">Download</string>
+  <string name="cutout_model_retry">Try again</string>
+  <string name="attach_cutout">Cut out from a photo</string>
 </resources>

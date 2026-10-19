@@ -60,5 +60,29 @@ fun rememberPosture(): State<Posture> {
   }
 }
 
+/**
+ * Where a vertical hinge starts, in dp from the window's left edge, or null when there is none.
+ * Used to put the split between the two panes on the crease when the phone is half open.
+ */
+@Composable
+fun rememberHingeLeftDp(): State<Int?> {
+  val context = LocalContext.current
+  val activity = context as? Activity
+  val density = context.resources.displayMetrics.density
+  return produceState<Int?>(initialValue = null, activity) {
+    if (activity == null) return@produceState
+    runCatching {
+        WindowInfoTracker.getOrCreate(activity).windowLayoutInfo(activity).collect { layout ->
+          val fold =
+            layout.displayFeatures.filterIsInstance<FoldingFeature>().firstOrNull {
+              it.orientation == FoldingFeature.Orientation.VERTICAL
+            }
+          value = fold?.let { (it.bounds.left / density).toInt() }
+        }
+      }
+      .onFailure { value = null }
+  }
+}
+
 /** Unused outside previews; kept so a preview can pin a posture without a hinge. */
 @Composable fun fixedPosture(posture: Posture): State<Posture> = mutableStateOf(posture)

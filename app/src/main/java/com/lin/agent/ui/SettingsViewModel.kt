@@ -295,6 +295,7 @@ constructor(
                   ModelRole.CHAT -> "chat"
                   ModelRole.EMBED -> "embedding"
                   ModelRole.ACTIONS -> "quick actions · needs a Hugging Face token"
+                  ModelRole.SEGMENT -> "photo cut-out"
                 }
               val fit =
                 when {

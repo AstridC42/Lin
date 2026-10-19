@@ -206,7 +206,7 @@ class ModelDownload(
       "https://huggingface.co/$repoId/resolve/main/${build.file}"
 
     /** The build this device should fetch. */
-    fun urlFor(model: CatalogModel): String = urlFor(model.repoId, model.build)
+    fun urlFor(model: CatalogModel): String = model.directUrl ?: urlFor(model.repoId, model.build)
 
     /** A download that sends [token] to Hugging Face, and to nobody else. */
     fun withToken(token: String): ModelDownload =

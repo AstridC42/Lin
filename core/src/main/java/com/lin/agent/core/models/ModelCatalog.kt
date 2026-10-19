@@ -28,6 +28,9 @@ enum class ModelRole {
 
   /** A small model that only turns a short command into an action. See MobileActions. */
   ACTIONS,
+
+  /** Finds the object at a tapped point in a photo, for cutting it out. */
+  SEGMENT,
 }
 
 /**
@@ -74,6 +77,8 @@ data class CatalogModel(
    * leaving that to be looked up later is how the last bug happened.
    */
   val socBuilds: Map<String, ModelBuild> = emptyMap(),
+  /** Where to fetch it, for a model that is not on Hugging Face. */
+  val directUrl: String? = null,
 ) {
   /**
    * The build to use on a device whose chip reports [socModel]. Always the portable one.
@@ -215,7 +220,24 @@ object ModelCatalog {
       contextTokens = 1024,
     )
 
-  val all = listOf(GEMMA_4_E2B, GEMMA_4_E4B, EMBEDDING_GEMMA_2, MOBILE_ACTIONS)
+  /**
+   * Google's Magic Touch interactive segmenter: tap a point in a photo and it outlines the object
+   * there. Version 1 pinned rather than "latest", so the size the download is checked against
+   * cannot change underneath it.
+   */
+  val MAGIC_TOUCH =
+    CatalogModel(
+      name = "Magic Touch",
+      role = ModelRole.SEGMENT,
+      repoId = "",
+      portable = ModelBuild("interactive_segmentation.task", 30_525_312),
+      minMemoryGb = 4,
+      contextTokens = 0,
+      directUrl =
+        "https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/1/interactive_segmentation.task",
+    )
+
+  val all = listOf(GEMMA_4_E2B, GEMMA_4_E4B, EMBEDDING_GEMMA_2, MOBILE_ACTIONS, MAGIC_TOUCH)
 
   val chatModels = all.filter { it.role == ModelRole.CHAT }
 

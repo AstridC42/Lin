@@ -10,13 +10,15 @@ All builds are made by GitHub Actions; nothing is built by hand.
 
 Each build is its own release because the repository uses immutable releases: a release is created as a draft, its files are attached, and only then is it published, after which it cannot change. The newest three test builds are kept; older ones are removed automatically.
 
+Test builds are published as pre-releases; numbered releases are marked "latest", which is where the README's Download link goes. **Actions → Tidy releases** clears old releases and unused tags.
+
 Both come from [`release_lin.yml`](../.github/workflows/release_lin.yml). It runs the unit tests,
 builds release APKs for each ABI plus a universal one, writes `SHA256SUMS.txt`, and publishes them
 with notes listing the recent commits and the signing certificate's fingerprint.
 
 ## Cutting a numbered release
 
-**Actions → Release Lin → Run workflow**, type the version (for example `0.2.0`), run. About
+**Actions → Release Lin → Run workflow**, type the version (for example `1.0`) and, if you like, a title (for example `Lin_V1.0`), run. About
 15–25 minutes.
 
 ## Versions
