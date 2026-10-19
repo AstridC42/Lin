@@ -19,7 +19,7 @@ package com.lin.agent.core.tools
 import java.util.Locale
 
 /** A tool to run straight away, and what to call it with. */
-data class QuickCommand(val tool: String, val arguments: Map<String, String>)
+data class QuickCommand(val tool: String, val arguments: Map<String, Any?>)
 
 /**
  * The plain commands that need no model at all: "flashlight on", "turn off wi-fi", "open camera".

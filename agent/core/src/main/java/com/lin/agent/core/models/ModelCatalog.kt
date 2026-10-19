@@ -25,6 +25,9 @@ enum class ModelRole {
 
   /** Turns text and media into vectors. Loaded for a burst, then released. */
   EMBED,
+
+  /** A small model that only turns a short command into an action. See MobileActions. */
+  ACTIONS,
 }
 
 /**
@@ -197,7 +200,22 @@ object ModelCatalog {
         ),
     )
 
-  val all = listOf(GEMMA_4_E2B, GEMMA_4_E4B, EMBEDDING_GEMMA_2)
+  /**
+   * Google's FunctionGemma 270M, fine-tuned for phone actions. Gated: the licence has to be
+   * accepted on Hugging Face and a token put in settings before it will download. About 0.3 s
+   * to an answer on a phone's CPU, which is why it is worth having beside a bigger model.
+   */
+  val MOBILE_ACTIONS =
+    CatalogModel(
+      name = "MobileActions 270M",
+      role = ModelRole.ACTIONS,
+      repoId = "litert-community/functiongemma-270m-ft-mobile-actions",
+      portable = ModelBuild("mobile_actions_q8_ekv1024.litertlm", 288_964_608),
+      minMemoryGb = 4,
+      contextTokens = 1024,
+    )
+
+  val all = listOf(GEMMA_4_E2B, GEMMA_4_E4B, EMBEDDING_GEMMA_2, MOBILE_ACTIONS)
 
   val chatModels = all.filter { it.role == ModelRole.CHAT }
 
