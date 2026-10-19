@@ -279,6 +279,15 @@ class SettingsRepository(private val context: Context) {
   suspend fun setTavilyKey(value: String) = write(TAVILY_KEY, value)
 
   /**
+   * A Hugging Face access token, sent with model downloads from huggingface.co. Empty by
+   * default: the models in the catalog are ungated. Entered on each phone, so an APK passed to
+   * somebody else carries nobody's token.
+   */
+  val hfToken: Flow<String> = read(HF_TOKEN, "")
+
+  suspend fun setHfToken(value: String) = write(HF_TOKEN, value.trim())
+
+  /**
    * The answers to the questions about who the user is, as JSON. See
    * [com.lin.agent.core.persona.personaFrom].
    *
@@ -611,6 +620,7 @@ class SettingsRepository(private val context: Context) {
     val FIRECRAWL_KEY = stringPreferencesKey("firecrawl_key")
     val FIRECRAWL_URL = stringPreferencesKey("firecrawl_url")
     val TAVILY_KEY = stringPreferencesKey("tavily_key")
+    val HF_TOKEN = stringPreferencesKey("hf_token")
     val PERSONA = stringPreferencesKey("persona")
     val STANDING_TASKS = stringPreferencesKey("standing_tasks")
     val REMINDERS = stringPreferencesKey("reminders")
