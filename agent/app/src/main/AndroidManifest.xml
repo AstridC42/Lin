@@ -427,6 +427,15 @@
             </intent-filter>
         </service>
 
+        <!--
+          What makes Android Auto list Lin at all. The car host looks for this entry before it
+          looks for the service above; without it the service is never bound and Lin does not
+          appear on the car's screen.
+        -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
         <!-- The oldest car host Lin can talk to. Level 6 is what the IOT category needs. -->
         <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="6" />
 
