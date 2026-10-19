@@ -51,9 +51,9 @@ sealed interface DownloadOutcome {
  * and the length matches - which means a half-finished file can never be handed to the engine,
  * where it would be a native crash rather than an error.
  *
- * No authentication. The Gemma and EmbeddingGemma builds used here are Apache-2.0 and ungated,
- * which was worth checking: it removes an OAuth flow, a token store and a licence-acceptance
- * screen from this app entirely.
+ * No authentication is needed for the catalog: the Gemma and EmbeddingGemma builds used here are
+ * Apache-2.0 and ungated. A Hugging Face token can still be set in settings, for gated models and
+ * higher rate limits; see [withToken].
  *
  * [openConnection] is injectable so the whole thing is testable without a network.
  */
@@ -178,7 +178,9 @@ class ModelDownload(
 
   private fun describeStatus(status: Int): String =
     when (status) {
-      401, 403 -> "The server refused the download ($status)."
+      401, 403 ->
+        "Hugging Face refused the download ($status). If this model is gated, accept its " +
+          "licence on huggingface.co and put an access token in Settings, under Models."
       404 -> "That model file is not where the app expected it ($status)."
       in 500..599 -> "The server had a problem ($status). Worth trying again."
       else -> "The download failed with status $status."
@@ -206,12 +208,33 @@ class ModelDownload(
     /** The build this device should fetch. */
     fun urlFor(model: CatalogModel): String = urlFor(model.repoId, model.build)
 
-    private fun httpConnection(url: String, rangeFrom: Long): Connection {
+    /** A download that sends [token] to Hugging Face, and to nobody else. */
+    fun withToken(token: String): ModelDownload =
+      ModelDownload { url, rangeFrom -> httpConnection(url, rangeFrom, token) }
+
+    /**
+     * The header that carries a Hugging Face token, or null.
+     *
+     * Only for huggingface.co itself, over HTTPS. A token is a password to somebody's account, and
+     * a model URL pointing anywhere else must not be handed it.
+     */
+    fun authFor(url: String, token: String): Pair<String, String>? {
+      val clean = token.trim()
+      if (clean.isEmpty()) return null
+      val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
+      val host = uri.host?.lowercase() ?: return null
+      if (uri.scheme != "https") return null
+      if (host != "huggingface.co" && !host.endsWith(".huggingface.co")) return null
+      return "Authorization" to "Bearer $clean"
+    }
+
+    private fun httpConnection(url: String, rangeFrom: Long, token: String = ""): Connection {
       val connection = (URL(url).openConnection() as HttpURLConnection).apply {
         instanceFollowRedirects = true
         connectTimeout = 30_000
         readTimeout = 30_000
         if (rangeFrom > 0) setRequestProperty("Range", "bytes=$rangeFrom-")
+        authFor(url, token)?.let { (name, value) -> setRequestProperty(name, value) }
       }
       return object : Connection {
         override val status: Int = connection.responseCode

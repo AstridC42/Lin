@@ -31,6 +31,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.lin.agent.core.diag.CrashReport
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 
 /**
  * Downloads a model while the user gets on with something else.
@@ -96,8 +97,12 @@ class ModelDownloadWorker(private val context: Context, params: WorkerParameters
 
     // One value for both the address and the length to check it against. See ModelBuild.
     val build = model.build
+    // Each phone's own token, if one was entered. See SettingsRepository.hfToken.
+    val token =
+      runCatching { com.lin.agent.core.settings.SettingsRepository(context).hfToken.first() }
+        .getOrDefault("")
     val outcome =
-      ModelDownload()
+      ModelDownload.withToken(token)
         .fetch(
           url = ModelDownload.urlFor(model.repoId, build),
           destination = store.fileFor(model),

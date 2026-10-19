@@ -2425,6 +2425,15 @@ meta-data pointing at an `automotive_app_desc.xml` that declares
 host never looked. Now added. A build installed from outside the Play Store also
 needs Android Auto's developer settings → "Unknown sources" turned on.
 
+### Phase 37 — Each phone's own Hugging Face token
+
+Settings → Models has an optional Hugging Face token field, masked, entered per
+phone. It is sent only with model downloads, only to huggingface.co over HTTPS
+(`ModelDownload.authFor`), so an APK handed to somebody else carries nobody's
+token and theirs goes nowhere but Hugging Face. A 401/403 now says what to do
+(accept the licence, add a token). Every other key — server, search providers,
+MCP — was already per-phone; nothing is built into the APK.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
