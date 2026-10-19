@@ -146,3 +146,34 @@ object Digest {
   private const val MAX_LENGTH = 200
   private const val MIN_WORDS = 3
 }
+
+/**
+ * Whether a fact is already held, by its words.
+ *
+ * The digest used to check this by meaning, with the embedding model - and with no embedding
+ * model downloaded it checked nothing and kept nothing, silently, every time. Words are a
+ * coarser test than meaning, but "Looper's sister is Mia" kept twice is a small price next to
+ * every fact from every conversation thrown away.
+ */
+fun alreadyHeld(fact: String, held: Collection<String>): Boolean {
+  val wanted = flattened(fact)
+  return wanted.isNotEmpty() && held.any { flattened(it) == wanted }
+}
+
+private fun flattened(text: String): String =
+  text.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
+
+/**
+ * One line saying what the last digest did, for the screen that lists what Lin remembers.
+ *
+ * Every way the digest could end used to end the same way: nothing saved, nothing said. That is
+ * how it stopped working without anybody being able to tell - so now each run leaves a line.
+ */
+fun digestReport(whenMillis: Long, kept: Int, found: Int, why: String = ""): String {
+  val time = java.text.SimpleDateFormat("EEE d MMM, HH:mm", java.util.Locale.ENGLISH).format(java.util.Date(whenMillis))
+  return when {
+    why.isNotBlank() -> "$time - nothing kept: $why"
+    found == 0 -> "$time - nothing lasting in that conversation"
+    else -> "$time - kept $kept of $found"
+  }
+}

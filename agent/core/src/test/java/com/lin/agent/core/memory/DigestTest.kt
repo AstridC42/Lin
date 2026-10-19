@@ -157,3 +157,27 @@ class DigestTest {
     assertTrue(Digest.PROMPT, Digest.PROMPT.contains("Do not record what was discussed"))
   }
 }
+
+class DigestHeldTest {
+
+  @Test
+  fun `a fact already held is recognised by its words`() {
+    assertTrue(alreadyHeld("Looper's sister is Mia.", listOf("looper's sister is mia")))
+    assertTrue(alreadyHeld("Looper lives in Tel Aviv", listOf("Looper  lives in Tel Aviv!")))
+  }
+
+  @Test
+  fun `a different fact is not`() {
+    assertFalse(alreadyHeld("Looper's brother is Tom", listOf("Looper's sister is Mia")))
+    assertFalse(alreadyHeld("   ", listOf("")))
+  }
+
+  @Test
+  fun `the report says what happened`() {
+    val noon = java.util.Calendar.getInstance().apply { set(2026, 9, 19, 12, 5) }.timeInMillis
+    assertTrue(digestReport(noon, kept = 2, found = 3).endsWith("kept 2 of 3"))
+    assertTrue(digestReport(noon, 0, 0).endsWith("nothing lasting in that conversation"))
+    assertTrue(digestReport(noon, 0, 0, why = "no model was ready").endsWith("nothing kept: no model was ready"))
+    assertTrue(digestReport(noon, 0, 0).startsWith("Mon 19 Oct, 12:05"))
+  }
+}
