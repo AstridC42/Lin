@@ -144,6 +144,7 @@ data class SettingsState(
   val tavilyKey: String = "",
   /** Hugging Face access token for model downloads. Empty for none. */
   val hfToken: String = "",
+  val webImages: Boolean = true,
   /** What a trial search actually got back, for a screen that must say facts rather than verdicts. */
   val searchTrial: String = "",
   val searchTrying: Boolean = false,
@@ -256,6 +257,7 @@ constructor(
           firecrawlUrl = settings.firecrawlUrl.first(),
           tavilyKey = settings.tavilyKey.first(),
           hfToken = settings.hfToken.first(),
+          webImages = settings.webImages.first(),
           persona = personaFrom(settings.persona.first()),
           standing = tasksFrom(settings.standingTasks.first()),
           reminders = reminders.ahead(),
@@ -674,6 +676,11 @@ constructor(
   fun onFirecrawlUrlChanged(value: String) {
     _state.update { it.copy(firecrawlUrl = value) }
     viewModelScope.launch { settings.setFirecrawlUrl(value) }
+  }
+
+  fun setWebImages(on: Boolean) {
+    _state.update { it.copy(webImages = on) }
+    viewModelScope.launch { settings.setWebImages(on) }
   }
 
   fun onHfTokenChanged(value: String) {

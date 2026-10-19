@@ -29,6 +29,8 @@ import com.lin.agent.core.web.looksLikeABotCheck
 import com.lin.agent.core.web.nothingCameBack
 import com.lin.agent.core.web.plainerQuery
 import com.lin.agent.core.web.readableText
+import com.lin.agent.core.web.markdownImage
+import com.lin.agent.core.web.pageImage
 import com.lin.agent.core.web.relevantPassages
 import com.lin.agent.core.web.samePagesAgain
 import com.lin.agent.core.web.searchBriefing
@@ -99,7 +101,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
 
     val chosen = searchProviderNamed(runCatching { settings.searchProvider.first() }.getOrNull())
     val first = attempt(chosen, query)
-    if (first is Attempt.Found) return ToolResult.Ok(briefed(query, first.hits, sourceNote(chosen)))
+    if (first is Attempt.Found) return briefed(query, first.hits, sourceNote(chosen))
 
     // The question may simply have been over-worded - worth one more try with the same
     // service, but only when it answered and found nothing. A service that is down or
@@ -113,7 +115,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
       if (fallback == chosen) continue
       val next = attempt(fallback, query)
       if (next is Attempt.Found) {
-        return ToolResult.Ok(briefed(query, next.hits, fallbackNote(chosen, first.why, fallback)))
+        return briefed(query, next.hits, fallbackNote(chosen, first.why, fallback))
       }
     }
 
@@ -174,13 +176,11 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
   private suspend fun tryPlainly(query: String, provider: SearchProvider): ToolResult? {
     val plainer = plainerQuery(query) ?: return null
     val found = attempt(provider, plainer) as? Attempt.Found ?: return null
-    return ToolResult.Ok(
-      briefed(
-        plainer,
-        found.hits,
-        "\"$query\" found nothing, so this is the same question in plainer words" +
-          sourceNote(provider).let { if (it.isEmpty()) "" else "; $it" },
-      )
+    return briefed(
+      plainer,
+      found.hits,
+      "\"$query\" found nothing, so this is the same question in plainer words" +
+        sourceNote(provider).let { if (it.isEmpty()) "" else "; $it" },
     )
   }
 
@@ -235,7 +235,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
    * has arrived by the deadline is used, and a page that missed it falls back to its snippet,
    * marked as such so the model knows the difference.
    */
-  private suspend fun briefed(query: String, hits: List<SearchHit>, note: String): String {
+  private suspend fun briefed(query: String, hits: List<SearchHit>, note: String): ToolResult {
     // Going round in a circle is caught before any page is fetched: the model has already
     // been given these pages, and fetching them again only makes the circle slower.
     val urls = hits.mapNotNull { it.url.takeIf(String::isNotEmpty) }
@@ -245,7 +245,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
         recent.removeAll { now - it.first > RECENT_MS }
         recent.map { it.second }
       }
-    if (samePagesAgain(urls, earlier)) return goingRoundText(query, hits.map { it.title })
+    if (samePagesAgain(urls, earlier)) return ToolResult.Ok(goingRoundText(query, hits.map { it.title }))
     synchronized(recent) { recent.add(now to urls.toSet()) }
 
     // One more than will be used: when a page turns out to be a bot check, the next result
@@ -267,6 +267,9 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
     val pending = toRead.map { hit -> hit to reader.async { runCatching { web.get(hit.url) }.getOrNull() } }
     val deadline = System.currentTimeMillis() + READ_DEADLINE_MS
     val texts = sent.toMutableMap()
+    // The pages' own preview pictures, in result order, for the screen - see pageImage.
+    val pictures = linkedMapOf<String, String>()
+    hits.filter { it.url in sent }.forEach { hit -> markdownImage(hit.page, hit.url)?.let { pictures[hit.url] = it } }
     try {
       for ((hit, job) in pending) {
         val left = deadline - System.currentTimeMillis()
@@ -274,6 +277,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
         if (page == null || !page.ok) continue
         if (page.contentType.isNotEmpty() && READABLE.none { page.contentType.startsWith(it) }) continue
         if (texts.size >= PAGES_READ) break
+        pageImage(page.body, hit.url)?.let { pictures[hit.url] = it }
         val text = readableText(page.body)
         // A challenge page is not the page. Left as unread, so it falls back to its snippet,
         // marked as such - a small model will otherwise summarise a CAPTCHA.
@@ -285,7 +289,20 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
       // Stragglers are abandoned rather than waited for: their answer is no longer wanted.
       reader.cancel()
     }
-    return searchBriefing(query, hits.map { ReadHit(it, texts[it.url].orEmpty()) }, note)
+    val briefing = searchBriefing(query, hits.map { ReadHit(it, texts[it.url].orEmpty()) }, note)
+    val showing =
+      if (runCatching { settings.webImages.first() }.getOrDefault(true)) {
+        hits.mapNotNull { pictures[it.url] }.distinct().take(PICTURES_SHOWN)
+      } else {
+        emptyList()
+      }
+    if (showing.isEmpty()) return ToolResult.Ok(briefing)
+    // Told, so the model neither describes pictures it cannot see nor lists their addresses.
+    return ToolResult.Ok(
+      briefing + "\n\nPictures from these pages are already shown to the user beside your " +
+        "answer. Do not describe them or list their addresses.",
+      shows = showing,
+    )
   }
 
   private fun notSetUp(provider: SearchProvider) =
@@ -338,6 +355,8 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
 
     /** How many results are read in full. Three covers the official page and two others. */
     const val PAGES_READ = 3
+    /** Pictures shown beside a web answer. A row, not a gallery. */
+    const val PICTURES_SHOWN = 4
 
     /**
      * Characters kept from each page. Three of these is under two thousand tokens, which

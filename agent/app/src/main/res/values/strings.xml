@@ -655,4 +655,7 @@
   <string name="car_chat_thinking">Lin is answering…</string>
   <string name="car_chat_failed">Sorry, that didn’t work. Try asking again.</string>
   <string name="car_chat_no_model">I can’t reach a model right now. Check Lin’s settings when you’ve stopped.</string>
+  <string name="settings_web_images">Show pictures from search results</string>
+  <string name="settings_web_images_detail">Shows the preview picture each result page offers, beside the answer. Tap one to open it.</string>
+  <string name="web_image">Picture from a search result</string>
 </resources>

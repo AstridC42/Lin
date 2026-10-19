@@ -278,6 +278,11 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setTavilyKey(value: String) = write(TAVILY_KEY, value)
 
+  /** Show the result pages' own pictures beside a web answer. On unless turned off. */
+  val webImages: Flow<Boolean> = read(WEB_IMAGES, true)
+
+  suspend fun setWebImages(value: Boolean) = write(WEB_IMAGES, value)
+
   /**
    * A Hugging Face access token, sent with model downloads from huggingface.co. Empty by
    * default: the models in the catalog are ungated. Entered on each phone, so an APK passed to
@@ -626,6 +631,7 @@ class SettingsRepository(private val context: Context) {
     val FIRECRAWL_URL = stringPreferencesKey("firecrawl_url")
     val TAVILY_KEY = stringPreferencesKey("tavily_key")
     val HF_TOKEN = stringPreferencesKey("hf_token")
+    val WEB_IMAGES = booleanPreferencesKey("web_images")
     val PERSONA = stringPreferencesKey("persona")
     val STANDING_TASKS = stringPreferencesKey("standing_tasks")
     val REMINDERS = stringPreferencesKey("reminders")
