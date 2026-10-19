@@ -144,7 +144,7 @@ object CarChat {
       manager.notify(
         ID,
         NotificationCompat.Builder(context, CHANNEL)
-          .setSmallIcon(R.drawable.lin_mark_mono)
+          .setSmallIcon(R.drawable.ic_notification)
           .setStyle(style)
           .setCategory(NotificationCompat.CATEGORY_MESSAGE)
           .setContentIntent(open)
