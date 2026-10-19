@@ -52,6 +52,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import java.time.ZoneId
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -80,6 +81,8 @@ class LinCarScreen(carContext: CarContext) : Screen(carContext), DefaultLifecycl
     fun reminders(): ReminderBook
 
     fun relay(): NotificationRelay
+
+    fun settings(): com.lin.agent.core.settings.SettingsRepository
   }
 
   private val deps by lazy {
@@ -101,6 +104,12 @@ class LinCarScreen(carContext: CarContext) : Screen(carContext), DefaultLifecycl
    */
   override fun onStart(owner: LifecycleOwner) {
     refresh()
+    // Opening Lin in the car puts the conversation back if it is switched on and was dismissed,
+    // so there is always a message to reply to.
+    lifecycleScope.launch {
+      val wanted = runCatching { deps.settings().carChat.first() }.getOrDefault(false)
+      if (wanted && !CarChat.isShowing(carContext)) CarChat.greet(carContext)
+    }
   }
 
   override fun onGetTemplate(): Template {

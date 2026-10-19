@@ -74,6 +74,9 @@ class ChatHistory @Inject constructor(@ApplicationContext context: Context) {
 
   fun find(id: String): SavedChat? = _chats.value.firstOrNull { it.id == id }
 
+  /** Waits until the file has been read, for callers that start with the app closed. */
+  suspend fun ready() = loaded.join()
+
   private fun write() {
     scope.launch {
       loaded.join()

@@ -2434,6 +2434,27 @@ token and theirs goes nowhere but Hugging Face. A 401/403 now says what to do
 (accept the licence, add a token). Every other key — server, search providers,
 MCP — was already per-phone; nothing is built into the APK.
 
+### Phase 38 — Lin as a conversation in Android Auto
+
+Android Auto's microphone button belongs to Google's assistant, and an ongoing
+notification never reaches the car screen. What Android Auto does carry for any
+app is messaging: it announces a message, reads it aloud, and sends a spoken
+reply back as text. So with "Chat with Lin in Android Auto" on, Lin posts a
+MessagingStyle notification (reply action with a RemoteInput, mark-as-read,
+semantic actions, no UI), declared with `<uses name="notification"/>`.
+
+A reply goes to `CarChatReceiver`, which updates the notification at once (the
+car shows a spinner until it changes) and queues `CarChatWorker` — expedited,
+appended so replies are answered in order. The worker continues the car
+conversation from the last half hour, runs a turn told the person is driving
+(one to three spoken sentences), and posts the answer with sound so the car
+announces it. The car hears `forTheCar(answer)`: no sources, citations,
+addresses or markdown, cut at a sentence. The full answer and the whole drive
+are kept in the history drawer under ids starting `car-`.
+
+The greeting that gives the driver something to reply to is posted when the
+setting is turned on, when Lin opens, and when Lin's car screen opens.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

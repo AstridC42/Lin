@@ -161,6 +161,7 @@ data class SettingsState(
   val disabledTools: Set<String> = emptySet(),
   /** Whether the "listen in the car" notification is kept up. */
   val carNotification: Boolean = false,
+  val carChat: Boolean = false,
   /** Whether the panel may appear over the lock screen, which a car needs. */
   val answerWhenLocked: Boolean = false,
   val spokenReplies: Boolean = true,
@@ -262,6 +263,7 @@ constructor(
           toolListing = tools.listing(),
           disabledTools = disabledFrom(settings.disabledTools.first()),
           carNotification = settings.carNotification.first(),
+          carChat = settings.carChat.first(),
           answerWhenLocked = settings.answerWhenLocked.first(),
           spokenReplies = settings.spokenReplies.first(),
           speakWhen = speakWhenNamed(settings.speakWhen.first()),
@@ -893,6 +895,14 @@ constructor(
     viewModelScope.launch {
       settings.setCarNotification(on)
       CarNotification.show(appContext, on)
+    }
+  }
+
+  fun setCarChat(on: Boolean) {
+    _state.update { it.copy(carChat = on) }
+    viewModelScope.launch {
+      settings.setCarChat(on)
+      if (on) com.lin.agent.car.CarChat.greet(appContext) else com.lin.agent.car.CarChat.cancel(appContext)
     }
   }
 

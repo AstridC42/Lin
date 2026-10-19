@@ -436,6 +436,11 @@
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
 
+        <!-- A reply spoken in Android Auto, arriving as text. Only Lin's own notification can send it. -->
+        <receiver
+            android:name=".car.CarChatReceiver"
+            android:exported="false" />
+
         <!-- The oldest car host Lin can talk to. Level 6 is what the IOT category needs. -->
         <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="6" />
 
