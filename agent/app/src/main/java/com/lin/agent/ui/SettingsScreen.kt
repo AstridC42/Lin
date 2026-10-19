@@ -1576,6 +1576,22 @@ private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewM
         )
     }
 
+    Row(
+      modifier = Modifier.fillMaxWidth().clickable { viewModel.setWebImages(!state.webImages) }.padding(vertical = 4.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(stringResource(R.string.settings_web_images), style = MaterialTheme.typography.bodyLarge)
+        Text(
+          stringResource(R.string.settings_web_images_detail),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      Switch(checked = state.webImages, onCheckedChange = viewModel::setWebImages)
+    }
+
     Text(
       stringResource(R.string.settings_search_fallback_note),
       style = MaterialTheme.typography.bodySmall,

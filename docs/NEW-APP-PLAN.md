@@ -2455,6 +2455,27 @@ are kept in the history drawer under ids starting `car-`.
 The greeting that gives the driver something to reply to is posted when the
 setting is turned on, when Lin opens, and when Lin's car screen opens.
 
+### Phase 39 — Instant commands, and pictures with search
+
+**The lag on "flashlight on".** Every command went through the model twice: once
+to choose the tool, once to say it was done — on a 12B server model, a second or
+two before the light came on. `quickCommand` now matches the plain ones (switch
+X on/off; open/launch an app) and runs the tool at once, answering with the
+tool's own first sentence (`quickReply`). It is deliberately narrow — questions,
+"and"/"then", commas, timing words and long phrases go to the model — and a
+command that fails falls through to the model, which can explain or try another
+way. Considered instead: Google's FunctionGemma "Mobile Actions" fine-tune
+(270M, ~290 MB, ~0.3 s to first token on CPU, 85% on its own eval). It would
+still be a model call, 15% wrong on its own test set, and its function names are
+not Lin's; a matcher is instant and never wrong on what it matches. It remains
+an option for fuzzier phrasings later.
+
+**Pictures in web answers.** The pages a search already reads name their own
+preview picture (`og:image`, `twitter:image`; or the first image in a page a
+service sent as Markdown). Up to four are shown beside the answer, tappable,
+with icons and logos skipped and large images decoded at display size. On by
+default; Settings → Web search → "Show pictures from search results".
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a
