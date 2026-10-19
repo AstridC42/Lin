@@ -314,6 +314,9 @@ constructor(
 
   fun detach(item: Attachment) = _state.update { it.copy(attached = it.attached - item) }
 
+  /** A picture made inside the app - a cut-out - joining the next message. */
+  fun attachPicture(item: Attachment.Picture) = _state.update { it.copy(attached = it.attached + item, error = "") }
+
   /**
    * Ends this conversation and begins another.
    *

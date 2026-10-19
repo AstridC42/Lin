@@ -129,6 +129,8 @@ kotlin {
 dependencies {
   implementation(project(":core"))
   implementation(project(":engine"))
+  // Photo cut-out: the interactive segmenter. See model/Segmenter.
+  implementation(libs.tasks.vision)
 
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.lifecycle.runtime.ktx)

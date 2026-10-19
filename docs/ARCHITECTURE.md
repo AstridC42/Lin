@@ -79,6 +79,21 @@ All in the app's private storage; nothing is uploaded.
 | Downloaded models | `files/models/` |
 | Documents Lin writes | `files/` (see `core/documents`) |
 
+## Photo cut-out
+
+`ui/CutOutScreen` and `ui/CutOutViewModel`: the photo is decoded at up to 1280 px, each tap
+becomes a positive or negative stroke for MediaPipe's interactive segmenter (`model/Segmenter`,
+the Magic Touch model from `ModelCatalog.MAGIC_TOUCH`), and the per-pixel confidence it returns
+is turned into soft edges, cropped, blurred and blended by plain functions in
+`core/media/CutOut` - which is where the tests are.
+
+## Layout on foldables
+
+`core/fold/listPaneWidth` decides: under 600 dp the history is a drawer; wider, it is a pane
+beside the conversation, about a third of the width, or exactly at the hinge when the phone is
+half open like a book (`ui/Fold.rememberHingeLeftDp`). Tabletop posture keeps its own split:
+conversation above the crease, composer below.
+
 ## Android integrations
 
 - **Assistant role**: `AssistActivity` and the `ASSIST` intent; `voice/` has dictation, speech and

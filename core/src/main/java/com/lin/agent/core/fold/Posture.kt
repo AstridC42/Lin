@@ -55,3 +55,27 @@ fun postureOf(halfOpened: Boolean, hingeIsHorizontal: Boolean): Posture =
  * bottom would cut both pages in half, which is worse than not splitting at all.
  */
 fun splitAcrossTheCrease(posture: Posture): Boolean = posture == Posture.TABLETOP
+
+/**
+ * How wide the conversation list is when it sits beside the conversation, in dp, or null for a
+ * single pane with the list in a drawer.
+ *
+ * Two panes from 600 dp, the width where Android's own guidance and every list-and-detail app
+ * stop treating a screen as a phone - an unfolded Fold, a tablet, a phone in landscape with room.
+ * The list takes about a third, held between a width its titles can be read at and one that
+ * does not squeeze the conversation.
+ *
+ * Half open like a book, the split goes on the hinge instead: anything drawn across a crease
+ * that is folded is read around a corner. Flat open, the hinge is invisible and ignored.
+ */
+fun listPaneWidth(windowWidthDp: Int, posture: Posture, hingeLeftDp: Int? = null): Int? {
+  if (windowWidthDp < TWO_PANES_FROM_DP) return null
+  if (posture == Posture.BOOK && hingeLeftDp != null && hingeLeftDp in MIN_LIST_DP..(windowWidthDp - MIN_LIST_DP)) {
+    return hingeLeftDp
+  }
+  return (windowWidthDp * 0.34f).toInt().coerceIn(MIN_LIST_DP, MAX_LIST_DP)
+}
+
+const val TWO_PANES_FROM_DP = 600
+private const val MIN_LIST_DP = 260
+private const val MAX_LIST_DP = 380

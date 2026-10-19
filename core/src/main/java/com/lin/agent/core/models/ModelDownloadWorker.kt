@@ -104,7 +104,7 @@ class ModelDownloadWorker(private val context: Context, params: WorkerParameters
     val outcome =
       ModelDownload.withToken(token)
         .fetch(
-          url = ModelDownload.urlFor(model.repoId, build),
+          url = model.directUrl ?: ModelDownload.urlFor(model.repoId, build),
           destination = store.fileFor(model),
           expectedBytes = build.sizeBytes,
           onProgress = { progress ->

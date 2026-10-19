@@ -37,6 +37,8 @@ a company's cloud unless you point it there.
 - Chat with streaming answers, Markdown, sources as chips, copy / read aloud / retry / share.
 - Conversation history in a side drawer, with search.
 - Attach photos and documents (PDF, Word, text).
+- **Photo cut-out:** tap anything in a photo to cut it out, save it as a transparent PNG, blur
+  the background, share it, or ask Lin about it. Runs on the phone (Google's Magic Touch model).
 - Voice in and out; Lin can be set as the phone's default digital assistant.
 - Shows the model's thinking when the model supports it.
 
@@ -59,7 +61,8 @@ a company's cloud unless you point it there.
 - Routines: questions Lin asks itself on a schedule and notifies you with the answer.
 - MCP client: connect Lin to any Model Context Protocol server for more tools.
 - Optional Shizuku integration for switches Android normally keeps from apps.
-- Built for foldables: flex mode puts the conversation above the crease.
+- Built for foldables: unfolded, the chat list sits beside the conversation (split on the hinge
+  when half open like a book); in tabletop mode the conversation goes above the crease.
 
 ## Models
 
@@ -68,6 +71,7 @@ a company's cloud unless you point it there.
 | On the phone | Gemma 4 E2B / E4B (LiteRT-LM) | Downloads in the app, 2.6–3.7 GB. Works offline. |
 | On the phone | MobileActions 270M (optional) | Handles short commands in about 0.3 s. Gated: needs a Hugging Face token. |
 | On the phone | EmbeddingGemma (optional) | Memory and photo search by meaning. |
+| On the phone | Magic Touch (optional) | Photo cut-out. 30 MB, downloads the first time you use it. |
 | Your server | Any model on Ollama, vLLM, Unsloth or another OpenAI-compatible server | Settings → Model server. |
 
 Each message goes to the fastest thing that can handle it: an instant command, then the small
