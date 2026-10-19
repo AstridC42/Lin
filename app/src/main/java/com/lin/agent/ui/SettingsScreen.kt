@@ -738,6 +738,21 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
         }
         Switch(checked = state.voiceChat, onCheckedChange = viewModel::setVoiceChat)
       }
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(stringResource(R.string.settings_background_voice), style = MaterialTheme.typography.bodyLarge)
+          Text(
+            stringResource(R.string.settings_background_voice_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(checked = state.backgroundVoice, onCheckedChange = viewModel::setBackgroundVoice)
+      }
     }
 
     // The voice itself. Asked for when this group is opened rather than at start-up: the

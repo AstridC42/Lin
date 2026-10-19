@@ -108,6 +108,11 @@ Two ways past:
 - **Photo cut-out:** + → **Cut out from a photo**. The first time, Lin downloads Google's Magic
   Touch model (30 MB). Tap the object; switch to **Remove** to take parts away. Saved cut-outs go
   to Pictures/Lin.
+- **Widgets:** long-press the home screen → Widgets → Lin. **Ask Lin** is a bar to type or talk
+  (make it taller for one-tap questions); **Last answer** shows your latest question and answer.
+- **Talk in the background:** Settings → Voice → **Keep talking in the background**. A voice
+  conversation then carries on with the screen off or in another app; a notification shows the
+  microphone is in use, with Stop.
 - **On your watch** (Wear OS 3 or newer: Galaxy Watch 4 and later, Pixel Watch): a watch cannot
   install an APK from a browser, so `lin-…-wear.apk` goes on through the watch's debugging:
   1. On the watch: Settings → About watch → Software information → tap **Software version** five

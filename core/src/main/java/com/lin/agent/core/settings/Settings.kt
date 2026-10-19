@@ -158,6 +158,14 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setVoiceChat(value: Boolean) = write(VOICE_CHAT, value)
 
+  /**
+   * Whether a voice conversation keeps going when Lin leaves the screen or the screen locks.
+   * Off: it needs a microphone notification for as long as the conversation lasts.
+   */
+  val backgroundVoice: Flow<Boolean> = read(BACKGROUND_VOICE, false)
+
+  suspend fun setBackgroundVoice(value: Boolean) = write(BACKGROUND_VOICE, value)
+
   val voiceName: Flow<String> = read(VOICE_NAME, "")
 
   suspend fun setVoiceName(value: String) = write(VOICE_NAME, value)
@@ -637,6 +645,7 @@ class SettingsRepository(private val context: Context) {
     val TAVILY_KEY = stringPreferencesKey("tavily_key")
     val HF_TOKEN = stringPreferencesKey("hf_token")
     val WEB_IMAGES = booleanPreferencesKey("web_images")
+    val BACKGROUND_VOICE = booleanPreferencesKey("background_voice")
     val QUICK_ACTIONS_MODEL = booleanPreferencesKey("quick_actions_model")
     val PERSONA = stringPreferencesKey("persona")
     val STANDING_TASKS = stringPreferencesKey("standing_tasks")

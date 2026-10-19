@@ -379,6 +379,14 @@ constructor(
     // a battery optimiser, a restore onto another phone - and arming an alarm that is already
     // armed costs nothing.
     viewModelScope.launch { runCatching { reminders.rearm() } }
+    // Stop on the background conversation's notification ends it here too.
+    viewModelScope.launch {
+      com.lin.agent.voice.VoiceSession.stops.collect {
+        stopListening()
+        speaker.stop()
+        stop()
+      }
+    }
     // The small action model is loaded while the person is still reading the screen.
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) { runCatching { quickActions.warm() } }
     viewModelScope.launch {
@@ -417,6 +425,13 @@ constructor(
   /** Opens the microphone and sends what it hears. */
   fun startListening() {
     if (_state.value.listening) return
+    // Started here, while the person is tapping the microphone - the one moment Android allows
+    // it - so the conversation can carry on if they then leave the app. See VoiceSession.
+    viewModelScope.launch {
+      if (runCatching { settings.backgroundVoice.first() }.getOrDefault(false)) {
+        com.lin.agent.voice.VoiceSession.begin(appContext)
+      }
+    }
     speaker.stop()
     listening?.cancel()
     _state.update { it.copy(listening = true, heard = "", error = "") }
@@ -430,8 +445,10 @@ constructor(
               asked = Asked.SPOKEN
               send(event.text, spoken = true)
             }
-            is Heard.Failed ->
+            is Heard.Failed -> {
               _state.update { it.copy(listening = false, heard = "", error = event.message) }
+              endVoiceSessionIfQuiet()
+            }
           }
         }
       }
@@ -441,6 +458,13 @@ constructor(
     listening?.cancel()
     listening = null
     _state.update { it.copy(listening = false, heard = "") }
+    endVoiceSessionIfQuiet()
+  }
+
+  /** The background session ends once nothing is being said, heard or answered. */
+  private fun endVoiceSessionIfQuiet() {
+    val now = _state.value
+    if (!now.listening && !now.inProgress) com.lin.agent.voice.VoiceSession.end(appContext)
   }
 
   /**
@@ -559,8 +583,12 @@ constructor(
       )
     }
     persist(complete)
-    if (shouldSpeak(speakWhenNamed(settings.speakWhen.first()), asked, inCar(appContext))) {
-      speaker.say(reply)
+    val speaking = shouldSpeak(speakWhenNamed(settings.speakWhen.first()), asked, inCar(appContext))
+    val carryOn = shouldListenAgain(settings.voiceChat.first(), asked, spoke = speaking)
+    if (speaking) {
+      speaker.say(reply, whenDone = { if (carryOn) startListening() else endVoiceSessionIfQuiet() })
+    } else {
+      endVoiceSessionIfQuiet()
     }
     return true
   }
@@ -718,7 +746,12 @@ constructor(
                   // The microphone reopens from the engine's own "finished" callback rather
                   // than after a guessed delay: opened a moment too early it hears Lin, and a
                   // delay long enough to be safe is long enough to feel broken.
-                  speaker.say(event.text, whenDone = { if (carryOn) startListening() })
+                  speaker.say(
+                    event.text,
+                    whenDone = { if (carryOn) startListening() else endVoiceSessionIfQuiet() },
+                  )
+                } else {
+                  endVoiceSessionIfQuiet()
                 }
               }
               is LoopEvent.Failed -> {
@@ -737,6 +770,7 @@ constructor(
                     backendId = backend.id,
                   )
                 }
+                endVoiceSessionIfQuiet()
               }
             }
           }

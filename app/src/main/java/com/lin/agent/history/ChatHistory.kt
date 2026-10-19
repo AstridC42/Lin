@@ -44,7 +44,7 @@ import kotlinx.coroutines.sync.withLock
  * in the background after every change. Nothing leaves the phone.
  */
 @Singleton
-class ChatHistory @Inject constructor(@ApplicationContext context: Context) {
+class ChatHistory @Inject constructor(@ApplicationContext private val context: Context) {
 
   private val file = File(context.filesDir, NAME)
   private val writing = Mutex()
@@ -93,6 +93,8 @@ class ChatHistory @Inject constructor(@ApplicationContext context: Context) {
           }
           .onFailure { Log.w(TAG, "Could not save the conversation history", it) }
       }
+      // The home screen widget shows the latest answer, so it follows the history.
+      com.lin.agent.widget.LastAnswerWidget.refresh(context)
     }
   }
 

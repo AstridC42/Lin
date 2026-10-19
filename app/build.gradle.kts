@@ -134,6 +134,9 @@ dependencies {
   // The watch app talks to the phone over Wear OS's Data Layer. See wear/WearBridge.
   implementation(libs.play.services.wearable)
   implementation(libs.kotlinx.coroutines.play.services)
+  // Home screen widgets. See widget/.
+  implementation(libs.glance.appwidget)
+  implementation(libs.glance.material3)
 
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.lifecycle.runtime.ktx)
