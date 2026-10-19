@@ -195,6 +195,7 @@ constructor(
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val reminders: com.lin.agent.remind.ReminderBook,
+  private val history: com.lin.agent.history.ChatHistory,
   private val saved: SavedStateHandle,
 ) : ViewModel() {
 
@@ -241,6 +242,55 @@ constructor(
   }
 
   fun discardStagedReply() = relay.discard()
+
+  /** Past conversations, newest first, for the drawer. */
+  val chats = history.chats
+
+  /** The conversation on screen, so the drawer can mark it. */
+  val currentChatId: String?
+    get() = saved[KEY_CONVERSATION_ID]
+
+  /**
+   * Brings back a past conversation, where it was left.
+   *
+   * The one on screen is saved first, so opening another never loses it. Marked as just active,
+   * or the half-hour boundary in [conversationNow] would clear it again on the next message.
+   */
+  fun openChat(id: String) {
+    if (_state.value.inProgress) stop()
+    val chat = history.find(id) ?: return
+    saved.get<String>(KEY_CONVERSATION_ID)?.let { captureNow(it) }
+    saved[KEY_CONVERSATION_ID] = chat.id
+    saved[KEY_LAST_ACTIVE] = System.currentTimeMillis()
+    speaker.stop()
+    stopListening()
+    val messages =
+      chat.lines.map { Message(if (it.fromUser) Message.Role.USER else Message.Role.ASSISTANT, it.text) }
+    _state.update {
+      it.copy(
+        messages = messages,
+        attached = emptyList(),
+        streaming = "",
+        thinking = "",
+        error = "",
+        shows = emptyList(),
+        toolRuns = emptyList(),
+      )
+    }
+    saved[KEY_ROLES] = ArrayList(messages.map { it.role.name })
+    saved[KEY_TEXTS] = ArrayList(messages.map { it.text })
+  }
+
+  /** Forgets a past conversation. Deleting the one on screen starts a fresh one. */
+  fun deleteChat(id: String) {
+    history.delete(id)
+    if (id == saved.get<String>(KEY_CONVERSATION_ID)) {
+      saved[KEY_CONVERSATION_ID] = java.util.UUID.randomUUID().toString()
+      _state.update { it.copy(messages = emptyList(), streaming = "", error = "", toolRuns = emptyList()) }
+      saved[KEY_ROLES] = ArrayList<String>()
+      saved[KEY_TEXTS] = ArrayList<String>()
+    }
+  }
 
   /**
    * Takes on a file or a picture for the next message.
@@ -840,6 +890,21 @@ constructor(
   private fun persist(messages: List<Message>) {
     saved[KEY_ROLES] = ArrayList(messages.map { it.role.name })
     saved[KEY_TEXTS] = ArrayList(messages.map { it.text })
+    // Into the history as well: what was said by either side, not tool results or prompts.
+    val id = saved.get<String>(KEY_CONVERSATION_ID) ?: return
+    val lines =
+      messages
+        .filter { (it.role == Message.Role.USER || it.role == Message.Role.ASSISTANT) && it.text.isNotBlank() }
+        .map { com.lin.agent.core.history.SavedLine(it.role == Message.Role.USER, it.text) }
+    if (lines.none { it.fromUser }) return
+    history.save(
+      com.lin.agent.core.history.SavedChat(
+        id,
+        com.lin.agent.core.history.chatTitle(lines),
+        System.currentTimeMillis(),
+        lines,
+      )
+    )
   }
 
   private fun restored(): List<Message> {
