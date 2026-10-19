@@ -196,6 +196,7 @@ constructor(
   private val settings: SettingsRepository,
   private val reminders: com.lin.agent.remind.ReminderBook,
   private val history: com.lin.agent.history.ChatHistory,
+  private val quickActions: com.lin.agent.model.QuickActions,
   private val saved: SavedStateHandle,
 ) : ViewModel() {
 
@@ -375,6 +376,8 @@ constructor(
     // a battery optimiser, a restore onto another phone - and arming an alarm that is already
     // armed costs nothing.
     viewModelScope.launch { runCatching { reminders.rearm() } }
+    // The small action model is loaded while the person is still reading the screen.
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) { runCatching { quickActions.warm() } }
     viewModelScope.launch {
       runCatching {
         val persona = personaOrDefault(personaFrom(settings.persona.first()))
@@ -525,7 +528,12 @@ constructor(
    * flashlight that is all lag and no judgement. See [com.lin.agent.core.tools.quickCommand].
    */
   private suspend fun quickly(said: String): Boolean {
-    val command = com.lin.agent.core.tools.quickCommand(said) ?: return false
+    // The instant matcher first, then the small on-phone model, then - by returning false -
+    // the main model on the server or the phone.
+    val command =
+      com.lin.agent.core.tools.quickCommand(said)
+        ?: runCatching { quickActions.pick(said) }.getOrNull()
+        ?: return false
     if (command.tool in withheldThisTurn()) return false
     val tool = registry.find(AgentRole.ORCHESTRATOR, command.tool) ?: return false
     val before = _state.value.toolRuns

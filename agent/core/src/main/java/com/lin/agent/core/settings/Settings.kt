@@ -283,6 +283,11 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setWebImages(value: Boolean) = write(WEB_IMAGES, value)
 
+  /** Let MobileActions 270M try short commands first, when it is downloaded. */
+  val quickActionsModel: Flow<Boolean> = read(QUICK_ACTIONS_MODEL, true)
+
+  suspend fun setQuickActionsModel(value: Boolean) = write(QUICK_ACTIONS_MODEL, value)
+
   /**
    * A Hugging Face access token, sent with model downloads from huggingface.co. Empty by
    * default: the models in the catalog are ungated. Entered on each phone, so an APK passed to
@@ -632,6 +637,7 @@ class SettingsRepository(private val context: Context) {
     val TAVILY_KEY = stringPreferencesKey("tavily_key")
     val HF_TOKEN = stringPreferencesKey("hf_token")
     val WEB_IMAGES = booleanPreferencesKey("web_images")
+    val QUICK_ACTIONS_MODEL = booleanPreferencesKey("quick_actions_model")
     val PERSONA = stringPreferencesKey("persona")
     val STANDING_TASKS = stringPreferencesKey("standing_tasks")
     val REMINDERS = stringPreferencesKey("reminders")

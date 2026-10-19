@@ -658,4 +658,6 @@
   <string name="settings_web_images">Show pictures from search results</string>
   <string name="settings_web_images_detail">Shows the preview picture each result page offers, beside the answer. Tap one to open it.</string>
   <string name="web_image">Picture from a search result</string>
+  <string name="settings_quick_actions">Quick actions on the phone first</string>
+  <string name="settings_quick_actions_detail">MobileActions 270M handles short commands (flashlight, calendar events, maps) on the phone in a fraction of a second. Everything else goes to your server or main model.</string>
 </resources>

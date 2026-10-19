@@ -2476,6 +2476,28 @@ service sent as Markdown). Up to four are shown beside the answer, tappable,
 with icons and logos skipped and large images decoded at display size. On by
 default; Settings → Web search → "Show pictures from search results".
 
+### Phase 40 — A small model goes first
+
+The routing asked for: little tasks on the phone, everything else to the server
+or the main local model. Order per message: the instant matcher (Phase 39,
+no model), then MobileActions 270M if downloaded, then the main model.
+
+MobileActions is FunctionGemma 270M fine-tuned on Google's Mobile Actions set.
+It knows seven functions; four map to Lin (flashlight on/off →
+`phone_setting`, `create_calendar_event` → `add_to_calendar`, which only opens
+the calendar filled in, `show_map` → `navigate`). It is given those four, in its
+dataset's words and its trained prompt (`mobileActionsPrompt`). Two guards keep
+chat out of it: it is asked only when the request's words point at one of its
+actions (`actionsFor` — flashlight/torch, calendar/meeting/event, map/directions),
+and a pick outside those is discarded (`fromMobileAction`). It runs on the CPU
+with a 4 s deadline, is loaded at launch, and anything it does not settle goes
+on to the main model. Gated on Hugging Face: accept the licence, add a token
+(Phase 37), then download it from Settings → Models. A switch there turns it off.
+
+Not verified on a device: that the `.litertlm` bundles FunctionGemma's template
+so LiteRT-LM's tool API returns structured calls. If it does not, the model's
+answer has no tool call and every request simply falls through.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

@@ -145,6 +145,7 @@ data class SettingsState(
   /** Hugging Face access token for model downloads. Empty for none. */
   val hfToken: String = "",
   val webImages: Boolean = true,
+  val quickActionsModel: Boolean = true,
   /** What a trial search actually got back, for a screen that must say facts rather than verdicts. */
   val searchTrial: String = "",
   val searchTrying: Boolean = false,
@@ -258,6 +259,7 @@ constructor(
           tavilyKey = settings.tavilyKey.first(),
           hfToken = settings.hfToken.first(),
           webImages = settings.webImages.first(),
+          quickActionsModel = settings.quickActionsModel.first(),
           persona = personaFrom(settings.persona.first()),
           standing = tasksFrom(settings.standingTasks.first()),
           reminders = reminders.ahead(),
@@ -288,7 +290,12 @@ constructor(
           models =
             ModelCatalog.all.map { model ->
               val gigabytes = "%.1f GB".format(model.build.sizeBytes / 1_000_000_000.0)
-              val role = if (model.role == ModelRole.CHAT) "chat" else "embedding"
+              val role =
+                when (model.role) {
+                  ModelRole.CHAT -> "chat"
+                  ModelRole.EMBED -> "embedding"
+                  ModelRole.ACTIONS -> "quick actions · needs a Hugging Face token"
+                }
               val fit =
                 when {
                   model.minMemoryGb > memoryGb -> "needs ${model.minMemoryGb} GB"
@@ -676,6 +683,11 @@ constructor(
   fun onFirecrawlUrlChanged(value: String) {
     _state.update { it.copy(firecrawlUrl = value) }
     viewModelScope.launch { settings.setFirecrawlUrl(value) }
+  }
+
+  fun setQuickActionsModel(on: Boolean) {
+    _state.update { it.copy(quickActionsModel = on) }
+    viewModelScope.launch { settings.setQuickActionsModel(on) }
   }
 
   fun setWebImages(on: Boolean) {
