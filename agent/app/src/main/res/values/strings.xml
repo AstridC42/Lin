@@ -629,4 +629,16 @@
     the usual reason.</string>
   <string name="recovery_copy">Copy the report</string>
   <string name="recovery_start_normally">Close and start normally</string>
+  <string name="open_history">Conversations</string>
+  <string name="history_new_chat">New chat</string>
+  <string name="history_search">Search conversations</string>
+  <string name="history_today">Today</string>
+  <string name="history_yesterday">Yesterday</string>
+  <string name="history_week">Previous 7 days</string>
+  <string name="history_older">Older</string>
+  <string name="history_empty">Your conversations will appear here.</string>
+  <string name="history_no_match">No conversation matches that.</string>
+  <string name="history_delete">Delete conversation</string>
+  <string name="history_delete_title">Delete this conversation?</string>
+  <string name="history_delete_confirm">Delete</string>
 </resources>

@@ -64,6 +64,13 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
@@ -71,7 +78,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -81,7 +90,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
@@ -116,6 +132,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -124,6 +141,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin.agent.R
 import com.lin.agent.core.fold.splitAcrossTheCrease
+import com.lin.agent.core.history.SavedChat
+import com.lin.agent.core.history.When
+import com.lin.agent.core.history.searchChats
+import com.lin.agent.core.history.shortModelName
+import com.lin.agent.core.history.whenHeading
 import com.lin.agent.core.media.PhotoLibrary
 import com.lin.agent.core.text.Step
 import com.lin.agent.core.text.domainOf
@@ -160,7 +182,34 @@ fun ConversationScreen(
   viewModel: ConversationViewModel = hiltViewModel(),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
+  val chats by viewModel.chats.collectAsStateWithLifecycle()
+  val drawer = rememberDrawerState(DrawerValue.Closed)
+  val drawerScope = rememberCoroutineScope()
 
+  // Past conversations in a drawer from the left, where Gemini, ChatGPT and Claude all keep
+  // them. Before this a conversation was gone the moment another began.
+  ModalNavigationDrawer(
+    drawerState = drawer,
+    drawerContent = {
+      HistoryDrawer(
+        chats = chats,
+        currentId = viewModel.currentChatId,
+        onNew = {
+          viewModel.startNewConversation()
+          drawerScope.launch { drawer.close() }
+        },
+        onOpen = { id ->
+          viewModel.openChat(id)
+          drawerScope.launch { drawer.close() }
+        },
+        onDelete = viewModel::deleteChat,
+        onSettings = {
+          drawerScope.launch { drawer.close() }
+          onOpenSettings()
+        },
+      )
+    },
+  ) {
   Scaffold(
     topBar = {
       Row(
@@ -169,37 +218,45 @@ fun ConversationScreen(
         modifier =
           Modifier.fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 6.dp),
+            .padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
       ) {
-        Column(modifier = Modifier.weight(1f)) {
+        IconButton(onClick = { drawerScope.launch { drawer.open() } }) {
+          Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.open_history))
+        }
+        Text(
+          stringResource(R.string.app_name),
+          style = MaterialTheme.typography.titleLarge,
+          fontWeight = FontWeight.SemiBold,
+        )
+        // Which model answered, as a short chip beside the name: "gemma-4-12B · server", not
+        // the whole download path. The full name is on the settings screen.
+        Surface(
+          shape = RoundedCornerShape(50),
+          color = MaterialTheme.colorScheme.surfaceContainerHigh,
+          modifier = Modifier.padding(start = 6.dp).weight(1f, fill = false),
+        ) {
           Text(
-            stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-          )
-          // Which model answered, under the name rather than squeezed beside it. An
-          // assistant that quietly answered from somewhere other than the user expects
-          // would be worse than one that was simply unavailable.
-          Text(
-            state.backendId.ifEmpty { stringResource(R.string.no_model) },
+            if (state.backendId.isEmpty()) stringResource(R.string.no_model)
+            else shortModelName(state.backendId),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
           )
         }
+        Spacer(modifier = Modifier.weight(0.001f))
         // Only once there is something to end. On an empty conversation it would do nothing
         // visible, which reads as a broken button.
         if (state.messages.isNotEmpty()) {
-          RoundIconButton(
-            onClick = viewModel::startNewConversation,
-            description = stringResource(R.string.new_conversation),
-          ) {
-            Icon(Icons.Filled.Add, contentDescription = null)
+          IconButton(onClick = viewModel::startNewConversation) {
+            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.new_conversation))
           }
         }
-        RoundIconButton(onClick = onOpenSettings, description = stringResource(R.string.open_settings)) {
-          Icon(Icons.Filled.Settings, contentDescription = null)
+        IconButton(onClick = onOpenSettings) {
+          Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.open_settings))
         }
       }
     },
@@ -227,6 +284,7 @@ fun ConversationScreen(
         viewModel = viewModel,
       )
     }
+  }
   }
 }
 
@@ -694,24 +752,43 @@ private fun NothingYet(greeting: String, onPick: (String) -> Unit) {
       modifier = Modifier.padding(horizontal = 4.dp),
     )
 
+    // Each card carries an icon in its own colour, as Gemini's and ChatGPT's do: the picture is
+    // read before the words, so the four are told apart at a glance.
     val suggestions =
-      listOf(R.string.empty_today, R.string.empty_music, R.string.empty_flashlight, R.string.empty_missed)
-    for (pair in suggestions.chunked(2)) {
+      listOf(
+        R.string.empty_today to rememberVectorPainter(Icons.Filled.DateRange),
+        R.string.empty_music to rememberVectorPainter(Icons.Filled.PlayArrow),
+        R.string.empty_flashlight to painterResource(R.drawable.ic_flashlight),
+        R.string.empty_missed to rememberVectorPainter(Icons.Filled.Notifications),
+      )
+    val tints =
+      listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.tertiary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.error,
+      )
+    suggestions.chunked(2).forEachIndexed { row, pair ->
       Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        for (suggestion in pair) {
+        pair.forEachIndexed { column, (suggestion, icon) ->
           val text = stringResource(suggestion)
+          val tint = tints[row * 2 + column]
           Card(
             onClick = { onPick(text) },
             shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            modifier = Modifier.weight(1f).height(96.dp),
+            modifier = Modifier.weight(1f).height(108.dp),
           ) {
-            Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-              Text(
-                text,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.align(Alignment.BottomStart),
-              )
+            Column(
+              modifier = Modifier.fillMaxSize().padding(16.dp),
+              verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Surface(shape = CircleShape, color = tint.copy(alpha = 0.16f), modifier = Modifier.size(34.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                  Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                }
+              }
+              Text(text, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
             }
           }
         }
@@ -735,7 +812,7 @@ private class AnswerActions(
   val onRetry: (() -> Unit)?,
 )
 
-/** One turn. The person gets a bubble; Lin gets a card, because Lin's answers are longer. */
+/** One turn. The person gets a bubble; Lin's answer sits on the page beside its mark. */
 @Composable
 private fun Said(message: Message, actions: AnswerActions? = null) {
   val fromUser = message.role == Message.Role.USER
@@ -765,15 +842,23 @@ private fun Said(message: Message, actions: AnswerActions? = null) {
         modifier = Modifier.widthIn(max = 560.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        Surface(
-          color = MaterialTheme.colorScheme.surfaceContainer,
-          shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 22.dp, bottomStart = 8.dp),
-        ) {
+        // No box. Gemini, ChatGPT and Claude all set the answer straight on the page with a small
+        // mark beside it - a long answer in a bubble is a wall in a frame, and the frame costs
+        // a sixth of a phone's width on every line.
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          Image(
+            painterResource(R.drawable.lin_mark),
+            contentDescription = null,
+            modifier = Modifier.padding(top = 2.dp).size(22.dp),
+          )
           // Markdown, laid out as what it meant rather than shown as what it typed.
-          MarkdownText(sourced.body, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+          MarkdownText(sourced.body, modifier = Modifier.weight(1f, fill = false).padding(end = 4.dp))
         }
-        if (sourced.sources.isNotEmpty()) Sources(sourced.sources)
-        actions?.let { AnswerRow(it) }
+        // Under the text, not under the mark, so the eye runs straight down.
+        Column(modifier = Modifier.padding(start = 28.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+          if (sourced.sources.isNotEmpty()) Sources(sourced.sources)
+          actions?.let { AnswerRow(it) }
+        }
       }
     }
   }
@@ -1024,17 +1109,25 @@ private fun ColumnScope.Composer(
     }
   var choosing by remember { mutableStateOf(false) }
 
+  // One pill holding everything, the way Gemini, ChatGPT and Claude all draw it: attach on the
+  // left inside it, speak and send on the right inside it. Four separate shapes in a row read
+  // as a toolbar; one shape reads as the place you talk.
+  Surface(
+    shape = RoundedCornerShape(28.dp),
+    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
+  ) {
   Row(
-    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp),
     verticalAlignment = Alignment.Bottom,
-    horizontalArrangement = Arrangement.spacedBy(10.dp),
+    horizontalArrangement = Arrangement.spacedBy(2.dp),
   ) {
     Box {
-      RoundIconButton(
+      IconButton(
         onClick = { if (!state.inProgress) choosing = true },
-        description = stringResource(R.string.attach),
+        modifier = Modifier.size(44.dp),
       ) {
-        Icon(Icons.Filled.Add, contentDescription = null)
+        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.attach))
       }
       DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
         DropdownMenuItem(
@@ -1062,7 +1155,7 @@ private fun ColumnScope.Composer(
       }
     }
 
-    OutlinedTextField(
+    TextField(
       // What the microphone has heard so far takes over the field while listening, so an
       // open microphone is never ambiguous and never silent-looking.
       value = if (state.listening) state.heard else draft,
@@ -1072,12 +1165,11 @@ private fun ColumnScope.Composer(
         Text(stringResource(if (state.listening) R.string.listening else R.string.ask_placeholder))
       },
       readOnly = state.listening,
-      maxLines = 5,
-      shape = RoundedCornerShape(24.dp),
+      maxLines = 6,
       colors =
         TextFieldDefaults.colors(
-          focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-          unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+          focusedContainerColor = Color.Transparent,
+          unfocusedContainerColor = Color.Transparent,
           focusedIndicatorColor = Color.Transparent,
           unfocusedIndicatorColor = Color.Transparent,
         ),
@@ -1095,13 +1187,11 @@ private fun ColumnScope.Composer(
         else micPermission.launch(Manifest.permission.RECORD_AUDIO)
       },
       shape = CircleShape,
-      color =
-        if (state.listening) MaterialTheme.colorScheme.error
-        else MaterialTheme.colorScheme.surfaceContainer,
+      color = if (state.listening) MaterialTheme.colorScheme.error else Color.Transparent,
       contentColor =
         if (state.listening) MaterialTheme.colorScheme.onError
         else MaterialTheme.colorScheme.onSurface,
-      modifier = Modifier.size(48.dp),
+      modifier = Modifier.size(44.dp),
     ) {
       Box(contentAlignment = Alignment.Center) {
         if (state.listening) {
@@ -1143,11 +1233,11 @@ private fun ColumnScope.Composer(
       // goes is one somebody has to learn, and this one has to be obvious.
       color =
         if (sendable || stoppable) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceContainer,
+        else MaterialTheme.colorScheme.surfaceContainerHighest,
       contentColor =
         if (sendable || stoppable) MaterialTheme.colorScheme.onPrimary
         else MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.size(48.dp),
+      modifier = Modifier.size(44.dp),
     ) {
       Box(contentAlignment = Alignment.Center) {
         if (stoppable) {
@@ -1165,6 +1255,7 @@ private fun ColumnScope.Composer(
         }
       }
     }
+  }
   }
 }
 
@@ -1226,5 +1317,141 @@ private fun Thinking(text: String, inProgress: Boolean) {
         )
       }
     }
+  }
+}
+
+/**
+ * Past conversations: new chat at the top, a search box, then the list under Today, Yesterday,
+ * Previous 7 days and Older. Tap one to go back to it; the bin asks first, because there is no
+ * getting a conversation back.
+ */
+@Composable
+private fun HistoryDrawer(
+  chats: List<SavedChat>,
+  currentId: String?,
+  onNew: () -> Unit,
+  onOpen: (String) -> Unit,
+  onDelete: (String) -> Unit,
+  onSettings: () -> Unit,
+) {
+  var query by rememberSaveable { mutableStateOf("") }
+  var deleting by remember { mutableStateOf<SavedChat?>(null) }
+  val zone = remember { java.time.ZoneId.systemDefault() }
+  val now = remember(chats) { System.currentTimeMillis() }
+  val shown = remember(chats, query) { searchChats(chats, query) }
+  val grouped = remember(shown, now) { shown.groupBy { whenHeading(it.updatedAt, now, zone) } }
+
+  ModalDrawerSheet(modifier = Modifier.widthIn(max = 320.dp)) {
+    Column(modifier = Modifier.fillMaxHeight().statusBarsPadding().padding(horizontal = 12.dp)) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 12.dp),
+      ) {
+        Image(painterResource(R.drawable.lin_mark), contentDescription = null, modifier = Modifier.size(28.dp))
+        Text(
+          stringResource(R.string.app_name),
+          style = MaterialTheme.typography.titleLarge,
+          fontWeight = FontWeight.SemiBold,
+        )
+      }
+      NavigationDrawerItem(
+        label = { Text(stringResource(R.string.history_new_chat)) },
+        icon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+        selected = false,
+        onClick = onNew,
+      )
+      TextField(
+        value = query,
+        onValueChange = { query = it },
+        placeholder = { Text(stringResource(R.string.history_search)) },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+        singleLine = true,
+        shape = RoundedCornerShape(50),
+        colors =
+          TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+          ),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+      )
+      LazyColumn(modifier = Modifier.weight(1f)) {
+        if (shown.isEmpty()) {
+          item {
+            Text(
+              stringResource(if (query.isBlank()) R.string.history_empty else R.string.history_no_match),
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(16.dp),
+            )
+          }
+        }
+        for (heading in When.entries) {
+          val group = grouped[heading] ?: continue
+          item(key = "heading-$heading") {
+            Text(
+              stringResource(
+                when (heading) {
+                  When.TODAY -> R.string.history_today
+                  When.YESTERDAY -> R.string.history_yesterday
+                  When.THIS_WEEK -> R.string.history_week
+                  When.OLDER -> R.string.history_older
+                }
+              ),
+              style = MaterialTheme.typography.labelMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 6.dp),
+            )
+          }
+          items(group, key = { it.id }) { chat ->
+            NavigationDrawerItem(
+              label = { Text(chat.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+              selected = chat.id == currentId,
+              onClick = { onOpen(chat.id) },
+              badge = {
+                IconButton(onClick = { deleting = chat }, modifier = Modifier.size(32.dp)) {
+                  Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.history_delete),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                  )
+                }
+              },
+              colors = NavigationDrawerItemDefaults.colors(),
+            )
+          }
+        }
+      }
+      HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+      NavigationDrawerItem(
+        label = { Text(stringResource(R.string.open_settings)) },
+        icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+        selected = false,
+        onClick = onSettings,
+        modifier = Modifier.padding(bottom = 8.dp),
+      )
+    }
+  }
+
+  deleting?.let { chat ->
+    AlertDialog(
+      onDismissRequest = { deleting = null },
+      title = { Text(stringResource(R.string.history_delete_title)) },
+      text = { Text(chat.title) },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            onDelete(chat.id)
+            deleting = null
+          }
+        ) {
+          Text(stringResource(R.string.history_delete_confirm))
+        }
+      },
+      dismissButton = { TextButton(onClick = { deleting = null }) { Text(stringResource(android.R.string.cancel)) } },
+    )
   }
 }
