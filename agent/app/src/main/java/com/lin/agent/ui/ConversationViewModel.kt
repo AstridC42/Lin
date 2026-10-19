@@ -350,6 +350,13 @@ constructor(
   private var asked = Asked.TYPED
 
   init {
+    // Coming back to an old conversation opens a new chat rather than the old one. The old one
+    // is in the history drawer; it is not cleared, only put away. A conversation still within
+    // the half hour - a fold, a quick switch to another app - is kept on screen.
+    if (_state.value.messages.isNotEmpty()) {
+      val last: Long = saved[KEY_LAST_ACTIVE] ?: 0L
+      if (TrainingData.startsNewConversation(last, System.currentTimeMillis())) startNewConversation()
+    }
     refreshReadiness()
     // Asked once, in the background, so a server's tools are in the list by the time anybody
     // types. Failures are reported on the settings screen rather than here: a server that is
@@ -958,6 +965,10 @@ constructor(
   }
 
   override fun onCleared() {
+    // Closing the app mid-answer keeps what was written so far: stop() puts the partial answer
+    // into the conversation and the history, where the drawer has it. The next launch opens a
+    // new chat, and nothing said is lost.
+    stop()
     // The microphone and the voice both stop with the screen. Neither is something to leave
     // running because a view model was discarded.
     stopListening()
