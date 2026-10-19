@@ -518,6 +518,42 @@ constructor(
     send(question)
   }
 
+  /**
+   * Runs a plain command straight away. True when it was done and answered.
+   *
+   * The model is a round trip to choose the tool and another to say it was done; for a
+   * flashlight that is all lag and no judgement. See [com.lin.agent.core.tools.quickCommand].
+   */
+  private suspend fun quickly(said: String): Boolean {
+    val command = com.lin.agent.core.tools.quickCommand(said) ?: return false
+    if (command.tool in withheldThisTurn()) return false
+    val tool = registry.find(AgentRole.ORCHESTRATOR, command.tool) ?: return false
+    val before = _state.value.toolRuns
+    _state.update { it.copy(toolRuns = before + ToolRun(tool.name, ToolState.RUNNING)) }
+    val result = runCatching { tool.run(command.arguments) }.getOrNull()
+    if (result !is com.lin.agent.engine.ToolResult.Ok) {
+      // Taken back off, so the model's own attempt is the only card.
+      _state.update { it.copy(toolRuns = before) }
+      return false
+    }
+    val reply = com.lin.agent.core.tools.quickReply(result.text)
+    val complete = _state.value.messages + Message(Message.Role.ASSISTANT, reply)
+    _state.update {
+      it.copy(
+        messages = complete,
+        toolRuns = it.toolRuns.settle(tool.name, ok = true, said = result.text),
+        streaming = "",
+        thinking = "",
+        inProgress = false,
+      )
+    }
+    persist(complete)
+    if (shouldSpeak(speakWhenNamed(settings.speakWhen.first()), asked, inCar(appContext))) {
+      speaker.say(reply)
+    }
+    return true
+  }
+
   /** Reads one answer aloud, whatever the spoken-replies setting says - it was asked for. */
   fun readAloud(text: String) {
     speaker.stop()
@@ -567,6 +603,10 @@ constructor(
 
     turn = viewModelScope.launch {
       try {
+        // "Flashlight on", "open camera": run at once, with no model in the way. Only when
+        // nothing is attached, and only if it worked - a failure goes to the model as before,
+        // which can explain it or try another way.
+        if (carried.isEmpty() && quickly(trimmed)) return@launch
         val readiness = backends.readiness()
         val backend =
           (readiness as? ChatReadiness.Ready)?.backend

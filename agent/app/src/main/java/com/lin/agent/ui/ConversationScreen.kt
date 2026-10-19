@@ -1262,24 +1262,31 @@ private fun ColumnScope.Composer(
 @Composable
 private fun Thumbnail(uri: String) {
   val context = LocalContext.current
+  val fromWeb = uri.startsWith("https://") || uri.startsWith("http://")
+  var failed by remember(uri) { mutableStateOf(false) }
   val bitmap: ImageBitmap? by
     produceState<ImageBitmap?>(initialValue = null, uri) {
-      val bytes = PhotoLibrary(context).bytesFor(uri)
+      val bytes = if (fromWeb) webImageBytes(uri) else PhotoLibrary(context).bytesFor(uri)
       value =
-        bytes?.let {
-          runCatching { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull()
-        }
+        bytes?.let { shrunk(it)?.asImageBitmap() }
+      if (value == null) failed = true
     }
+  // A picture from the web that will not load is left out rather than shown as an empty box.
+  if (fromWeb && failed) return
+  val opener = LocalUriHandler.current
 
   Surface(
     shape = RoundedCornerShape(18.dp),
     color = MaterialTheme.colorScheme.surfaceContainer,
-    modifier = Modifier.height(160.dp).widthIn(min = 120.dp, max = 160.dp),
+    modifier =
+      Modifier.height(160.dp)
+        .widthIn(min = 120.dp, max = if (fromWeb) 220.dp else 160.dp)
+        .then(if (fromWeb) Modifier.clickable { runCatching { opener.openUri(uri) } } else Modifier),
   ) {
     bitmap?.let {
       Image(
         bitmap = it,
-        contentDescription = stringResource(R.string.photo_found),
+        contentDescription = stringResource(if (fromWeb) R.string.web_image else R.string.photo_found),
         contentScale = ContentScale.Crop,
         modifier = Modifier.fillMaxSize(),
       )
@@ -1455,3 +1462,46 @@ private fun HistoryDrawer(
     )
   }
 }
+
+/** A web picture's bytes, or null. Capped, so one huge image cannot fill the phone's memory. */
+private suspend fun webImageBytes(url: String): ByteArray? =
+  kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    runCatching {
+        val connection = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+          connectTimeout = 8_000
+          readTimeout = 8_000
+          instanceFollowRedirects = true
+          setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 16) Lin")
+        }
+        try {
+          if (connection.responseCode !in 200..299) return@runCatching null
+          if (connection.contentType?.startsWith("image/") == false) return@runCatching null
+          val limit = 6 * 1024 * 1024
+          connection.inputStream.use { input ->
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(1 shl 14)
+            while (true) {
+              val read = input.read(buffer)
+              if (read < 0) break
+              out.write(buffer, 0, read)
+              if (out.size() > limit) return@runCatching null
+            }
+            out.toByteArray()
+          }
+        } finally {
+          connection.disconnect()
+        }
+      }
+      .getOrNull()
+  }
+
+/** Decoded at about the size it is shown, not the size it was uploaded. */
+private fun shrunk(bytes: ByteArray): android.graphics.Bitmap? =
+  runCatching {
+      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+      var sample = 1
+      while (bounds.outWidth / (sample * 2) >= 480 && bounds.outHeight / (sample * 2) >= 480) sample *= 2
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+    .getOrNull()
