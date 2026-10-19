@@ -2374,6 +2374,26 @@ rather than as "there is no such app". And the tool says outright that opening
 the gallery is its job, because "open gallery" reads to a small model like a
 request about photos and it reached for the photo search instead.
 
+### Phase 34 — The digest that threw everything away
+
+"Nothing has been added to long-term memory since the last test." The automatic
+digest — the one that reads a finished conversation and keeps lasting facts —
+ran its saving loop inside `withEmbedder { … }`, which returns null when no
+embedding model is downloaded. Without one, the loop never ran, every fact from
+every conversation was discarded, and the worker reported success. "Remember X"
+had been fixed for exactly this long ago (save first, embed if possible); the
+digest was the half that was missed.
+
+Facts are now kept with or without a vector, and get one when a model arrives.
+Duplicates are caught by their words always, and by meaning when there is a
+vector to compare.
+
+And the digest no longer fails silently. Every way it can end — no model ready,
+the model refusing, nothing lasting in the conversation, kept two of three —
+writes one line, and the memory screen shows it, beside the switch that allows
+learning at all. That switch is off by default, and this is the screen somebody
+opens when Lin has remembered nothing, so it belongs here as well as in settings.
+
 ## Risks and kill criteria
 
 **Brief quality is the whole architecture.** If a 2B model cannot write a

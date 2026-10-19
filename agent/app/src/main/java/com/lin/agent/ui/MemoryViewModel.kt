@@ -25,6 +25,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -33,6 +34,10 @@ data class MemoryState(
   val loading: Boolean = true,
   /** Set while the user is being asked to confirm forgetting everything. */
   val confirmingForgetAll: Boolean = false,
+  /** Whether Lin learns from conversations on its own - the digest switch. */
+  val learning: Boolean = false,
+  /** What the last digest did, in one line. Empty before the first one. */
+  val lastDigest: String = "",
 )
 
 /**
@@ -44,7 +49,12 @@ data class MemoryState(
  * where the app holds things about somebody that they cannot look at.
  */
 @HiltViewModel
-class MemoryViewModel @Inject constructor(private val memories: MemoryStore) : ViewModel() {
+class MemoryViewModel
+@Inject
+constructor(
+  private val memories: MemoryStore,
+  private val settings: com.lin.agent.core.settings.SettingsRepository,
+) : ViewModel() {
 
   private val _state = MutableStateFlow(MemoryState())
   val state: StateFlow<MemoryState> = _state.asStateFlow()
@@ -56,7 +66,9 @@ class MemoryViewModel @Inject constructor(private val memories: MemoryStore) : V
   fun reload() {
     viewModelScope.launch {
       val held = memories.all()
-      _state.update { it.copy(memories = held, loading = false) }
+      val learning = runCatching { settings.digestConversations.first() }.getOrDefault(false)
+      val last = runCatching { settings.lastDigest.first() }.getOrDefault("")
+      _state.update { it.copy(memories = held, loading = false, learning = learning, lastDigest = last) }
     }
   }
 
@@ -68,6 +80,15 @@ class MemoryViewModel @Inject constructor(private val memories: MemoryStore) : V
    * twice to get rid of it puts the friction on the wrong side. Losing a note they wanted is
    * recoverable - they can say it again.
    */
+  /**
+   * The same switch as in settings, here as well because this is where somebody looks when
+   * Lin has not remembered anything - and the first question is whether it was ever allowed to.
+   */
+  fun setLearning(on: Boolean) {
+    _state.update { it.copy(learning = on) }
+    viewModelScope.launch { settings.setDigestConversations(on) }
+  }
+
   fun forget(memory: Memory) {
     // Removed from the list first so the row disappears under the thumb rather than after a
     // round trip to the database.

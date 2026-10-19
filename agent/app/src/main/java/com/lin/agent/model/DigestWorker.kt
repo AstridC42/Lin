@@ -24,6 +24,8 @@ import com.lin.agent.core.memory.Digest
 import com.lin.agent.core.memory.Memory
 import com.lin.agent.core.memory.MemorySource
 import com.lin.agent.core.memory.MemoryStore
+import com.lin.agent.core.memory.alreadyHeld
+import com.lin.agent.core.memory.digestReport
 import com.lin.agent.core.settings.SettingsRepository
 import com.lin.agent.engine.EmbedPart
 import com.lin.agent.engine.Message
@@ -71,6 +73,11 @@ class DigestWorker(private val context: Context, params: WorkerParameters) :
       throw e
     } catch (e: Throwable) {
       Log.w(TAG, "Digest failed", e)
+      runCatching {
+        EntryPointAccessors.fromApplication(context, Deps::class.java)
+          .settings()
+          .setLastDigest(digestReport(System.currentTimeMillis(), 0, 0, "it failed: ${e.message ?: e::class.java.simpleName}"))
+      }
       // Failure is silent on purpose: nothing asked for this, so nothing is waiting to be told
       // it did not happen. The log is cleared either way so it is not re-read later.
       ConversationLog(context).clear()
@@ -84,16 +91,23 @@ class DigestWorker(private val context: Context, params: WorkerParameters) :
     if (conversation.isBlank()) return Result.success()
 
     val deps = EntryPointAccessors.fromApplication(context, Deps::class.java)
+    val settings = deps.settings()
+    val now = System.currentTimeMillis()
+    suspend fun report(kept: Int, found: Int, why: String = "") =
+      runCatching { settings.setLastDigest(digestReport(now, kept, found, why)) }
 
     // Asked again here, not only where this was enqueued. The constraints mean a worker can sit
     // for hours before running, and the switch it was queued under is the user's answer to "may
     // you write things about me" - which they are entitled to change their mind about in the
     // meantime. The queued work is not a promise they are held to.
-    if (!deps.settings().digestConversations.first()) return Result.success()
+    if (!settings.digestConversations.first()) return Result.success()
 
     val backend =
       (deps.backends().readiness() as? com.lin.agent.model.ChatReadiness.Ready)?.backend
-        ?: return Result.success()
+        ?: run {
+          report(0, 0, "no model was ready to read the conversation")
+          return Result.success()
+        }
 
     val events =
       backend
@@ -108,37 +122,57 @@ class DigestWorker(private val context: Context, params: WorkerParameters) :
         )
         .toList()
 
+    events.filterIsInstance<TurnEvent.Failed>().firstOrNull()?.let { failed ->
+      report(0, 0, "the model said: ${failed.message.take(120)}")
+      return Result.success()
+    }
+
     val answer =
       events.filterIsInstance<TurnEvent.Done>().lastOrNull()?.fullText
         ?: events.filterIsInstance<TurnEvent.Token>().joinToString("") { it.text }
 
     val facts = Digest.parse(answer)
-    if (facts.isEmpty()) return Result.success()
+    if (facts.isEmpty()) {
+      report(0, 0)
+      return Result.success()
+    }
 
     val memories = deps.memories()
+    val held = memories.all(limit = 1_000).map { it.text }.toMutableList()
     var kept = 0
-    deps.embedders().withEmbedder { embedder ->
-      for (fact in facts) {
-        val vector = embedder.embed(listOf(EmbedPart.Text(fact)))
-        if (vector.isEmpty()) continue
 
-        // Already known? A digest run after every conversation will keep rediscovering the
-        // same few facts about somebody, and a memory screen with "Otto's sister is Mia" on it
-        // nine times is one nobody reads.
-        val existing =
+    // Kept whether or not there is an embedding model. This used to run only inside
+    // withEmbedder, which returns null when no embedding model is downloaded - so without one
+    // the loop never ran, every fact from every conversation was thrown away, and the worker
+    // reported success. "Remember X" was fixed the same way long ago; this half was missed.
+    // A fact without a vector is still kept and shown, and gets one when a model arrives.
+    val withVectors =
+      deps.embedders().withEmbedder { embedder ->
+        facts.map { fact -> fact to runCatching { embedder.embed(listOf(EmbedPart.Text(fact))) }.getOrDefault(FloatArray(0)) }
+      } ?: facts.map { it to FloatArray(0) }
+
+    for ((fact, vector) in withVectors) {
+      // Already known? A digest after every conversation keeps rediscovering the same few
+      // facts, and a memory screen with the same sentence on it nine times is one nobody
+      // reads. By meaning when there is a vector to compare, by words always.
+      if (alreadyHeld(fact, held)) continue
+      if (vector.isNotEmpty()) {
+        val similar =
           memories.search(
             vector,
             limit = 1,
             minScore = Digest.SAME_FACT,
             sources = setOf(MemorySource.TOLD, MemorySource.CONVERSATION),
           )
-        if (existing.isNotEmpty()) continue
-
-        memories.remember(Memory(text = fact, source = MemorySource.CONVERSATION), vector)
+        if (similar.isNotEmpty()) continue
+      }
+      if (memories.remember(Memory(text = fact, source = MemorySource.CONVERSATION), vector) >= 0) {
+        held.add(fact)
         kept++
       }
     }
 
+    report(kept, facts.size)
     Log.i(TAG, "Kept $kept of ${facts.size} candidate facts")
     return Result.success()
   }

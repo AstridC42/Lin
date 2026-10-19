@@ -424,6 +424,16 @@ class SettingsRepository(private val context: Context) {
   suspend fun setDigestConversations(value: Boolean) = write(DIGEST_CONVERSATIONS, value)
 
   /**
+   * What the last digest did, in one line - see [com.lin.agent.core.memory.digestReport].
+   *
+   * Kept because every way a digest could end used to end silently, which is how it stopped
+   * keeping anything without anybody being able to tell.
+   */
+  val lastDigest: Flow<String> = read(LAST_DIGEST, "")
+
+  suspend fun setLastDigest(value: String) = write(LAST_DIGEST, value)
+
+  /**
    * How much the model may think before answering, as the name of a level.
    *
    * A string rather than an enum because this module does not know about the engine's types and
@@ -604,6 +614,7 @@ class SettingsRepository(private val context: Context) {
     val PERSONA = stringPreferencesKey("persona")
     val STANDING_TASKS = stringPreferencesKey("standing_tasks")
     val REMINDERS = stringPreferencesKey("reminders")
+    val LAST_DIGEST = stringPreferencesKey("last_digest")
     val SERVER_TEMPERATURE = stringPreferencesKey("server_temperature")
     val SERVER_TOP_P = stringPreferencesKey("server_top_p")
     val SERVER_TOP_K = stringPreferencesKey("server_top_k")
