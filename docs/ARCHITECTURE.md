@@ -94,6 +94,21 @@ beside the conversation, about a third of the width, or exactly at the hinge whe
 half open like a book (`ui/Fold.rememberHingeLeftDp`). Tabletop posture keeps its own split:
 conversation above the crease, composer below.
 
+## Lin's own voice and hearing
+
+`voice/LinVoice` (text to speech) and `voice/LinEars` (speech to text) run sherpa-onnx models on
+the phone. `Speaker` and `Dictation` use them whenever **Lin's own voice and hearing** is on and
+the packs are downloaded, and fall back to the phone's engines otherwise.
+
+- Packs are catalog models (`ModelCatalog.voices`, `.hearings`, `SILERO_VAD`) downloaded from
+  sherpa-onnx's releases by the normal model downloader, which unpacks `.tar.bz2` archives
+  (`core/models/Archives`, refusing paths that escape the folder) and marks them complete.
+- `core/voice/LinVoices` reads which file in a pack is which, and cuts replies into sentences:
+  `LinVoice` makes the next sentence while the current one plays, through an `AudioTrack`, with
+  transient audio focus so music ducks.
+- `LinEars` records 16 kHz audio, feeds Silero to find the start and end of speech, re-reads the
+  speech so far about once a second for live words, and transcribes the final segment.
+
 ## Widgets and background voice
 
 `widget/` holds two Jetpack Glance widgets. **Ask Lin** opens the app, the listening panel

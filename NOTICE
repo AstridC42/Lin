@@ -9,3 +9,7 @@ written from scratch; it uses Google's LiteRT-LM runtime and can download Gemma 
 
 Lin is not affiliated with, endorsed by, or sponsored by Google. Models that Lin downloads are
 provided by their publishers under their own terms and are not part of this product.
+
+Lin's speech runs on sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx, Apache License 2.0)
+and ONNX Runtime (MIT). The voice and hearing models - Piper, Kokoro, Moonshine, Whisper and
+Silero VAD - are downloaded by the user from sherpa-onnx's releases under their own licences.

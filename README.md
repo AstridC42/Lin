@@ -39,7 +39,8 @@ a company's cloud unless you point it there.
 - Attach photos and documents (PDF, Word, text).
 - **Photo cut-out:** tap anything in a photo to cut it out, save it as a transparent PNG, blur
   the background, share it, or ask Lin about it. Runs on the phone (Google's Magic Touch model).
-- Voice in and out; Lin can be set as the phone's default digital assistant. Voice conversations
+- Voice in and out with **Lin's own voice and hearing**, on the phone (no Google speech
+  services needed); Lin can be set as the phone's default digital assistant. Voice conversations
   can carry on in the background, with the screen off or another app open.
 - Home screen widgets: an "Ask Lin" bar (type, talk, or one-tap questions) and Lin's last answer.
 - Shows the model's thinking when the model supports it.
@@ -76,6 +77,8 @@ a company's cloud unless you point it there.
 | On the phone | MobileActions 270M (optional) | Handles short commands in about 0.3 s. Gated: needs a Hugging Face token. |
 | On the phone | EmbeddingGemma (optional) | Memory and photo search by meaning. |
 | On the phone | Magic Touch (optional) | Photo cut-out. 30 MB, downloads the first time you use it. |
+| On the phone | Piper Amy or Kokoro | Lin's voice. 67 MB (fast) or 103 MB (most natural, 11 voices). |
+| On the phone | Moonshine Tiny or Whisper Base, with Silero | Lin's hearing. 108 MB (English) or 208 MB (many languages). |
 | Your server | Any model on Ollama, vLLM, Unsloth or another OpenAI-compatible server | Settings → Model server. |
 
 Each message goes to the fastest thing that can handle it: an instant command, then the small

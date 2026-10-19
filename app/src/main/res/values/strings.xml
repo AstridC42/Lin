@@ -697,4 +697,15 @@
   <string name="widget_answer_label">Lin: last answer</string>
   <string name="widget_answer_description">Your latest question and Lin\'s answer.</string>
   <string name="widget_empty">Ask Lin something and the answer shows here.</string>
+  <string name="own_voice_title">Lin\'s own voice and hearing</string>
+  <string name="own_voice_detail">Speaks and listens with models on this phone: nothing goes to Google, and it works offline. Until they are downloaded, the phone\'s own voice and speech recognition are used.</string>
+  <string name="own_voice_voice">Voice</string>
+  <string name="own_voice_hearing">Hearing</string>
+  <string name="own_voice_piper">Clear and fast · %1$d MB</string>
+  <string name="own_voice_kokoro">Most natural, eleven voices, slower · %1$d MB</string>
+  <string name="own_voice_moonshine">English, fast · %1$d MB</string>
+  <string name="own_voice_whisper">Many languages · %1$d MB</string>
+  <string name="own_voice_try">Try</string>
+  <string name="own_voice_download">Download</string>
+  <string name="own_voice_sample">Hi, I\'m Lin. This is how I sound.</string>
 </resources>

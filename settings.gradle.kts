@@ -33,6 +33,9 @@ dependencyResolutionManagement {
   repositories {
     google()
     mavenCentral()
+    // sherpa-onnx (Lin's own voice and hearing) is published through JitPack. Limited to that
+    // one group, so nothing else can ever be resolved from it.
+    maven("https://jitpack.io") { content { includeGroup("com.github.k2-fsa.sherpa-onnx") } }
   }
 }
 

@@ -108,6 +108,9 @@ Two ways past:
 - **Photo cut-out:** + → **Cut out from a photo**. The first time, Lin downloads Google's Magic
   Touch model (30 MB). Tap the object; switch to **Remove** to take parts away. Saved cut-outs go
   to Pictures/Lin.
+- **Lin's own voice and hearing:** Settings → Voice → **Lin's own voice and hearing**. Download a
+  voice (Piper Amy, 67 MB, or Kokoro, 103 MB) and a hearing model (Moonshine Tiny, 108 MB, English;
+  or Whisper Base, 208 MB, many languages). Until then the phone's own speech services are used.
 - **Widgets:** long-press the home screen → Widgets → Lin. **Ask Lin** is a bar to type or talk
   (make it taller for one-tap questions); **Last answer** shows your latest question and answer.
 - **Talk in the background:** Settings → Voice → **Keep talking in the background**. A voice

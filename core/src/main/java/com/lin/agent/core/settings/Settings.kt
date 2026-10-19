@@ -166,6 +166,29 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setBackgroundVoice(value: Boolean) = write(BACKGROUND_VOICE, value)
 
+  /**
+   * Whether Lin speaks and listens with its own models rather than the phone's text-to-speech
+   * and speech recognition. On: the phone's are used only until Lin's are downloaded.
+   */
+  val ownVoice: Flow<Boolean> = read(OWN_VOICE, true)
+
+  suspend fun setOwnVoice(value: Boolean) = write(OWN_VOICE, value)
+
+  /** Which of Lin's voices, by catalog name. */
+  val linVoice: Flow<String> = read(LIN_VOICE, "Piper Amy")
+
+  suspend fun setLinVoice(value: String) = write(LIN_VOICE, value)
+
+  /** Which of Lin's hearing models, by catalog name. */
+  val linHearing: Flow<String> = read(LIN_HEARING, "Moonshine Tiny")
+
+  suspend fun setLinHearing(value: String) = write(LIN_HEARING, value)
+
+  /** Which of Kokoro's speakers, by its id ("af_sarah"). */
+  val kokoroSpeaker: Flow<String> = read(KOKORO_SPEAKER, "af_sarah")
+
+  suspend fun setKokoroSpeaker(value: String) = write(KOKORO_SPEAKER, value)
+
   val voiceName: Flow<String> = read(VOICE_NAME, "")
 
   suspend fun setVoiceName(value: String) = write(VOICE_NAME, value)
@@ -646,6 +669,10 @@ class SettingsRepository(private val context: Context) {
     val HF_TOKEN = stringPreferencesKey("hf_token")
     val WEB_IMAGES = booleanPreferencesKey("web_images")
     val BACKGROUND_VOICE = booleanPreferencesKey("background_voice")
+    val OWN_VOICE = booleanPreferencesKey("own_voice")
+    val LIN_VOICE = stringPreferencesKey("lin_voice")
+    val LIN_HEARING = stringPreferencesKey("lin_hearing")
+    val KOKORO_SPEAKER = stringPreferencesKey("kokoro_speaker")
     val QUICK_ACTIONS_MODEL = booleanPreferencesKey("quick_actions_model")
     val PERSONA = stringPreferencesKey("persona")
     val STANDING_TASKS = stringPreferencesKey("standing_tasks")

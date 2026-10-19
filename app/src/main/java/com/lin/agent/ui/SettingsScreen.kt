@@ -699,6 +699,7 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    OwnVoiceCard(state, viewModel)
     // Three ways rather than a switch. "When spoken to" is the default and the one worth
     // having - a phone that answers a typed question out loud in a quiet room is the reason
     // people turn these off - but somebody who wants a voice assistant should be able to say so.
@@ -2524,5 +2525,96 @@ private fun openVoiceSettings(context: android.content.Context) {
         }
         .getOrDefault(false)
     if (opened) return
+  }
+}
+
+/**
+ * Lin's own voice and hearing: on or off, which voice and which hearing, each downloaded from
+ * here. Until they are, the phone's own text-to-speech and recognition are used.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun OwnVoiceCard(state: SettingsState, viewModel: SettingsViewModel) {
+  val sample = stringResource(R.string.own_voice_sample)
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(stringResource(R.string.own_voice_title), style = MaterialTheme.typography.bodyLarge)
+          Text(
+            stringResource(R.string.own_voice_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Switch(checked = state.ownVoice, onCheckedChange = viewModel::setOwnVoice)
+      }
+      if (!state.ownVoice) return@Column
+
+      Text(stringResource(R.string.own_voice_voice), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+      for (model in com.lin.agent.core.models.ModelCatalog.voices) {
+        val detail = if (model == com.lin.agent.core.models.ModelCatalog.KOKORO) R.string.own_voice_kokoro else R.string.own_voice_piper
+        OwnModelRow(state, model, detail, selected = state.linVoice == model.name, onSelect = { viewModel.setLinVoice(model.name) },
+          onDownload = { viewModel.download(model) }, onTry = { viewModel.tryOwnVoice(model, sample) })
+      }
+      val kokoro = state.models.firstOrNull { it.model == com.lin.agent.core.models.ModelCatalog.KOKORO }
+      if (state.linVoice == com.lin.agent.core.models.ModelCatalog.KOKORO.name && kokoro?.present == true) {
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(start = 48.dp)) {
+          for (id in com.lin.agent.core.voice.LinVoices.KOKORO_SPEAKERS) {
+            FilterChip(
+              selected = state.kokoroSpeaker == id,
+              onClick = {
+                viewModel.setKokoroSpeaker(id)
+                viewModel.tryOwnVoice(com.lin.agent.core.models.ModelCatalog.KOKORO, sample)
+              },
+              label = { Text(com.lin.agent.core.voice.LinVoices.speakerLabel(id)) },
+            )
+          }
+        }
+      }
+
+      Text(stringResource(R.string.own_voice_hearing), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+      for (model in com.lin.agent.core.models.ModelCatalog.hearings) {
+        val detail = if (model == com.lin.agent.core.models.ModelCatalog.WHISPER_BASE) R.string.own_voice_whisper else R.string.own_voice_moonshine
+        OwnModelRow(state, model, detail, selected = state.linHearing == model.name, onSelect = { viewModel.setLinHearing(model.name) },
+          onDownload = { viewModel.downloadHearing(model) }, onTry = null)
+      }
+    }
+  }
+}
+
+/** One voice or hearing model: choose it, download it, and (for a voice) hear it. */
+@Composable
+private fun OwnModelRow(
+  state: SettingsState,
+  model: com.lin.agent.core.models.CatalogModel,
+  detail: Int,
+  selected: Boolean,
+  onSelect: () -> Unit,
+  onDownload: () -> Unit,
+  onTry: (() -> Unit)?,
+) {
+  val line = state.models.firstOrNull { it.model == model }
+  val megabytes = model.build.sizeBytes / 1_000_000
+  Row(
+    modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    RadioButton(selected = selected, onClick = onSelect)
+    Column(modifier = Modifier.weight(1f)) {
+      Text(model.name, style = MaterialTheme.typography.bodyMedium)
+      Text(
+        stringResource(detail, megabytes),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    when {
+      line?.present == true -> if (onTry != null) TextButton(onClick = onTry) { Text(stringResource(R.string.own_voice_try)) }
+      line?.download is com.lin.agent.core.models.DownloadState.Running ->
+        Text("${(line.download as com.lin.agent.core.models.DownloadState.Running).percent}%", style = MaterialTheme.typography.labelMedium)
+      line?.download is com.lin.agent.core.models.DownloadState.Waiting -> Text("…", style = MaterialTheme.typography.labelMedium)
+      else -> TextButton(onClick = onDownload) { Text(stringResource(R.string.own_voice_download)) }
+    }
   }
 }
