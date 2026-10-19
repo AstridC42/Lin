@@ -917,6 +917,22 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
     )
     Card(modifier = Modifier.fillMaxWidth()) {
       Column {
+        // First, because it is the one that works inside Android Auto itself.
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_car_chat), style = MaterialTheme.typography.bodyLarge)
+            Text(
+              stringResource(R.string.settings_car_chat_detail),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Switch(checked = state.carChat, onCheckedChange = viewModel::setCarChat)
+        }
         Row(
           modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
           horizontalArrangement = Arrangement.spacedBy(12.dp),

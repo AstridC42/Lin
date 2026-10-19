@@ -214,6 +214,10 @@ class MainActivity : ComponentActivity() {
           // without opening the app, so it has to outlive the app being closed - and a
           // notification does not survive a reboot on its own.
           CarNotification.show(this@MainActivity, settings.carNotification.first())
+          // The car conversation needs a message to reply to; put the greeting back if it went.
+          if (settings.carChat.first() && !com.lin.agent.car.CarChat.isShowing(this@MainActivity)) {
+            com.lin.agent.car.CarChat.greet(this@MainActivity)
+          }
         }
       }
     }

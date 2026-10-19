@@ -407,6 +407,11 @@ class SettingsRepository(private val context: Context) {
 
   suspend fun setCarNotification(value: Boolean) = write(CAR_NOTIFICATION, value)
 
+  /** Lin as a conversation in Android Auto: answers read out by the car, replies by voice. */
+  val carChat: Flow<Boolean> = read(CAR_CHAT, false)
+
+  suspend fun setCarChat(value: Boolean) = write(CAR_CHAT, value)
+
   /**
    * Whether Lin reads its replies out when it was spoken to.
    *
@@ -641,6 +646,7 @@ class SettingsRepository(private val context: Context) {
     val ALLOW_DIRECT_CALLS = booleanPreferencesKey("allow_direct_calls")
     val ANSWER_WHEN_LOCKED = booleanPreferencesKey("answer_when_locked")
     val CAR_NOTIFICATION = booleanPreferencesKey("car_notification")
+    val CAR_CHAT = booleanPreferencesKey("car_chat")
     val SPOKEN_REPLIES = booleanPreferencesKey("spoken_replies")
     val DIGEST_CONVERSATIONS = booleanPreferencesKey("digest_conversations")
     val REASONING = stringPreferencesKey("reasoning")
