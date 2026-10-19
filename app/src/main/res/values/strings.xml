@@ -685,4 +685,16 @@
   <string name="watch_thinking">Answering your watch…</string>
   <string name="watch_no_model">Lin has no model on the phone yet. Open Lin on the phone to get one.</string>
   <string name="watch_failed">Sorry, that didn’t work. Try asking again.</string>
+  <string name="settings_background_voice">Keep talking in the background</string>
+  <string name="settings_background_voice_detail">A voice conversation carries on when you switch apps or lock the screen. A notification shows the microphone is in use, with a Stop button.</string>
+  <string name="voice_session_channel">Voice conversation</string>
+  <string name="voice_session_title">Lin is in a voice conversation</string>
+  <string name="voice_session_detail">Listening and answering in the background.</string>
+  <string name="voice_session_stop">Stop</string>
+  <string name="widget_ask">Ask Lin</string>
+  <string name="widget_ask_label">Ask Lin</string>
+  <string name="widget_ask_description">Type or talk to Lin from the home screen.</string>
+  <string name="widget_answer_label">Lin: last answer</string>
+  <string name="widget_answer_description">Your latest question and Lin\'s answer.</string>
+  <string name="widget_empty">Ask Lin something and the answer shows here.</string>
 </resources>

@@ -94,6 +94,18 @@ beside the conversation, about a third of the width, or exactly at the hinge whe
 half open like a book (`ui/Fold.rememberHingeLeftDp`). Tabletop posture keeps its own split:
 conversation above the crease, composer below.
 
+## Widgets and background voice
+
+`widget/` holds two Jetpack Glance widgets. **Ask Lin** opens the app, the listening panel
+(`ListenActivity`), or asks a question straight away through `AssistActivity` with
+`WakeService.EXTRA_SAID`. **Last answer** reads the newest conversation from `ChatHistory`, which
+refreshes it after every save.
+
+`voice/VoiceSession` keeps a voice conversation going off screen: with **Keep talking in the
+background** on, tapping the microphone starts a microphone foreground service (the only moment
+Android allows it), and the conversation ends it once nothing is being heard, said or answered,
+or when Stop is tapped on its notification.
+
 ## The watch
 
 `wear/` is a separate, small app (same `applicationId` and signing key as the phone app, which is

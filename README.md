@@ -39,7 +39,9 @@ a company's cloud unless you point it there.
 - Attach photos and documents (PDF, Word, text).
 - **Photo cut-out:** tap anything in a photo to cut it out, save it as a transparent PNG, blur
   the background, share it, or ask Lin about it. Runs on the phone (Google's Magic Touch model).
-- Voice in and out; Lin can be set as the phone's default digital assistant.
+- Voice in and out; Lin can be set as the phone's default digital assistant. Voice conversations
+  can carry on in the background, with the screen off or another app open.
+- Home screen widgets: an "Ask Lin" bar (type, talk, or one-tap questions) and Lin's last answer.
 - Shows the model's thinking when the model supports it.
 
 **Acting on the phone**

@@ -445,6 +445,32 @@
           Lin on the watch: Wear OS wakes this when the watch app sends a question. Exported
           because Google Play services delivers the message; it only accepts Lin's own path.
         -->
+        <!-- Home screen widgets: "Ask Lin", and Lin's latest answer. -->
+        <receiver
+            android:name=".widget.AskWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_ask_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_ask" />
+        </receiver>
+        <receiver
+            android:name=".widget.LastAnswerWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_answer_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_answer" />
+        </receiver>
+
+        <!-- A voice conversation carrying on after Lin leaves the screen. See VoiceSession. -->
+        <service
+            android:name=".voice.VoiceSessionService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
         <service
             android:name=".wear.WearBridge"
             android:exported="true">
