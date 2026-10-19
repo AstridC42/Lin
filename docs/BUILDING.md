@@ -32,7 +32,8 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew :app:assembleDebug
 ```
 
-The debug APKs land in `app/build/outputs/apk/debug/`, one per ABI plus a universal one. The first
+The debug APKs land in `app/build/outputs/apk/debug/`, one per ABI plus a universal one.
+The watch app is `./gradlew :wear:assembleDebug` (`wear/build/outputs/apk/debug/`). The first
 build downloads a few GB of dependencies; later ones take a couple of minutes. On macOS use the
 `-mac-` tools archive; on Windows use `gradlew.bat`.
 

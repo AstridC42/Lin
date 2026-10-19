@@ -108,5 +108,14 @@ Two ways past:
 - **Photo cut-out:** + → **Cut out from a photo**. The first time, Lin downloads Google's Magic
   Touch model (30 MB). Tap the object; switch to **Remove** to take parts away. Saved cut-outs go
   to Pictures/Lin.
+- **On your watch** (Wear OS 3 or newer: Galaxy Watch 4 and later, Pixel Watch): a watch cannot
+  install an APK from a browser, so `lin-…-wear.apk` goes on through the watch's debugging:
+  1. On the watch: Settings → About watch → Software information → tap **Software version** five
+     times. Then Settings → Developer options → turn on **ADB debugging** and **Wireless debugging**.
+  2. From the phone, an installer app such as *Wear Installer 2* or *Bugjaeger* pairs with the
+     watch over Wi-Fi and installs the APK. From a computer:
+     `adb pair <watch-ip>:<pair-port>`, `adb connect <watch-ip>:<port>`, `adb install lin-…-wear.apk`.
+  3. Open Lin on the watch, or add the **Ask Lin** Tile. Tap **Speak** or **Type**; Lin on the phone
+     answers. The phone needs the same version of Lin (or newer).
 - **More switches with Shizuku:** with [Shizuku](https://shizuku.rikka.app/) running, Lin can set
   Wi-Fi, Bluetooth, NFC and airplane mode directly instead of opening their panels.

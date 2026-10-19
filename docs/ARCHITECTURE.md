@@ -94,6 +94,22 @@ beside the conversation, about a third of the width, or exactly at the hinge whe
 half open like a book (`ui/Fold.rememberHingeLeftDp`). Tabletop posture keeps its own split:
 conversation above the crease, composer below.
 
+## The watch
+
+`wear/` is a separate, small app (same `applicationId` and signing key as the phone app, which is
+what lets Wear OS connect them). It cannot run Lin's models, so it is a remote:
+
+1. The watch takes a question by voice (`RecognizerIntent`) or the watch's input picker
+   (`RemoteInputIntentHelper`), finds the phone advertising the `lin_phone` capability, and sends
+   it on `/lin/ask` (`watch/WatchLink`).
+2. On the phone, `wear/WearBridge` (a `WearableListenerService`, woken even with the app closed)
+   replies `/lin/working` and queues `wear/WatchWorker`, which answers with the same headless turn
+   the Android Auto chat uses (`model/HeadlessTurn`) and sends the short form back on `/lin/answer`.
+3. The watch shows it, reads it aloud if the question was spoken, or posts a notification if the
+   app was closed. Watch conversations are kept in the phone's history under `watch-` ids.
+
+The message format is `core/wear/WearProtocol`, compiled into both apps so they cannot drift.
+
 ## Android integrations
 
 - **Assistant role**: `AssistActivity` and the `ASSIST` intent; `voice/` has dictation, speech and

@@ -131,6 +131,9 @@ dependencies {
   implementation(project(":engine"))
   // Photo cut-out: the interactive segmenter. See model/Segmenter.
   implementation(libs.tasks.vision)
+  // The watch app talks to the phone over Wear OS's Data Layer. See wear/WearBridge.
+  implementation(libs.play.services.wearable)
+  implementation(libs.kotlinx.coroutines.play.services)
 
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.lifecycle.runtime.ktx)
