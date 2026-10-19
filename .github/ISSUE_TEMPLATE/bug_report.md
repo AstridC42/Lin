@@ -1,32 +1,25 @@
 ---
-name: 🐛 Bug report
-about: Create a report to help us improve
+name: Bug report
+about: Something in Lin does not work as it should
 title: ''
-labels: ''
+labels: bug
 assignees: ''
-
 ---
 
-**Describe the bug:**    
-A clear and concise description of what the bug is.
+**What happened**
+What you said or tapped, and what Lin did.
 
-**To Reproduce:**      
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+**What you expected**
 
-**Expected behavior:**        
-A clear and concise description of what you expected to happen.
+**Steps to reproduce**
+1.
+2.
 
-**Screenshots:**    
-If applicable, add screenshots to help explain your problem.
+**Screenshots**
+If you can. Remove anything private first.
 
-**Device & App Information (Please complete the following):**
-- Device: [e.g., Samsung Galaxy S23, Google Pixel 7]
-- Android Version: [e.g., Android 12, Android 13]
-- App Version: [e.g., 1.0.1, v1.0.2]
-
-**Additional context:**    
-Add any other context about the problem here.
+**Setup**
+- Lin version (Android Settings → Apps → Lin, or the APK name):
+- Phone and Android version:
+- Which model answered (on the phone / your server, and its name):
+- Search service, if it is about web search:

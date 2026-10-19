@@ -1,0 +1,76 @@
+# Checks that Lin builds and its tests pass, on every pull request and every push to main.
+#
+# It produces nothing installable on purpose: delivery is release_lin.yml's job, which publishes
+# signed builds to the Releases page. This is the fast gate - does it build, do the tests pass.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'core/**'
+      - 'engine/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'gradlew'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'core/**'
+      - 'engine/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'gradlew'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+# Pull requests from forks run with read-only access and no secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # android-37.0, with the minor version, because compileSdk pins
+      # release(37) { minorApiLevel = 0 }: "platforms;android-37" is not a package that exists.
+      # Cannot fail the job by itself: if the platform really is missing, the build below says so.
+      - name: Install Android SDK Platform 37
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platforms;android-37.0" || true
+
+      # Before the build, so a broken test fails the run quickly.
+      - name: Unit tests
+        run: ./gradlew --no-daemon :core:testDebugUnitTest :engine:testDebugUnitTest :app:testDebugUnitTest --console=plain
+
+      - name: Build
+        run: ./gradlew --no-daemon :app:assembleDebug --console=plain
