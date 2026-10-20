@@ -96,6 +96,7 @@ private val VERBS: Map<String, Pair<String, String>> =
     "open_app" to ("Opening an app" to "Opened an app"),
     "device_status" to ("Checking the phone" to "Checked the phone"),
     "read_screen" to ("Reading the screen" to "Read the screen"),
+    "cut_out_photo" to ("Opening the cut-out" to "Opened the cut-out"),
     "find_photo" to ("Looking through photos" to "Looked through photos"),
     "remember" to ("Remembering" to "Remembered"),
     "recall" to ("Recalling" to "Recalled"),

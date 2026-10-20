@@ -79,6 +79,7 @@ constructor(
   private val lastSaid: LastSaid,
   private val web: com.lin.agent.web.Web,
   private val reminders: com.lin.agent.remind.ReminderBook,
+  private val photoDesk: PhotoDesk,
 ) {
 
   /**
@@ -95,6 +96,7 @@ constructor(
       RememberTool(memories, embedders),
       RecallTool(memories, embedders),
       FindPhotoTool(memories, embedders, attachments, context),
+      CutOutTool(photoDesk),
       UnreadTool(relay),
       ReplyTool(relay),
       CalendarTool(calendars),

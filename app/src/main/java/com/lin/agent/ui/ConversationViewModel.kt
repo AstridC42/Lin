@@ -191,6 +191,7 @@ constructor(
   private val tools: com.lin.agent.model.Tools,
   private val mcp: com.lin.agent.mcp.McpConnections,
   private val lastSaidHolder: com.lin.agent.model.LastSaid,
+  private val photoDesk: com.lin.agent.model.PhotoDesk,
   private val speaker: Speaker,
   private val settings: SettingsRepository,
   private val reminders: com.lin.agent.remind.ReminderBook,
@@ -314,6 +315,9 @@ constructor(
   fun detach(item: Attachment) = _state.update { it.copy(attached = it.attached - item) }
 
   /** A picture made inside the app - a cut-out - joining the next message. */
+  /** Lin asking for the cut-out editor on a photo; the screen opens it. */
+  val cutOutRequests = photoDesk.cutOut
+
   fun attachPicture(item: Attachment.Picture) = _state.update { it.copy(attached = it.attached + item, error = "") }
 
   /**
@@ -618,6 +622,8 @@ constructor(
     // Documents are folded into the words; pictures ride along as attachments, because only
     // one of those is something a backend needs to know about. See withDocuments.
     val carried = _state.value.attached
+    // The newest photo, for "remove the background" to work on. See CutOutTool.
+    carried.filterIsInstance<Attachment.Picture>().lastOrNull()?.let { photoDesk.lastPicture = it }
     val outgoing =
       _state.value.messages +
         Message(

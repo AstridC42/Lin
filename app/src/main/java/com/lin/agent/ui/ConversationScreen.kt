@@ -24,6 +24,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -891,7 +892,11 @@ private fun Said(message: Message, actions: AnswerActions? = null) {
         shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 8.dp, bottomStart = 22.dp),
         modifier = Modifier.widthIn(max = 300.dp),
       ) {
-        Text(
+        Column {
+        for (picture in message.attachments.filterIsInstance<com.lin.agent.engine.Attachment.Picture>()) {
+          PicturePreview(picture)
+        }
+        if (message.text.isNotBlank()) Text(
           message.text,
           style =
             MaterialTheme.typography.bodyLarge.copy(
@@ -900,6 +905,7 @@ private fun Said(message: Message, actions: AnswerActions? = null) {
             ),
           modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
+        }
       }
     } else {
       // The source list comes off the end and becomes chips - see splitSources.
@@ -1181,8 +1187,27 @@ private fun ColumnScope.Composer(
   var cutting by rememberSaveable { mutableStateOf<android.net.Uri?>(null) }
   val cutPicker =
     rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> cutting = uri }
+  // Opened by Lin ("remove the background"), with the subject picked for a start.
+  var autoCut by rememberSaveable { mutableStateOf(false) }
+  LaunchedEffect(viewModel) {
+    viewModel.cutOutRequests.collect { picture ->
+      val file = java.io.File(attachContext.cacheDir, "cutout-${System.currentTimeMillis()}.jpg")
+      runCatching { file.writeBytes(picture.bytes) }.onSuccess {
+        autoCut = true
+        cutting = android.net.Uri.fromFile(file)
+      }
+    }
+  }
   cutting?.let { photo ->
-    CutOutScreen(photo = photo, onClose = { cutting = null }, onAsk = viewModel::attachPicture)
+    CutOutScreen(
+      photo = photo,
+      onClose = {
+        cutting = null
+        autoCut = false
+      },
+      onAsk = viewModel::attachPicture,
+      pickSubject = autoCut,
+    )
   }
 
   // One pill holding everything, the way Gemini, ChatGPT and Claude all draw it: attach on the
@@ -1603,3 +1628,31 @@ private fun shrunk(bytes: ByteArray): android.graphics.Bitmap? =
       BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
     }
     .getOrNull()
+
+/** A photo the person sent, shown in their bubble. Decoded small, once per photo. */
+@Composable
+private fun PicturePreview(picture: com.lin.agent.engine.Attachment.Picture) {
+  val image =
+    remember(picture) {
+      runCatching {
+          val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+          android.graphics.BitmapFactory.decodeByteArray(picture.bytes, 0, picture.bytes.size, bounds)
+          var sample = 1
+          while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 600) sample *= 2
+          android.graphics.BitmapFactory.decodeByteArray(
+              picture.bytes, 0, picture.bytes.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+            ?.asImageBitmap()
+        }
+        .getOrNull()
+    } ?: return
+  Image(
+    bitmap = image,
+    contentDescription = picture.name,
+    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+    modifier =
+      Modifier.padding(4.dp)
+        .widthIn(max = 292.dp)
+        .heightIn(max = 320.dp)
+        .clip(RoundedCornerShape(18.dp)),
+  )
+}

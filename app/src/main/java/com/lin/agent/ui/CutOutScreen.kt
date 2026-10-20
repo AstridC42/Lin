@@ -86,9 +86,14 @@ fun CutOutScreen(
   photo: Uri,
   onClose: () -> Unit,
   onAsk: (Attachment.Picture) -> Unit,
+  /** Select the subject in the middle of the photo straight away, when Lin opened this. */
+  pickSubject: Boolean = false,
   viewModel: CutOutViewModel = hiltViewModel(key = photo.toString()),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
+  LaunchedEffect(state.photo, state.modelReady) {
+    if (pickSubject && state.photo != null && state.modelReady && state.taps.isEmpty()) viewModel.tap(0.5f, 0.5f)
+  }
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   LaunchedEffect(photo) { viewModel.open(photo) }
