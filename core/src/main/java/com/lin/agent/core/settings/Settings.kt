@@ -547,6 +547,11 @@ class SettingsRepository(private val context: Context) {
    */
   val wakeWord: Flow<Boolean> = read(WAKE_WORD, false)
 
+  /** Whether the first-run setup has been finished or skipped. */
+  val setupDone: Flow<Boolean> = read(SETUP_DONE, false)
+
+  suspend fun setSetupDone(value: Boolean) = write(SETUP_DONE, value)
+
   suspend fun setWakeWord(value: Boolean) = write(WAKE_WORD, value)
 
   val keepTranscripts: Flow<Boolean> = read(KEEP_TRANSCRIPTS, true)
@@ -701,6 +706,7 @@ class SettingsRepository(private val context: Context) {
     val SERVER_KIND = stringPreferencesKey("server_kind")
     val KEEP_TRANSCRIPTS = booleanPreferencesKey("keep_transcripts")
     val WAKE_WORD = booleanPreferencesKey("wake_word")
+    val SETUP_DONE = booleanPreferencesKey("setup_done")
     val SERVER_MODEL_TYPED = booleanPreferencesKey("server_model_typed")
   }
 }

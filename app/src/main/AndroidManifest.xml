@@ -114,6 +114,8 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <!-- Nearby devices: to see a Bluetooth device connect, for routines like "when I get in the car". -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Lets setup ask to exempt Lin from battery optimisation, so routines and the wake word are not killed. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 

@@ -746,6 +746,11 @@ constructor(
   }
 
   /** Runs a routine now, to try it. */
+  /** Marks the first-run setup as finished, so it does not open again by itself. */
+  fun finishSetup() {
+    viewModelScope.launch { settings.setSetupDone(true) }
+  }
+
   fun runStanding(id: String) = com.lin.agent.model.Routines.runNow(appContext, id)
 
   /** Paired Bluetooth devices' names, for the routine form. Empty without Nearby devices. */

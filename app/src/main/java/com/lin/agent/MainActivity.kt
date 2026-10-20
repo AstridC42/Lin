@@ -147,6 +147,7 @@ class MainActivity : ComponentActivity() {
         val backTo: String? =
           when (screen) {
             SETTINGS -> CONVERSATION
+            SETUP -> CONVERSATION
             MEMORY, TRAINING, BACKUP -> SETTINGS
             // A share has no settings screen behind it, so back goes where the user would
             // otherwise have been.
@@ -158,9 +159,11 @@ class MainActivity : ComponentActivity() {
         BackHandler(enabled = backTo != null) { backTo?.let { screen = it } }
 
         when (screen) {
+          SETUP -> com.lin.agent.ui.SetupScreen(onDone = { screen = CONVERSATION })
           SETTINGS ->
             SettingsScreen(
               onBack = { screen = CONVERSATION },
+              onOpenSetup = { screen = SETUP },
               onOpenMemory = { screen = MEMORY },
               onOpenDocuments = { screen = DOCUMENTS },
               onOpenTraining = { screen = TRAINING },
@@ -209,6 +212,8 @@ class MainActivity : ComponentActivity() {
                 SettingsEntryPoint::class.java,
               )
               .settings()
+          // First launch, or the first after this update: walk through what Lin needs.
+          if (shared == null && !settings.setupDone.first()) screen = SETUP
           if (settings.wakeWord.first()) WakeService.start(this@MainActivity)
           // Put the car notification back after a restart. It is how listening is started
           // without opening the app, so it has to outlive the app being closed - and a
@@ -245,6 +250,7 @@ private const val MEMORY = "memory"
 private const val DOCUMENTS = "documents"
 private const val TRAINING = "training"
 private const val BACKUP = "backup"
+private const val SETUP = "setup"
 
 /** Reading one setting from an activity, without making the activity a view model's owner. */
 @dagger.hilt.EntryPoint

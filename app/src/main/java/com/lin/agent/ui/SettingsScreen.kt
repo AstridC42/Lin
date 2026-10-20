@@ -145,6 +145,7 @@ fun SettingsScreen(
   onOpenDocuments: () -> Unit = {},
   onOpenTraining: () -> Unit = {},
   onOpenBackup: () -> Unit = {},
+  onOpenSetup: () -> Unit = {},
   viewModel: SettingsViewModel = hiltViewModel(),
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
@@ -161,6 +162,7 @@ fun SettingsScreen(
       Column {
         TopAppBar(
           title = { Text(stringResource(R.string.settings_title)) },
+          actions = { TextButton(onClick = onOpenSetup) { Text(stringResource(R.string.settings_run_setup)) } },
           navigationIcon = {
             IconButton(onClick = onBack) {
               Icon(

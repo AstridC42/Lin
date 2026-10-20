@@ -24,3 +24,11 @@ conversations, memories or keys; bypassing the confirmation for messages and cal
 
 Out of scope: vulnerabilities in the models themselves (for example a model being talked into
 saying something), in Android, or in servers you run yourself.
+
+## Dependencies
+
+Most libraries flagged by GitHub's dependency scan arrive with the build tools (the Android
+Gradle Plugin, lint, the test platform) and never ship in the app. Patched versions of all of
+them are pinned in the root `build.gradle.kts`, for the build's own classpath and for every
+module. When a new advisory appears, add the fixed version there; check the result by
+resolving dependencies and querying [OSV](https://osv.dev) for each one.
