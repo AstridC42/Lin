@@ -17,103 +17,172 @@
 package com.lin.agent.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import com.lin.agent.R
 
-/**
- * Lin's own colours.
+/*
+ * Lin's look, from the Astrid-design system: the logo's near-black navy with warm bone ink,
+ * orange for the one primary action, and copper, brass and arcane purple as accents. Dark is
+ * the default; light swaps the ground to bone. Values are the system's tokens, named here as
+ * they are there, so a change to the system can be carried over line by line.
  *
- * Dynamic colour is gone, and that is the decision rather than an omission. Taking the palette
- * from the wallpaper is a good default for an app with no look of its own; this one now has
- * one, chosen on purpose, and a wallpaper that turns the whole app mint green undoes it. The
- * cost is that Lin no longer matches the rest of the phone, which is the trade: it looks like
- * itself instead.
- *
- * Built from the dark side first, because that is where this app is read - at night, in a car,
- * on a phone that is dark the rest of the time. The light scheme is the same hues brought up,
- * not a separate design.
- *
- * The one rule the colours have to keep: a state that matters is never signalled by hue alone.
- * "Playing" and "not sent yet" differ in lightness as well as colour, so they are still
- * different to somebody who cannot tell blue from amber.
+ * The rule the colours keep: a state that matters is never signalled by hue alone.
  */
-private val Periwinkle = Color(0xFFAFC0FF)
-private val PeriwinkleInk = Color(0xFF101218)
-private val DeepBlue = Color(0xFF35407A)
-private val Ground = Color(0xFF101218)
-private val Raised = Color(0xFF1A1D25)
-private val RaisedHigh = Color(0xFF262A35)
-private val Ink = Color(0xFFF2F3F6)
-private val Muted = Color(0xFF8C93A4)
-private val Amber = Color(0xFFF0C05A)
-private val AmberInk = Color(0xFF231B05)
-private val Rose = Color(0xFFFFB3B3)
-private val RoseInk = Color(0xFF3A1414)
+
+// Dark theme tokens.
+private val Surface = Color(0xFF0F1721)
+private val SurfaceRaised = Color(0xFF18222F)
+private val SurfaceSunken = Color(0xFF0A1119)
+private val Line = Color(0xFF2C3A4D)
+private val LineStrong = Color(0xFF6B7A90)
+private val Ink = Color(0xFFF8F6E8)
+private val InkMuted = Color(0xFFAAB2BD)
+// orange-text: the dark theme's orange, bright enough to read as text as well as fill.
+private val Orange = Color(0xFFF2701F)
+private val OnOrange = Color(0xFF0F1721)
+private val Brass = Color(0xFFC79848)
+private val ArcaneText = Color(0xFFB08CF0)
+private val Danger = Color(0xFFFF7A70)
+
+// The deep grounds, the same in both themes.
+private val SilentBlue = Color(0xFF0D365D)
+private val PurpleOfTheDeep = Color(0xFF352641)
+private val BloodRed = Color(0xFF5F1313)
 
 private val LinDark =
   darkColorScheme(
-    primary = Periwinkle,
-    onPrimary = PeriwinkleInk,
-    primaryContainer = DeepBlue,
+    primary = Orange,
+    onPrimary = OnOrange,
+    // The person's own bubble: navy, the pair to orange in Marlin's hair.
+    primaryContainer = SilentBlue,
     onPrimaryContainer = Ink,
-    secondary = Amber,
-    onSecondary = AmberInk,
-    // Where a staged action lives: written, not sent. Amber on purpose - it is neither a
-    // success nor a failure, and the two-colour palettes that only have those make it one.
-    secondaryContainer = Color(0xFF2A2415),
-    onSecondaryContainer = Color(0xFFF7E6B8),
-    tertiary = Color(0xFF8ED6AD),
-    onTertiary = Color(0xFF07281A),
-    background = Ground,
+    secondary = Brass,
+    onSecondary = OnOrange,
+    // Where a staged action lives: written, not sent.
+    secondaryContainer = PurpleOfTheDeep,
+    onSecondaryContainer = Ink,
+    tertiary = ArcaneText,
+    onTertiary = OnOrange,
+    background = Surface,
     onBackground = Ink,
-    surface = Ground,
+    surface = Surface,
     onSurface = Ink,
-    surfaceContainer = Raised,
-    surfaceContainerHigh = Raised,
-    surfaceContainerHighest = RaisedHigh,
-    surfaceVariant = Raised,
-    onSurfaceVariant = Muted,
-    outline = Color(0xFF3A3F4C),
-    outlineVariant = Color(0xFF262A35),
-    error = Rose,
-    onError = RoseInk,
-    errorContainer = Color(0xFF3A1A1A),
-    onErrorContainer = Color(0xFFFFD6D6),
+    surfaceContainerLowest = SurfaceSunken,
+    surfaceContainerLow = SurfaceRaised,
+    surfaceContainer = SurfaceRaised,
+    surfaceContainerHigh = Color(0xFF223042),
+    surfaceContainerHighest = Line,
+    surfaceVariant = SurfaceRaised,
+    onSurfaceVariant = InkMuted,
+    outline = LineStrong,
+    outlineVariant = Line,
+    error = Danger,
+    onError = OnOrange,
+    errorContainer = BloodRed,
+    onErrorContainer = Ink,
   )
 
 private val LinLight =
   lightColorScheme(
-    primary = Color(0xFF3F4FA8),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFDCE1FF),
-    onPrimaryContainer = Color(0xFF101218),
-    secondary = Color(0xFF7A5C00),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFFFE9A8),
-    onSecondaryContainer = Color(0xFF2A2415),
-    tertiary = Color(0xFF1F6B47),
-    onTertiary = Color(0xFFFFFFFF),
-    background = Color(0xFFFBFBFE),
-    onBackground = Color(0xFF14161C),
-    surface = Color(0xFFFBFBFE),
-    onSurface = Color(0xFF14161C),
-    surfaceContainer = Color(0xFFF0F1F7),
-    surfaceContainerHigh = Color(0xFFEAECF4),
-    surfaceContainerHighest = Color(0xFFE3E6F0),
-    surfaceVariant = Color(0xFFF0F1F7),
-    onSurfaceVariant = Color(0xFF5A6072),
-    outline = Color(0xFFBDC2D2),
-    outlineVariant = Color(0xFFDDE0EA),
+    // The light theme's orange-text: Material uses primary for text and labels as well as
+    // fills, and plain orange is too faint as text on bone.
+    primary = Color(0xFFA84300),
+    onPrimary = Color(0xFFF8F6E8),
+    primaryContainer = SilentBlue,
+    onPrimaryContainer = Color(0xFFF8F6E8),
+    secondary = Color(0xFF7A5A10),
+    onSecondary = Color(0xFFF8F6E8),
+    secondaryContainer = Color(0xFFEFE2C4),
+    onSecondaryContainer = Color(0xFF0F1721),
+    tertiary = Color(0xFF5E3D94),
+    onTertiary = Color(0xFFF8F6E8),
+    background = Color(0xFFF8F6E8),
+    onBackground = Color(0xFF0F1721),
+    surface = Color(0xFFF8F6E8),
+    onSurface = Color(0xFF0F1721),
+    surfaceContainerLowest = Color(0xFFEFEADB),
+    surfaceContainerLow = Color(0xFFFDFDFD),
+    surfaceContainer = Color(0xFFFDFDFD),
+    surfaceContainerHigh = Color(0xFFEFEADB),
+    surfaceContainerHighest = Color(0xFFE4DECB),
+    surfaceVariant = Color(0xFFFDFDFD),
+    onSurfaceVariant = Color(0xFF4A5361),
+    outline = Color(0xFF6F6A58),
+    outlineVariant = Color(0xFFD6D0BD),
     error = Color(0xFFB3261E),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFDAD6),
+    onError = Color(0xFFFDFDFD),
+    errorContainer = Color(0xFFF9DEDC),
     onErrorContainer = Color(0xFF410E0B),
+  )
+
+/** IBM Plex Mono, in its Nerd Font build: everything that is read. */
+private val Text =
+  FontFamily(
+    Font(R.font.blex_mono_regular, FontWeight.Normal),
+    Font(R.font.blex_mono_medium, FontWeight.Medium),
+    Font(R.font.blex_mono_semibold, FontWeight.SemiBold),
+    Font(R.font.blex_mono_bold, FontWeight.Bold),
+  )
+
+/** BigBlue Terminal, a 1980s PC pixel face, by VileR: titles only, at multiples of 16. */
+private val Display = FontFamily(Font(R.font.big_blue_terminal, FontWeight.Normal))
+
+private fun display(size: Int, line: Int, spacing: Float = 0f) =
+  TextStyle(fontFamily = Display, fontWeight = FontWeight.Normal, fontSize = size.sp, lineHeight = line.sp, letterSpacing = spacing.em)
+
+private fun text(size: Int, line: Int, weight: FontWeight = FontWeight.Normal, spacing: Float = 0f) =
+  TextStyle(fontFamily = Text, fontWeight = weight, fontSize = size.sp, lineHeight = line.sp, letterSpacing = spacing.em)
+
+private val LinType =
+  Typography(
+    displayLarge = display(64, 64),
+    displayMedium = display(48, 48),
+    displaySmall = display(32, 40),
+    headlineLarge = display(32, 40),
+    headlineMedium = display(32, 40),
+    headlineSmall = display(32, 40),
+    // The top bar's title: the pixel face, as an overline.
+    titleLarge = display(16, 24, 0.08f),
+    titleMedium = text(16, 24, FontWeight.SemiBold),
+    titleSmall = text(14, 20, FontWeight.SemiBold),
+    bodyLarge = text(15, 24),
+    bodyMedium = text(14, 22),
+    bodySmall = text(13, 20),
+    labelLarge = text(14, 20, FontWeight.Medium),
+    labelMedium = text(12, 16, FontWeight.Medium, 0.04f),
+    labelSmall = text(11, 16, FontWeight.Medium, 0.04f),
+  )
+
+/** radius-sm 3, radius-md 6 (buttons, inputs, bubbles), radius-lg 12 (cards). */
+private val LinShapes =
+  Shapes(
+    extraSmall = RoundedCornerShape(3.dp),
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(6.dp),
+    large = RoundedCornerShape(12.dp),
+    extraLarge = RoundedCornerShape(12.dp),
   )
 
 @Composable
 fun LinTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-  MaterialTheme(colorScheme = if (darkTheme) LinDark else LinLight, content = content)
+  MaterialTheme(
+    colorScheme = if (darkTheme) LinDark else LinLight,
+    typography = LinType,
+    shapes = LinShapes,
+    content = content,
+  )
 }

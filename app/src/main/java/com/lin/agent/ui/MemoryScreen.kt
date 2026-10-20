@@ -140,7 +140,7 @@ fun MemoryScreen(onBack: () -> Unit, viewModel: MemoryViewModel = hiltViewModel(
       item {
         Surface(
           color = MaterialTheme.colorScheme.surfaceContainer,
-          shape = RoundedCornerShape(20.dp),
+          shape = RoundedCornerShape(12.dp),
           modifier = Modifier.fillMaxWidth(),
         ) {
           Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

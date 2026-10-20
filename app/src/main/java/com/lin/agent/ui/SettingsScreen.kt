@@ -94,6 +94,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -155,7 +157,14 @@ fun SettingsScreen(
   // page any more. Held as an ordinal rather than the enum, because that is what survives being
   // written into a Bundle without a Saver.
   var openTab by rememberSaveable { mutableIntStateOf(0) }
-  val tab = SettingsTab.entries[openTab.coerceIn(SettingsTab.entries.indices)]
+  // Swipe between tabs, or tap one. The pager and the saved tab follow each other.
+  val pager =
+    androidx.compose.foundation.pager.rememberPagerState(
+      initialPage = openTab.coerceIn(SettingsTab.entries.indices)
+    ) { SettingsTab.entries.size }
+  LaunchedEffect(pager.currentPage) { openTab = pager.currentPage }
+  val pagerScope = rememberCoroutineScope()
+  val tab = SettingsTab.entries[pager.currentPage.coerceIn(SettingsTab.entries.indices)]
 
   Scaffold(
     topBar = {
@@ -177,7 +186,7 @@ fun SettingsScreen(
           SettingsTab.entries.forEachIndexed { index, each ->
             Tab(
               selected = each == tab,
-              onClick = { openTab = index },
+              onClick = { pagerScope.launch { pager.animateScrollToPage(index) } },
               text = { Text(stringResource(each.title)) },
             )
           }
@@ -186,22 +195,22 @@ fun SettingsScreen(
     },
     modifier = Modifier.imePadding(),
   ) { padding ->
-    val scroll = rememberScrollState()
-    // A new tab starts at its top. Carrying the last tab's scroll position into a shorter page
-    // lands somebody in the middle of it, or past the end of it.
-    LaunchedEffect(tab) { scroll.scrollTo(0) }
-
+    androidx.compose.foundation.pager.HorizontalPager(
+      state = pager,
+      modifier = Modifier.fillMaxSize().padding(padding),
+      beyondViewportPageCount = 0,
+    ) { page ->
+    // Each tab keeps its own scroll, and starts at its top.
     Column(
       modifier =
         Modifier.fillMaxSize()
-          .padding(padding)
           .padding(horizontal = 20.dp)
-          .verticalScroll(scroll),
+          .verticalScroll(rememberScrollState()),
       verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
       // Exhaustive on the enum, with no else: adding a group to the list below without giving
       // it anything to show is then a compile error rather than an empty tab.
-      when (tab) {
+      when (SettingsTab.entries[page]) {
         SettingsTab.MODELS -> ModelsTab(state, viewModel)
         SettingsTab.PERSONA -> PersonaTab(state, viewModel)
         SettingsTab.SERVER -> ServerTab(state, viewModel)
@@ -214,6 +223,7 @@ fun SettingsScreen(
       }
       // The last section of any tab should not sit against the navigation bar.
       Spacer(modifier = Modifier.height(24.dp))
+    }
     }
   }
 }
@@ -1794,7 +1804,7 @@ private fun ColumnScope.McpServers(viewModel: SettingsViewModel) {
     for (each in servers) {
       Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
       ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -2070,7 +2080,7 @@ private fun ColumnScope.Section(
   )
   Surface(
     color = MaterialTheme.colorScheme.surfaceContainerLow,
-    shape = RoundedCornerShape(24.dp),
+    shape = RoundedCornerShape(12.dp),
     modifier = Modifier.fillMaxWidth(),
   ) {
     Column {
@@ -2124,7 +2134,7 @@ private fun CollapsedPicker(
   )
   Surface(
     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    shape = RoundedCornerShape(16.dp),
+    shape = RoundedCornerShape(12.dp),
     modifier = Modifier.fillMaxWidth(),
   ) {
     Column {
@@ -2335,7 +2345,7 @@ private fun ColumnScope.Routines(state: SettingsState, viewModel: SettingsViewMo
     for (task in state.standing) {
       Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
       ) {
         Column(modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 4.dp)) {
