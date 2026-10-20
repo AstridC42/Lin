@@ -40,6 +40,9 @@ fun quickCommand(said: String): QuickCommand? {
   text = text.replace(Regex("\\s+"), " ")
   for (filler in LEADING) text = text.removePrefix(filler).trim()
   for (filler in TRAILING) text = text.removeSuffix(filler).trim()
+  // Before the clause check, because "put the phone in silent mode" is the usual way to say
+  // it; soundCommand rejects anything left over, so "in five minutes" still goes to the model.
+  com.lin.agent.core.phone.soundCommand(text)?.let { (tool, args) -> return QuickCommand(tool, args) }
   val words = text.split(' ')
   if (words.any { it in CLAUSES }) return null
 

@@ -178,9 +178,13 @@ class ModelDownload(
 
   private fun describeStatus(status: Int): String =
     when (status) {
-      401, 403 ->
-        "Hugging Face refused the download ($status). If this model is gated, accept its " +
-          "licence on huggingface.co and put an access token in Settings, under Models."
+      401 ->
+        "Hugging Face did not accept the token ($status). Check it was copied whole, or make a " +
+          "new Read token at huggingface.co/settings/tokens and paste it in Settings, under Models."
+      403 ->
+        "Hugging Face refused the download ($status). Open the model's page on huggingface.co " +
+          "and accept its licence, and use a Read token (a fine-grained token needs \"read access " +
+          "to public gated repos\" ticked; an Inference token cannot download)."
       404 -> "That model file is not where the app expected it ($status)."
       in 500..599 -> "The server had a problem ($status). Worth trying again."
       else -> "The download failed with status $status."
@@ -239,7 +243,10 @@ class ModelDownload(
       return object : Connection {
         override val status: Int = connection.responseCode
         override val contentLength: Long = connection.contentLengthLong
-        override val body: InputStream = connection.inputStream
+        // Read only once the status says there is a file. For a refusal (401, 403, 404)
+        // inputStream throws, and reading it eagerly turned every refusal into what looked
+        // like a dropped connection: retried quietly, shown as "waiting for a connection".
+        override val body: InputStream by lazy { connection.inputStream }
         override fun close() = connection.disconnect()
       }
     }

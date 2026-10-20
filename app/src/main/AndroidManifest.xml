@@ -107,6 +107,11 @@
       RECEIVE_BOOT_COMPLETED is not optional for this feature. Alarms are lost on restart, so
       without it every reminder set before a reboot would be listed as pending and never arrive.
     -->
+    <!--
+      Do Not Disturb access. Without this declared, Lin never appears on the system's access
+      list, so silent mode and the Do Not Disturb switch could never be granted.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
