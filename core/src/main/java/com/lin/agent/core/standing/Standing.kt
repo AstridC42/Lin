@@ -46,6 +46,16 @@ data class StandingTask(
    * run today" and a timestamp would need the same arithmetic done twice.
    */
   val lastRunDay: Long = 0,
+  /** What starts it. A time unless said otherwise, which is what every older task was. */
+  val trigger: Trigger = Trigger.TIME,
+  /**
+   * For a Bluetooth trigger, part of the device's name ("car", "Buds"). Blank means any device.
+   */
+  val device: String = "",
+  /** Read the result aloud as well as putting it in a notification. */
+  val speak: Boolean = false,
+  /** When an event last started it, in epoch millis, so a flapping connection fires once. */
+  val lastRunAt: Long = 0,
 ) {
   val minuteOfDay: Int
     get() = hour * 60 + minute
@@ -69,6 +79,7 @@ data class StandingTask(
  * phone was asleep at 08:00 is still the briefing somebody wanted.
  */
 fun isDue(task: StandingTask, dayOfWeek: Int, minuteOfDay: Int, todayEpochDay: Long): Boolean {
+  if (task.trigger != Trigger.TIME) return false
   if (!task.enabled) return false
   if (task.ask.isBlank()) return false
   if (task.days.isNotEmpty() && dayOfWeek !in task.days) return false
@@ -143,6 +154,10 @@ fun tasksFrom(stored: String?): List<StandingTask> {
             .toSet(),
         enabled = each.optBoolean("enabled", true),
         lastRunDay = each.optLong("lastRunDay", 0),
+        trigger = Trigger.entries.firstOrNull { it.name == each.optString("trigger") } ?: Trigger.TIME,
+        device = each.optString("device").trim(),
+        speak = each.optBoolean("speak", false),
+        lastRunAt = each.optLong("lastRunAt", 0),
       )
     )
   }
@@ -161,6 +176,10 @@ fun storedTasks(tasks: List<StandingTask>): String {
         .put("days", JSONArray(task.days.sorted()))
         .put("enabled", task.enabled)
         .put("lastRunDay", task.lastRunDay)
+        .put("trigger", task.trigger.name)
+        .put("device", task.device)
+        .put("speak", task.speak)
+        .put("lastRunAt", task.lastRunAt)
     )
   }
   return array.toString()

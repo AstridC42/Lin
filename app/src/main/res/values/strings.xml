@@ -223,6 +223,7 @@
   <string name="settings_tab_server">Server</string>
   <string name="settings_tab_voice">Voice</string>
   <string name="settings_tab_phone">Phone</string>
+  <string name="settings_tab_routines">Routines</string>
   <string name="settings_sampling_heading">How the server model generates</string>
   <string name="settings_sampling_detail">Leave a box empty and Lin sends nothing for it, so
     your server\'s own setting for that model decides. Fill one in and Lin sends it with every
@@ -254,14 +255,11 @@
   <string name="standing_channel">Routines</string>
   <string name="standing_channel_detail">Answers to the things you asked Lin to check on a
     schedule.</string>
-  <string name="settings_standing_heading">Things Lin does on its own</string>
-  <string name="settings_standing_detail">A question you ask every day is one you should only
-    have to ask once. Lin runs it in the background and puts the answer in a notification.
-    Late by up to three hours is still delivered; later than that waits for tomorrow, because
-    a morning briefing arriving at night is the wrong message rather than a late one.</string>
-  <string name="settings_standing_none">Nothing scheduled.</string>
+  <string name="settings_standing_heading">Your routines</string>
+  <string name="settings_standing_detail">Things Lin does by itself: at a time, when the phone starts charging, or when a Bluetooth device like your car or earbuds connects or disconnects. Results arrive as a notification.</string>
+  <string name="settings_standing_none">No routines yet.</string>
   <string name="settings_standing_add">Add a routine</string>
-  <string name="settings_standing_ask">What should Lin ask itself?</string>
+  <string name="settings_standing_ask">What should Lin do?</string>
   <string name="settings_standing_hour">Hour (0–23)</string>
   <string name="settings_standing_minute">Minute</string>
   <string name="settings_standing_days">Which days? Leave all off for every day.</string>
@@ -269,6 +267,25 @@
   <string name="settings_standing_cancel">Cancel</string>
   <string name="settings_standing_remove">Remove</string>
   <string name="settings_standing_everyday">Every day</string>
+  <string name="routine_try">Try now</string>
+  <string name="routine_speaks">reads aloud</string>
+  <string name="routine_ask_hint">Silent mode and do not disturb on</string>
+  <string name="routine_ask_help">Plain phone commands run instantly. Anything else, like \"tell me the weather\", is answered by your model.</string>
+  <string name="routine_when">When</string>
+  <string name="routine_trigger_time">At a time</string>
+  <string name="routine_trigger_charging">Starts charging</string>
+  <string name="routine_trigger_bt_on">Bluetooth connects</string>
+  <string name="routine_trigger_bt_off">Bluetooth disconnects</string>
+  <string name="routine_when_bt_on">When %1$s connects</string>
+  <string name="routine_when_bt_off">When %1$s disconnects</string>
+  <string name="routine_charging_note">Runs within a minute or two of plugging in, once per charge.</string>
+  <string name="routine_nearby_needed">Lin needs the Nearby devices permission to notice Bluetooth connections.</string>
+  <string name="routine_nearby_allow">Allow Nearby devices</string>
+  <string name="routine_device">Device name (part of it is enough)</string>
+  <string name="routine_device_any">Any device</string>
+  <string name="routine_device_any_short">any device</string>
+  <string name="routine_speak">Read the result aloud</string>
+  <string name="routine_by_voice">You can also just ask Lin: \"every weekday at 7, put the phone on sound and tell me the weather\".</string>
 
   <string name="settings_tab_persona">Who Lin is</string>
 
