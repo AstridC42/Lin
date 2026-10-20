@@ -496,6 +496,8 @@
   <string name="settings_models_choose">Tap “Use this one” to pick which downloaded model
     answers. Without a choice, Lin picks the one suited to this phone.</string>
 
+  <string name="settings_models_all">All models (%1$d)</string>
+  <string name="settings_models_fewer">Show fewer</string>
   <string name="settings_models_where">Models are read from, and will be downloaded to:</string>
 
   <string name="settings_server_kind_ollama">Ollama\'s own API. Listens on 11434. No key

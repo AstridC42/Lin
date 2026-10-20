@@ -287,23 +287,29 @@ jobs:
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
           fi
 
-      # Only the newest few test builds are kept, so the Releases page stays short. Numbered
-      # releases are never touched. Never fatal: a build that published is a success.
-      - name: Remove older test builds
+      # The Releases page always holds exactly one stable release (the newest numbered one) and
+      # one test build (the newest pre-release). Everything older goes, and so do its tags where
+      # GitHub allows it. Never fatal: a build that published is a success.
+      - name: Keep one stable release and one test build
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
-            --jq '.[] | select(.draft | not) | "\(.created_at) \(.id) \(.tag_name)"')"
-          # The old rolling release, which immutable releases left empty, goes at once.
-          echo "$releases" | awk '$3 == "lin-dev"' | while read -r _ id tag; do
-            echo "Removing $tag"; gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id" || true
-          done
-          # Of the per-build test releases, the newest three stay.
-          echo "$releases" | awk '$3 ~ /^lin-0\.1\.0-dev\./' | sort -r | tail -n +4 | while read -r _ id tag; do
-            echo "Removing $tag"; gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id" || true
-          done
+            --jq '.[] | select(.draft | not) | "\(.created_at) \(.id) \(.tag_name)"' | sort -r)"
+          drop() {
+            while read -r _ id tag; do
+              echo "Removing $tag"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id" || true
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/$tag" 2>/dev/null || true
+            done
+          }
+          # The old rolling release, which immutable releases left empty.
+          echo "$releases" | awk '$3 == "lin-dev"' | drop
+          # Newest test build stays.
+          echo "$releases" | awk '$3 ~ /^lin-0\.1\.0-dev\./' | tail -n +2 | drop
+          # Newest numbered release stays.
+          echo "$releases" | awk '$3 ~ /^lin-v/' | tail -n +2 | drop
 
       - name: Say where it went
         run: |

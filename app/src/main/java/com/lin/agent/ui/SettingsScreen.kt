@@ -33,6 +33,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -65,7 +68,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -166,9 +169,8 @@ fun SettingsScreen(
             }
           },
         )
-        // Fixed rather than scrollable: five short labels fit across a phone, and tabs that
-        // have to be scrolled to be seen hide the thing somebody came here for.
-        PrimaryTabRow(selectedTabIndex = tab.ordinal) {
+        // Scrollable: seven labels squeezed across a folded phone get cut off mid-word.
+        PrimaryScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 12.dp) {
           SettingsTab.entries.forEachIndexed { index, each ->
             Tab(
               selected = each == tab,
@@ -240,13 +242,23 @@ private enum class SettingsTab(@param:StringRes val title: Int) {
  */
 @Composable
 private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewModel) {
-  Section(R.string.settings_models_heading) {
+  Section(R.string.settings_models_heading, open = true) {
     Text(
       stringResource(R.string.settings_device, state.memoryGb, state.socModel.ifEmpty { "?" }),
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    for (line in state.models) {
+    // Collapsed to what matters right now: the model answering and anything downloading.
+    // The full catalogue is one tap away rather than a wall of cards on every visit.
+    var allModels by rememberSaveable { mutableStateOf(false) }
+    val busy = { line: ModelLine ->
+      line.name == state.chatModel ||
+        line.download is DownloadState.Waiting ||
+        line.download is DownloadState.Running ||
+        line.download is DownloadState.Failed
+    }
+    val shown = if (allModels) state.models else state.models.filter(busy).ifEmpty { state.models }
+    for (line in shown) {
       Card(modifier = Modifier.fillMaxWidth()) {
         Column(
           modifier = Modifier.padding(12.dp),
@@ -341,6 +353,18 @@ private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewM
               }
           }
         }
+      }
+    }
+    if (shown.size < state.models.size || allModels) {
+      TextButton(onClick = { allModels = !allModels }, modifier = Modifier.fillMaxWidth()) {
+        Text(
+          if (allModels) stringResource(R.string.settings_models_fewer)
+          else stringResource(R.string.settings_models_all, state.models.size)
+        )
+        Icon(
+          if (allModels) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+          contentDescription = null,
+        )
       }
     }
     // Only once it is here: a switch for a model that is not downloaded does nothing.
@@ -455,7 +479,7 @@ private fun ColumnScope.ModelsTab(state: SettingsState, viewModel: SettingsViewM
  */
 @Composable
 private fun ColumnScope.ServerTab(state: SettingsState, viewModel: SettingsViewModel) {
-  Section(R.string.settings_server_heading) {
+  Section(R.string.settings_server_heading, open = true) {
     Text(
       stringResource(R.string.settings_server_detail),
       style = MaterialTheme.typography.bodySmall,
@@ -693,7 +717,7 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
     onDispose { systemLifecycle.lifecycle.removeObserver(observer) }
   }
 
-  Section(R.string.settings_voice_heading) {
+  Section(R.string.settings_voice_heading, open = true) {
     Text(
       stringResource(R.string.settings_voice_detail),
       style = MaterialTheme.typography.bodySmall,
@@ -1038,7 +1062,7 @@ private fun ColumnScope.VoiceTab(state: SettingsState, viewModel: SettingsViewMo
 /** What Lin may touch on the phone itself: calls, messages, the calendar, photos, music. */
 @Composable
 private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewModel) {
-  Section(R.string.settings_phone_heading) {
+  Section(R.string.settings_phone_heading, open = true) {
     Text(
       stringResource(R.string.settings_direct_calls),
       style = MaterialTheme.typography.bodyLarge,
@@ -1472,7 +1496,7 @@ private fun shellStateLabel(state: ShizukuState) =
 private fun ColumnScope.ToolsTab(state: SettingsState, viewModel: SettingsViewModel) {
   WebSearch(state, viewModel)
 
-  Section(R.string.settings_tools_heading) {
+  Section(R.string.settings_tools_heading, open = true) {
     Text(
       stringResource(R.string.settings_tools_detail),
       style = MaterialTheme.typography.bodySmall,
@@ -1809,7 +1833,7 @@ private fun ColumnScope.DataTab(
   onOpenTraining: () -> Unit,
   onOpenBackup: () -> Unit,
 ) {
-  Section(R.string.settings_memory_heading) {
+  Section(R.string.settings_memory_heading, open = true) {
     Card(modifier = Modifier.fillMaxWidth()) {
       Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
@@ -1980,24 +2004,102 @@ private fun ServerModelRow(model: ServerModel, selected: Boolean, onPick: () -> 
 @Composable
 private fun ColumnScope.Section(
   @StringRes title: Int,
+  open: Boolean = false,
+  collapsible: Boolean = true,
   content: @Composable ColumnScope.() -> Unit,
 ) {
-  Text(
-    stringResource(title),
-    style = MaterialTheme.typography.labelLarge,
-    color = MaterialTheme.colorScheme.primary,
-    modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 6.dp),
+  // Saved per section, so turning the phone or unfolding it keeps what was open.
+  var expanded by rememberSaveable { mutableStateOf(open || !collapsible) }
+  val turn by androidx.compose.animation.core.animateFloatAsState(
+    if (expanded) 180f else 0f,
+    label = "chevron",
   )
   Surface(
     color = MaterialTheme.colorScheme.surfaceContainerLow,
     shape = RoundedCornerShape(24.dp),
     modifier = Modifier.fillMaxWidth(),
   ) {
-    Column(
-      modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp),
-      content = content,
-    )
+    Column {
+      Row(
+        modifier =
+          Modifier.fillMaxWidth()
+            .then(if (collapsible) Modifier.clickable { expanded = !expanded } else Modifier)
+            .padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = if (expanded) 4.dp else 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+          stringResource(title),
+          style = MaterialTheme.typography.titleSmall,
+          color = if (expanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+          modifier = Modifier.weight(1f),
+        )
+        if (collapsible) {
+          Icon(
+            Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.graphicsLayer { rotationZ = turn },
+          )
+        }
+      }
+      androidx.compose.animation.AnimatedVisibility(visible = expanded) {
+        Column(
+          modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 14.dp),
+          verticalArrangement = Arrangement.spacedBy(10.dp),
+          content = content,
+        )
+      }
+    }
+  }
+}
+
+/**
+ * A choice among a few options that shows only the current one until tapped: the label, what
+ * is chosen, and a chevron. Long lists of radio rows are what made this screen feel heavy.
+ */
+@Composable
+private fun CollapsedPicker(
+  label: String,
+  current: String,
+  content: @Composable ColumnScope.() -> Unit,
+) {
+  var expanded by rememberSaveable { mutableStateOf(false) }
+  val turn by androidx.compose.animation.core.animateFloatAsState(
+    if (expanded) 180f else 0f,
+    label = "chevron",
+  )
+  Surface(
+    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    shape = RoundedCornerShape(16.dp),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Column {
+      Row(
+        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          Text(current, style = MaterialTheme.typography.bodyLarge)
+        }
+        Icon(
+          Icons.Filled.KeyboardArrowDown,
+          contentDescription = null,
+          modifier = Modifier.graphicsLayer { rotationZ = turn },
+        )
+      }
+      androidx.compose.animation.AnimatedVisibility(visible = expanded) {
+        Column(
+          modifier = Modifier.padding(start = 4.dp, end = 8.dp, bottom = 8.dp),
+          verticalArrangement = Arrangement.spacedBy(4.dp),
+          content = content,
+        )
+      }
+    }
   }
 }
 
@@ -2016,7 +2118,7 @@ private fun ColumnScope.Section(
  */
 @Composable
 private fun ColumnScope.PersonaTab(state: SettingsState, viewModel: SettingsViewModel) {
-  Section(R.string.settings_persona_heading) {
+  Section(R.string.settings_persona_heading, collapsible = false) {
     Text(
       stringResource(R.string.settings_persona_detail),
       style = MaterialTheme.typography.bodySmall,
@@ -2033,7 +2135,7 @@ private fun ColumnScope.PersonaTab(state: SettingsState, viewModel: SettingsView
   }
 
   for (question in Answers.entries) {
-    Section(questionLabel(question)) {
+    Section(questionLabel(question), open = true) {
       questionHint(question)?.let {
         Text(
           stringResource(it),
@@ -2551,7 +2653,12 @@ private fun OwnVoiceCard(state: SettingsState, viewModel: SettingsViewModel) {
       }
       if (!state.ownVoice) return@Column
 
-      Text(stringResource(R.string.own_voice_voice), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+      val voiceName = com.lin.agent.core.models.ModelCatalog.voices.firstOrNull { it.name == state.linVoice }?.name ?: state.linVoice
+      val speaker =
+        if (state.linVoice == com.lin.agent.core.models.ModelCatalog.KOKORO.name)
+          " · " + com.lin.agent.core.voice.LinVoices.speakerLabel(state.kokoroSpeaker)
+        else ""
+      CollapsedPicker(stringResource(R.string.own_voice_voice), voiceName + speaker) {
       for (model in com.lin.agent.core.models.ModelCatalog.voices) {
         val detail = if (model == com.lin.agent.core.models.ModelCatalog.KOKORO) R.string.own_voice_kokoro else R.string.own_voice_piper
         OwnModelRow(state, model, detail, selected = state.linVoice == model.name, onSelect = { viewModel.setLinVoice(model.name) },
@@ -2559,7 +2666,7 @@ private fun OwnVoiceCard(state: SettingsState, viewModel: SettingsViewModel) {
       }
       val kokoro = state.models.firstOrNull { it.model == com.lin.agent.core.models.ModelCatalog.KOKORO }
       if (state.linVoice == com.lin.agent.core.models.ModelCatalog.KOKORO.name && kokoro?.present == true) {
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(start = 48.dp)) {
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(start = 48.dp, bottom = 4.dp)) {
           for (id in com.lin.agent.core.voice.LinVoices.KOKORO_SPEAKERS) {
             FilterChip(
               selected = state.kokoroSpeaker == id,
@@ -2572,12 +2679,15 @@ private fun OwnVoiceCard(state: SettingsState, viewModel: SettingsViewModel) {
           }
         }
       }
+      }
 
-      Text(stringResource(R.string.own_voice_hearing), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+      val hearingName = com.lin.agent.core.models.ModelCatalog.hearings.firstOrNull { it.name == state.linHearing }?.name ?: state.linHearing
+      CollapsedPicker(stringResource(R.string.own_voice_hearing), hearingName) {
       for (model in com.lin.agent.core.models.ModelCatalog.hearings) {
         val detail = if (model == com.lin.agent.core.models.ModelCatalog.WHISPER_BASE) R.string.own_voice_whisper else R.string.own_voice_moonshine
         OwnModelRow(state, model, detail, selected = state.linHearing == model.name, onSelect = { viewModel.setLinHearing(model.name) },
           onDownload = { viewModel.downloadHearing(model) }, onTry = null)
+      }
       }
     }
   }
