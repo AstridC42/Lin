@@ -3,7 +3,7 @@
 [versions]
 shizuku = "13.1.5"
 agp = "9.0.1"
-kotlin = "2.2.21"
+kotlin = "2.4.21"
 ksp = "2.3.6"
 coreKtx = "1.15.0"
 lifecycleRuntimeKtx = "2.8.7"
