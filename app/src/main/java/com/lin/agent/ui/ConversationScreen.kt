@@ -872,6 +872,14 @@ private class AnswerActions(
 @Composable
 private fun Said(message: Message, actions: AnswerActions? = null) {
   val fromUser = message.role == Message.Role.USER
+  // Hebrew or Arabic: Lin's answer is laid out right to left, so it sits on the right with
+  // its mark beside it. The person's own bubble stays on the right whatever the language;
+  // only the text inside it turns.
+  val rtl = remember(message.text) { com.lin.agent.core.text.isRightToLeft(message.text) }
+  val direction =
+    if (rtl && !fromUser) androidx.compose.ui.unit.LayoutDirection.Rtl
+    else androidx.compose.ui.platform.LocalLayoutDirection.current
+  androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides direction) {
   Row(
     modifier = Modifier.fillMaxWidth(),
     horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start,
@@ -885,7 +893,11 @@ private fun Said(message: Message, actions: AnswerActions? = null) {
       ) {
         Text(
           message.text,
-          style = MaterialTheme.typography.bodyLarge,
+          style =
+            MaterialTheme.typography.bodyLarge.copy(
+              textDirection = if (rtl) androidx.compose.ui.text.style.TextDirection.Rtl else androidx.compose.ui.text.style.TextDirection.Content,
+              textAlign = if (rtl) androidx.compose.ui.text.style.TextAlign.Right else androidx.compose.ui.text.style.TextAlign.Start,
+            ),
           modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
       }
@@ -917,6 +929,7 @@ private fun Said(message: Message, actions: AnswerActions? = null) {
         }
       }
     }
+  }
   }
 }
 
