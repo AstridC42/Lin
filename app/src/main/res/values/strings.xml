@@ -496,6 +496,10 @@
   <string name="settings_models_choose">Tap “Use this one” to pick which downloaded model
     answers. Without a choice, Lin picks the one suited to this phone.</string>
 
+  <string name="settings_sound_heading">Volume and sound mode</string>
+  <string name="settings_sound_detail">Lin can set any volume and switch between sound and vibrate. Silent mode, and Do Not Disturb, also need Do Not Disturb access.</string>
+  <string name="settings_sound_allow">Allow Do Not Disturb access</string>
+  <string name="settings_sound_granted">Do Not Disturb access is on.</string>
   <string name="settings_models_all">All models (%1$d)</string>
   <string name="settings_models_fewer">Show fewer</string>
   <string name="settings_models_where">Models are read from, and will be downloaded to:</string>

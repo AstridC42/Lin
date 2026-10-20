@@ -99,6 +99,8 @@ constructor(
       ReplyTool(relay),
       CalendarTool(calendars),
       MediaTool(context),
+      VolumeTool(context, launchGuard),
+      SoundModeTool(context, launchGuard, privileged),
       WeatherTool(context),
       PlayMusicTool(context, settings, launchGuard),
       PhoneSettingTool(context, launchGuard, privileged),

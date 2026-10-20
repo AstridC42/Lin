@@ -80,6 +80,8 @@ private val VERBS: Map<String, Pair<String, String>> =
     "set_timer_or_alarm" to ("Setting the clock" to "Set the clock"),
     "weather" to ("Checking the weather" to "Checked the weather"),
     "media" to ("Checking what's playing" to "Checked what's playing"),
+    "volume" to ("Changing the volume" to "Changed the volume"),
+    "sound_mode" to ("Changing the sound mode" to "Changed the sound mode"),
     "play_music" to ("Starting music" to "Started music"),
     "phone_setting" to ("Changing a setting" to "Changed a setting"),
     "phone_action" to ("Using the phone" to "Used the phone"),

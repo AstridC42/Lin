@@ -162,6 +162,32 @@ class ModelDownloadTest {
     assertFalse("a 404 will still be a 404", (outcome as DownloadOutcome.Failed).retryable)
   }
 
+  /**
+   * Over a real socket, because the bug was in the real connection: reading the body of a
+   * refusal threw, and the refusal was retried as a dropped connection forever.
+   */
+  @Test
+  fun aRealRefusalIsReportedNotRetried() = runTest {
+    val http = com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress("127.0.0.1", 0), 0)
+    http.createContext("/") { exchange ->
+      val body = "Access to model is restricted".toByteArray()
+      exchange.sendResponseHeaders(403, body.size.toLong())
+      exchange.responseBody.use { it.write(body) }
+    }
+    http.start()
+    try {
+      val outcome =
+        ModelDownload.withToken("")
+          .fetch("http://127.0.0.1:${http.address.port}/f", File(folder.root, "m"), expectedBytes = 10)
+      assertTrue(outcome is DownloadOutcome.Failed)
+      outcome as DownloadOutcome.Failed
+      assertFalse("a refusal will still be a refusal", outcome.retryable)
+      assertTrue(outcome.message, outcome.message.contains("403"))
+    } finally {
+      http.stop(0)
+    }
+  }
+
   @Test
   fun aServerProblemIsWorthRetrying() = runTest {
     val outcome =

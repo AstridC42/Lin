@@ -1093,6 +1093,55 @@ private fun ColumnScope.PhoneTab(state: SettingsState, viewModel: SettingsViewMo
     }
   }
 
+  Section(R.string.settings_sound_heading) {
+    Text(
+      stringResource(R.string.settings_sound_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val soundContext = LocalContext.current
+    // Read on every resume, so coming back from the system screen shows the new state.
+    var soundAccess by remember { mutableStateOf(false) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+      val check = {
+        soundAccess =
+          runCatching {
+              soundContext.getSystemService(android.app.NotificationManager::class.java)
+                ?.isNotificationPolicyAccessGranted == true
+            }
+            .getOrDefault(false)
+      }
+      check()
+      val observer =
+        androidx.lifecycle.LifecycleEventObserver { _, event ->
+          if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) check()
+        }
+      lifecycle.lifecycle.addObserver(observer)
+      onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
+    if (soundAccess) {
+      Text(
+        stringResource(R.string.settings_sound_granted),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.primary,
+      )
+    } else {
+      OutlinedButton(
+        onClick = {
+          runCatching {
+            soundContext.startActivity(
+              android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+          }
+        }
+      ) {
+        Text(stringResource(R.string.settings_sound_allow))
+      }
+    }
+  }
+
   Section(R.string.settings_messages_heading) {
     Text(
       stringResource(R.string.settings_messages_detail),
