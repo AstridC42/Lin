@@ -55,7 +55,6 @@ import com.lin.agent.R
 import com.lin.agent.core.diag.describeFault
 import com.lin.agent.core.tools.disabledFrom
 import com.lin.agent.core.standing.tasksFrom
-import com.lin.agent.model.StandingWorker
 import com.lin.agent.core.persona.Answers
 import com.lin.agent.core.persona.personaFrom
 import com.lin.agent.core.persona.personaOrDefault
@@ -371,7 +370,7 @@ constructor(
     // silently stopped running is worse than one that never existed.
     viewModelScope.launch {
       runCatching {
-        StandingWorker.sync(work, tasksFrom(settings.standingTasks.first()))
+        com.lin.agent.model.Routines.sync(appContext, tasksFrom(settings.standingTasks.first()))
       }
     }
     // Reminders go back on the clock here as well as after a reboot. The boot broadcast is

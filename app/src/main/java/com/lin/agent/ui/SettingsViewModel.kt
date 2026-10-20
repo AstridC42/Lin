@@ -36,7 +36,6 @@ import com.lin.agent.core.web.searchCall
 import com.lin.agent.core.web.searchTrialReport
 import com.lin.agent.core.standing.storedTasks
 import com.lin.agent.core.standing.tasksFrom
-import com.lin.agent.model.StandingWorker
 import com.lin.agent.core.persona.personaFrom
 import com.lin.agent.core.persona.storedPersona
 import com.lin.agent.core.tools.disabledFrom
@@ -746,6 +745,28 @@ constructor(
     writeStanding(next)
   }
 
+  /** Runs a routine now, to try it. */
+  fun runStanding(id: String) = com.lin.agent.model.Routines.runNow(appContext, id)
+
+  /** Paired Bluetooth devices' names, for the routine form. Empty without Nearby devices. */
+  fun pairedDevices(): List<String> {
+    if (appContext.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) !=
+      android.content.pm.PackageManager.PERMISSION_GRANTED) return emptyList()
+    return runCatching {
+        appContext.getSystemService(android.bluetooth.BluetoothManager::class.java)
+          ?.adapter?.bondedDevices.orEmpty().mapNotNull { it.alias ?: it.name }.distinct().sorted()
+      }
+      .getOrDefault(emptyList())
+  }
+
+  /** Re-reads the list, for when routines were added by voice while Settings was closed. */
+  fun reloadStanding() {
+    viewModelScope.launch {
+      val tasks = tasksFrom(settings.standingTasks.first())
+      _state.update { it.copy(standing = tasks) }
+    }
+  }
+
   fun removeStanding(id: String) = writeStanding(_state.value.standing.filterNot { it.id == id })
 
   fun setStandingEnabled(id: String, enabled: Boolean) =
@@ -754,7 +775,7 @@ constructor(
   private fun writeStanding(tasks: List<StandingTask>) {
     _state.update { it.copy(standing = tasks) }
     viewModelScope.launch { settings.setStandingTasks(storedTasks(tasks)) }
-    StandingWorker.sync(work, tasks)
+    com.lin.agent.model.Routines.sync(appContext, tasks)
   }
 
   /**

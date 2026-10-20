@@ -54,6 +54,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import com.lin.agent.core.standing.StandingTask
+import com.lin.agent.core.standing.Trigger
 import com.lin.agent.core.standing.clockTime
 import com.lin.agent.core.standing.dayNumbers
 import com.lin.agent.core.persona.Answers
@@ -204,6 +205,7 @@ fun SettingsScreen(
         SettingsTab.SERVER -> ServerTab(state, viewModel)
         SettingsTab.VOICE -> VoiceTab(state, viewModel)
         SettingsTab.PHONE -> PhoneTab(state, viewModel)
+        SettingsTab.ROUTINES -> Routines(state, viewModel)
         SettingsTab.TOOLS -> ToolsTab(state, viewModel)
         SettingsTab.DATA ->
           DataTab(state, viewModel, onOpenMemory, onOpenDocuments, onOpenTraining, onOpenBackup)
@@ -230,6 +232,7 @@ private enum class SettingsTab(@param:StringRes val title: Int) {
   SERVER(R.string.settings_tab_server),
   VOICE(R.string.settings_tab_voice),
   PHONE(R.string.settings_tab_phone),
+  ROUTINES(R.string.settings_tab_routines),
   TOOLS(R.string.settings_tab_tools),
   DATA(R.string.settings_tab_data),
 }
@@ -2252,8 +2255,6 @@ private fun ColumnScope.PersonaTab(state: SettingsState, viewModel: SettingsView
     }
   }
 
-  Routines(state, viewModel)
-
   Section(R.string.settings_persona_preview_heading) {
     // Deliberately the prompt Lin will really be given, not the answers on this screen. Until
     // somebody answers a question of their own that is the shipped set, and a preview that went
@@ -2304,8 +2305,21 @@ private fun ColumnScope.Routines(state: SettingsState, viewModel: SettingsViewMo
   var hour by rememberSaveable { mutableStateOf("8") }
   var minute by rememberSaveable { mutableStateOf("00") }
   var days by rememberSaveable { mutableStateOf(setOf<Int>()) }
+  var trigger by rememberSaveable { mutableStateOf(Trigger.TIME) }
+  var device by rememberSaveable { mutableStateOf("") }
+  var speak by rememberSaveable { mutableStateOf(false) }
+  val context = LocalContext.current
+  var nearby by remember {
+    mutableStateOf(
+      context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+    )
+  }
+  val askNearby =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> nearby = granted }
+  // Routines added by voice while this screen was closed.
+  LaunchedEffect(Unit) { viewModel.reloadStanding() }
 
-  Section(R.string.settings_standing_heading) {
+  Section(R.string.settings_standing_heading, open = true) {
     Text(
       stringResource(R.string.settings_standing_detail),
       style = MaterialTheme.typography.bodySmall,
@@ -2317,25 +2331,29 @@ private fun ColumnScope.Routines(state: SettingsState, viewModel: SettingsViewMo
     }
 
     for (task in state.standing) {
-      Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
       ) {
-        Column(modifier = Modifier.weight(1f)) {
-          Text(task.ask, style = MaterialTheme.typography.bodyLarge)
-          Text(
-            clockTime(task) + " · " + whichDays(task),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-        Switch(
-          checked = task.enabled,
-          onCheckedChange = { viewModel.setStandingEnabled(task.id, it) },
-        )
-        TextButton(onClick = { viewModel.removeStanding(task.id) }) {
-          Text(stringResource(R.string.settings_standing_remove))
+        Column(modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 4.dp)) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(task.ask, style = MaterialTheme.typography.bodyLarge)
+              Text(
+                whenLine(task) + if (task.speak) " · " + stringResource(R.string.routine_speaks) else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+            Switch(checked = task.enabled, onCheckedChange = { viewModel.setStandingEnabled(task.id, it) })
+          }
+          Row {
+            TextButton(onClick = { viewModel.runStanding(task.id) }) { Text(stringResource(R.string.routine_try)) }
+            TextButton(onClick = { viewModel.removeStanding(task.id) }) {
+              Text(stringResource(R.string.settings_standing_remove))
+            }
+          }
         }
       }
     }
@@ -2345,26 +2363,72 @@ private fun ColumnScope.Routines(state: SettingsState, viewModel: SettingsViewMo
         value = ask,
         onValueChange = { ask = it },
         label = { Text(stringResource(R.string.settings_standing_ask)) },
-        placeholder = { Text(stringResource(R.string.empty_today)) },
+        placeholder = { Text(stringResource(R.string.routine_ask_hint)) },
+        supportingText = { Text(stringResource(R.string.routine_ask_help)) },
         modifier = Modifier.fillMaxWidth(),
       )
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-          value = hour,
-          onValueChange = { hour = it.filter(Char::isDigit).take(2) },
-          label = { Text(stringResource(R.string.settings_standing_hour)) },
-          singleLine = true,
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-          modifier = Modifier.weight(1f),
-        )
-        OutlinedTextField(
-          value = minute,
-          onValueChange = { minute = it.filter(Char::isDigit).take(2) },
-          label = { Text(stringResource(R.string.settings_standing_minute)) },
-          singleLine = true,
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-          modifier = Modifier.weight(1f),
-        )
+      Text(stringResource(R.string.routine_when), style = MaterialTheme.typography.labelLarge)
+      @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+      androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (each in Trigger.entries) {
+          FilterChip(selected = trigger == each, onClick = { trigger = each }, label = { Text(stringResource(triggerLabel(each))) })
+        }
+      }
+      when (trigger) {
+        Trigger.TIME ->
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+              value = hour,
+              onValueChange = { hour = it.filter(Char::isDigit).take(2) },
+              label = { Text(stringResource(R.string.settings_standing_hour)) },
+              singleLine = true,
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+              value = minute,
+              onValueChange = { minute = it.filter(Char::isDigit).take(2) },
+              label = { Text(stringResource(R.string.settings_standing_minute)) },
+              singleLine = true,
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              modifier = Modifier.weight(1f),
+            )
+          }
+        Trigger.CHARGING ->
+          Text(
+            stringResource(R.string.routine_charging_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        Trigger.BLUETOOTH_CONNECTED, Trigger.BLUETOOTH_DISCONNECTED -> {
+          if (!nearby) {
+            Text(
+              stringResource(R.string.routine_nearby_needed),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = { askNearby.launch(Manifest.permission.BLUETOOTH_CONNECT) }) {
+              Text(stringResource(R.string.routine_nearby_allow))
+            }
+          }
+          OutlinedTextField(
+            value = device,
+            onValueChange = { device = it },
+            label = { Text(stringResource(R.string.routine_device)) },
+            placeholder = { Text(stringResource(R.string.routine_device_any)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+          )
+          if (nearby) {
+            val paired = remember(nearby) { viewModel.pairedDevices() }
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+              for (name in paired) {
+                FilterChip(selected = device == name, onClick = { device = name }, label = { Text(name) })
+              }
+            }
+          }
+        }
       }
       Text(
         stringResource(R.string.settings_standing_days),
@@ -2380,6 +2444,10 @@ private fun ColumnScope.Routines(state: SettingsState, viewModel: SettingsViewMo
           )
         }
       }
+      Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { speak = !speak }) {
+        Text(stringResource(R.string.routine_speak), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = speak, onCheckedChange = { speak = it })
+      }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
           enabled = ask.isNotBlank(),
@@ -2391,10 +2459,16 @@ private fun ColumnScope.Routines(state: SettingsState, viewModel: SettingsViewMo
                 hour = hour.toIntOrNull()?.coerceIn(0, 23) ?: 8,
                 minute = minute.toIntOrNull()?.coerceIn(0, 59) ?: 0,
                 days = days,
+                trigger = trigger,
+                device = if (trigger == Trigger.BLUETOOTH_CONNECTED || trigger == Trigger.BLUETOOTH_DISCONNECTED) device.trim() else "",
+                speak = speak,
               )
             )
             ask = ""
             days = emptySet()
+            device = ""
+            speak = false
+            trigger = Trigger.TIME
             adding = false
           },
         ) {
@@ -2409,7 +2483,34 @@ private fun ColumnScope.Routines(state: SettingsState, viewModel: SettingsViewMo
         Text(stringResource(R.string.settings_standing_add))
       }
     }
+    Text(
+      stringResource(R.string.routine_by_voice),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
+}
+
+private fun triggerLabel(trigger: Trigger) =
+  when (trigger) {
+    Trigger.TIME -> R.string.routine_trigger_time
+    Trigger.CHARGING -> R.string.routine_trigger_charging
+    Trigger.BLUETOOTH_CONNECTED -> R.string.routine_trigger_bt_on
+    Trigger.BLUETOOTH_DISCONNECTED -> R.string.routine_trigger_bt_off
+  }
+
+/** When a routine runs, in words: the trigger, then the days. */
+@Composable
+private fun whenLine(task: StandingTask): String {
+  val device = task.device.ifBlank { stringResource(R.string.routine_device_any_short) }
+  val start =
+    when (task.trigger) {
+      Trigger.TIME -> clockTime(task)
+      Trigger.CHARGING -> stringResource(R.string.routine_trigger_charging)
+      Trigger.BLUETOOTH_CONNECTED -> stringResource(R.string.routine_when_bt_on, device)
+      Trigger.BLUETOOTH_DISCONNECTED -> stringResource(R.string.routine_when_bt_off, device)
+    }
+  return start + " · " + whichDays(task)
 }
 
 /** Monday first, matching the day numbers the tasks use. */

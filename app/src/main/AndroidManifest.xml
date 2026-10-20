@@ -112,6 +112,8 @@
       list, so silent mode and the Do Not Disturb switch could never be granted.
     -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Nearby devices: to see a Bluetooth device connect, for routines like "when I get in the car". -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
@@ -445,6 +447,21 @@
         <receiver
             android:name=".car.CarChatReceiver"
             android:exported="false" />
+
+        <!--
+          Routines that start when a Bluetooth device connects or disconnects. Off until a
+          routine needs it; switched on by Routines.sync. Exported because the system sends it.
+        -->
+        <receiver
+            android:name=".model.BluetoothRoutineReceiver"
+            android:enabled="false"
+            android:exported="true"
+            android:permission="android.permission.BLUETOOTH_CONNECT">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
 
         <!--
           Lin on the watch: Wear OS wakes this when the watch app sends a question. Exported

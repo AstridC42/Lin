@@ -107,99 +107,25 @@ class StandingWorker(private val context: Context, params: WorkerParameters) :
     val tasks = tasksFrom(settings.standingTasks.first())
     if (tasks.isEmpty()) return
 
+    // The charging trigger waits for a plug-in once per unplug; this is where it is re-armed.
+    if (tasks.any { it.enabled && it.trigger == com.lin.agent.core.standing.Trigger.CHARGING }) {
+      Routines.armCharging(context)
+    }
+
     val now = LocalTime.now()
     val date = LocalDate.now()
     val due = dueNow(tasks, date.dayOfWeek.value, now.hour * 60 + now.minute, date.toEpochDay())
     if (due.isEmpty()) return
 
-    val backend =
-      (deps.backends().readiness() as? ChatReadiness.Ready)?.backend
-      // Left unmarked so it runs at the next check rather than being lost for the day.
-      ?: return
-
-    var updated = tasks
+    val runner = RoutineRunner(context)
     for (task in due) {
-      val answer = ask(deps, backend, task) ?: continue
-      notify(task, answer)
-      updated = markRun(updated, task.id, date.toEpochDay())
-      // Written after each one rather than at the end, so a task that answered is not run
-      // again because a later one crashed the worker.
-      settings.setStandingTasks(storedTasks(updated))
+      // Null when nothing could answer: left unmarked so the next check tries again.
+      runner.run(task) ?: continue
+      // Re-read before writing, so an edit made while this ran is kept. Written after each one,
+      // so a routine that answered is not run again because a later one crashed the worker.
+      val latest = tasksFrom(settings.standingTasks.first())
+      settings.setStandingTasks(storedTasks(markRun(latest, task.id, date.toEpochDay())))
     }
-  }
-
-  /** One turn, with the tools, exactly as though the user had typed it. */
-  private suspend fun ask(
-    deps: Deps,
-    backend: com.lin.agent.engine.LlmBackend,
-    task: StandingTask,
-  ): String? {
-    val off = disabledFrom(deps.settings().disabledTools.first())
-    val registry = deps.tools().registry.value
-    // Delegation is withheld outright here. A standing task running in the background is the
-    // worst place to spend a minute on a server round trip nobody is waiting through.
-    val withheld = off + DelegateTool.NAME
-    val offered = registry.forRole(AgentRole.ORCHESTRATOR).filterNot { it.name in withheld }
-
-    // The same persona the conversation uses, shipped answers included: a routine that spoke
-    // to somebody else's Lin would be the one place the personal half silently did not apply.
-    val who = personaPrompt(personaOrDefault(personaFrom(deps.settings().persona.first())))
-    val prompt = buildString {
-      append("You are Lin, an assistant running on this phone. ")
-      append("This question was asked by a standing routine rather than typed just now, so ")
-      append("answer it in full and do not ask anything back - nobody is there to reply. ")
-      if (who.isNotBlank()) append(who).append(' ')
-      append(capabilityPrompt(offered))
-    }
-
-    val events =
-      TurnLoop(
-          backend = backend,
-          registry = registry,
-          role = AgentRole.ORCHESTRATOR,
-          systemPrompt = prompt,
-          withhold = withheld,
-        )
-        .run(listOf(Message(Message.Role.USER, task.ask)))
-        .toList()
-
-    return events.filterIsInstance<LoopEvent.Done>().lastOrNull()?.text?.takeIf { it.isNotBlank() }
-  }
-
-  private fun notify(task: StandingTask, answer: String) {
-    if (
-      context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-        PackageManager.PERMISSION_GRANTED
-    ) {
-      Log.i(TAG, "No notification permission, so ${task.id} has nowhere to go")
-      return
-    }
-    val manager = context.getSystemService(NotificationManager::class.java) ?: return
-    manager.createNotificationChannel(
-      NotificationChannel(CHANNEL, context.getString(R.string.standing_channel), NotificationManager.IMPORTANCE_DEFAULT)
-        .apply { description = context.getString(R.string.standing_channel_detail) }
-    )
-
-    val open =
-      PendingIntent.getActivity(
-        context,
-        task.id.hashCode(),
-        Intent(context, Class.forName("com.lin.agent.MainActivity")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-      )
-
-    manager.notify(
-      task.id.hashCode(),
-      NotificationCompat.Builder(context, CHANNEL)
-        .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle(task.ask)
-        .setContentText(answer.lineSequence().firstOrNull().orEmpty())
-        // The whole answer, because the point of a routine is not having to open anything.
-        .setStyle(NotificationCompat.BigTextStyle().bigText(answer))
-        .setContentIntent(open)
-        .setAutoCancel(true)
-        .build(),
-    )
   }
 
   companion object {
