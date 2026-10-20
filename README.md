@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  Built by <a href="https://github.com/AstridC42"><b>AstridC42</b></a>
+  Built by <a href="https://github.com/AstridC42"><b>AstridC42</b></a> with <a href="https://claude.com/claude-code">Claude Code</a> by Anthropic
 </p>
 
 <p align="center">
@@ -131,7 +131,8 @@ publishers and are covered by their own terms (for Gemma, the
 
 ## Author
 
-Lin is created and maintained by [AstridC42](https://github.com/AstridC42).
+Lin is created and maintained by [AstridC42](https://github.com/AstridC42), and was built with
+[Claude Code](https://claude.com/claude-code), Anthropic's AI coding assistant.
 
 ## Thanks
 
