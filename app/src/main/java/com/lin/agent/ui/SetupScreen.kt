@@ -410,7 +410,7 @@ private fun ColumnScope.Summary(done: Set<SetupStep>, onPick: (SetupStep) -> Uni
 
 @Composable
 private fun Card(@StringRes title: Int, content: @Composable ColumnScope.() -> Unit) {
-  Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+  Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
       Text(stringResource(title), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
       content()

@@ -142,3 +142,8 @@ written from scratch, and runs on Google's [LiteRT-LM](https://github.com/google
 and [Gemma](https://ai.google.dev/gemma) models.
 
 Lin is not affiliated with, endorsed by, or sponsored by Google.
+
+Lin's look comes from the Astrid-design system. Its text face is
+[IBM Plex Mono](https://github.com/IBM/plex) (SIL Open Font License), and its titles are set in
+BigBlue Terminal by [VileR](https://int10h.org/) (CC BY-SA 4.0), both in their
+[Nerd Fonts](https://www.nerdfonts.com/) v3.5.1 builds, cut down to the characters Lin uses.

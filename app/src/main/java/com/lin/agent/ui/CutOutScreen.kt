@@ -210,7 +210,7 @@ fun CutOutScreen(
 /** Shown over the photo until the model is on the phone. */
 @Composable
 private fun ModelCard(download: DownloadState, onGet: () -> Unit) {
-  Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.padding(24.dp).widthIn(max = 360.dp)) {
+  Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(24.dp).widthIn(max = 360.dp)) {
     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
       Text(stringResource(R.string.cutout_model_title), style = MaterialTheme.typography.titleMedium)
       Text(stringResource(R.string.cutout_model_detail), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -393,7 +393,7 @@ fun AssistPanel(
       )
 
       Surface(
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
         tonalElevation = 3.dp,
         shadowElevation = 12.dp,
         modifier = Modifier.fillMaxWidth().heightIn(max = panelMaxHeight),
@@ -634,7 +634,7 @@ private fun ColumnScope.ConversationBody(
           }
         Card(
           colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-          shape = RoundedCornerShape(22.dp),
+          shape = RoundedCornerShape(12.dp),
           modifier = Modifier.fillMaxWidth(),
         ) {
           Column(
@@ -662,7 +662,7 @@ private fun ColumnScope.ConversationBody(
       item {
         Card(
           colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-          shape = RoundedCornerShape(22.dp),
+          shape = RoundedCornerShape(12.dp),
           modifier = Modifier.fillMaxWidth(),
         ) {
           Text(
@@ -699,7 +699,7 @@ private fun ColumnScope.ConversationBody(
     val replyContext = LocalContext.current
     Card(
       colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-      shape = RoundedCornerShape(22.dp),
+      shape = RoundedCornerShape(12.dp),
       modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
       Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -719,12 +719,12 @@ private fun ColumnScope.ConversationBody(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           Button(
             onClick = { viewModel.sendStagedReply(replyContext) },
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier.weight(1f),
           ) {
             Text(stringResource(R.string.reply_send))
           }
-          TextButton(onClick = viewModel::discardStagedReply, shape = RoundedCornerShape(22.dp)) {
+          TextButton(onClick = viewModel::discardStagedReply, shape = RoundedCornerShape(12.dp)) {
             Text(stringResource(R.string.reply_discard))
           }
         }
@@ -735,7 +735,7 @@ private fun ColumnScope.ConversationBody(
   val missing = state.missingModel
   if (missing != null) {
     Card(
-      shape = RoundedCornerShape(22.dp),
+      shape = RoundedCornerShape(12.dp),
       colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
       modifier = Modifier.fillMaxWidth().padding(16.dp),
     ) {
@@ -750,7 +750,7 @@ private fun ColumnScope.ConversationBody(
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Button(onClick = onGetModel, shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = onGetModel, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
           Text(stringResource(R.string.no_model_action))
         }
       }
@@ -832,7 +832,7 @@ private fun NothingYet(greeting: String, onPick: (String) -> Unit) {
           val tint = tints[row * 2 + column]
           Card(
             onClick = { onPick(text) },
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             modifier = Modifier.weight(1f).height(108.dp),
           ) {
@@ -889,7 +889,7 @@ private fun Said(message: Message, actions: AnswerActions? = null) {
       Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 8.dp, bottomStart = 22.dp),
+        shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp, bottomEnd = 2.dp, bottomStart = 6.dp),
         modifier = Modifier.widthIn(max = 300.dp),
       ) {
         Column {
@@ -1015,7 +1015,7 @@ private fun Steps(runs: List<ToolRun>) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Surface(
       onClick = { open = !open },
-      shape = RoundedCornerShape(16.dp),
+      shape = RoundedCornerShape(12.dp),
       color = colors.surfaceContainerLow,
       modifier = Modifier.widthIn(max = 560.dp),
     ) {
@@ -1077,7 +1077,7 @@ private fun ToolCard(run: ToolRun) {
 
   Surface(
     color = colors.surfaceContainer,
-    shape = RoundedCornerShape(18.dp),
+    shape = RoundedCornerShape(12.dp),
     modifier =
       Modifier.fillMaxWidth().then(
         if (canOpen) Modifier.clickable { open = !open } else Modifier
@@ -1120,7 +1120,7 @@ private fun ToolCard(run: ToolRun) {
 /** A word with a background: the one visual that says a state rather than describing it. */
 @Composable
 private fun StateChip(text: String, background: Color, foreground: Color) {
-  Surface(color = background, contentColor = foreground, shape = RoundedCornerShape(20.dp)) {
+  Surface(color = background, contentColor = foreground, shape = RoundedCornerShape(12.dp)) {
     Text(
       text,
       style = MaterialTheme.typography.labelSmall,
@@ -1214,7 +1214,7 @@ private fun ColumnScope.Composer(
   // left inside it, speak and send on the right inside it. Four separate shapes in a row read
   // as a toolbar; one shape reads as the place you talk.
   Surface(
-    shape = RoundedCornerShape(28.dp),
+    shape = RoundedCornerShape(6.dp),
     color = MaterialTheme.colorScheme.surfaceContainerHigh,
     modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
   ) {
@@ -1384,7 +1384,7 @@ private fun Thumbnail(uri: String) {
   val opener = LocalUriHandler.current
 
   Surface(
-    shape = RoundedCornerShape(18.dp),
+    shape = RoundedCornerShape(12.dp),
     color = MaterialTheme.colorScheme.surfaceContainer,
     modifier =
       Modifier.height(160.dp)
@@ -1421,7 +1421,7 @@ private fun Thinking(text: String, inProgress: Boolean) {
     if (open) {
       Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text(
@@ -1653,6 +1653,6 @@ private fun PicturePreview(picture: com.lin.agent.engine.Attachment.Picture) {
       Modifier.padding(4.dp)
         .widthIn(max = 292.dp)
         .heightIn(max = 320.dp)
-        .clip(RoundedCornerShape(18.dp)),
+        .clip(RoundedCornerShape(12.dp)),
   )
 }
