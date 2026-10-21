@@ -195,8 +195,17 @@ class OnDeviceBackend(
         )
       started.initialize()
       engine = started
-      conversation =
-        started.createConversation(
+      conversation = started.createConversation(plainConfig())
+      null
+    } catch (e: Throwable) {
+      // Throwable, not Exception: a model too large for the device fails with OutOfMemoryError,
+      // which is an Error. It went straight past the first version's handler and killed the
+      // process, and a crash during model load is one the user cannot be shown or escape from.
+      explain(e)
+    }
+
+  /** The plain conversation's settings, also used to replace one the engine has stopped. */
+  private fun plainConfig() =
           ConversationConfig(
             // Greedy, and greedy comes from topK - not from the temperature.
             //
@@ -214,14 +223,35 @@ class OnDeviceBackend(
             samplerConfig =
               SamplerConfig(topK = GREEDY_TOP_K, topP = 1.0, temperature = SAFE_TEMPERATURE)
           )
-        )
-      null
-    } catch (e: Throwable) {
-      // Throwable, not Exception: a model too large for the device fails with OutOfMemoryError,
-      // which is an Error. It went straight past the first version's handler and killed the
-      // process, and a crash during model load is one the user cannot be shown or escape from.
-      explain(e)
+
+  /**
+   * Swaps out a conversation the engine has stopped. A stopped reply can leave its conversation
+   * refusing every later message with "Task cancelled"; a fresh one answers. What the old one
+   * held is lost, which beats a conversation that answers nothing.
+   */
+  /** Closes and loads the model again. Returns null on success, or why it failed. */
+  @Synchronized
+  private fun reload(): String? {
+    closeQuietly()
+    loadFailure = null
+    return ensureLoaded()
+  }
+
+  @Synchronized
+  private fun replaceStopped(stopped: Conversation) {
+    val started = engine ?: return
+    when {
+      stopped === shaped -> {
+        runCatching { shaped?.close() }
+        shaped = null
+        shapedFor = null
+      }
+      stopped === conversation -> {
+        runCatching { conversation?.close() }
+        conversation = runCatching { started.createConversation(plainConfig()) }.getOrNull()
+      }
     }
+  }
 
   /**
    * Streams a reply, loading the model first if it is not already loaded.
@@ -264,17 +294,48 @@ class OnDeviceBackend(
         // seconds; waiting seconds is a far better worst case for the user's turn than
         // whichever error two generations at once produces.
         generation.withLock {
-          emitAll(
+          var current = built
+          var target = current?.conversation ?: live
+          for (attempt in 0..2) {
+            var refused = false
+            var said = false
             stream(
-              live = built?.conversation ?: live,
-              prompt = prompt,
-              format = built?.format,
-            pictures = if (supportsImages) request.picturesOfLastMessage() else emptyList(),
-            thinking = thinkingFor(request.reasoning, structured = request.responseSchema != null),
-              // A structured turn's conversation is closed when the turn ends - see [Built].
-              closeAfter = built?.takeIf { it.throwaway }?.conversation,
-            )
-          )
+                live = target,
+                prompt = prompt,
+                format = current?.format,
+                pictures = if (supportsImages) request.picturesOfLastMessage() else emptyList(),
+                thinking = thinkingFor(request.reasoning, structured = request.responseSchema != null),
+                // A structured turn's conversation is closed when the turn ends - see [Built].
+                closeAfter = current?.takeIf { it.throwaway }?.conversation,
+              )
+              .collect { event ->
+                // Refused as cancelled before saying anything: the conversation was stopped
+                // earlier and will refuse everything. Replaced and asked again, once.
+                if (attempt < 2 && !said && event is TurnEvent.Failed && event.detail.lowercase().contains("cancel")) {
+                  refused = true
+                } else {
+                  if (event is TurnEvent.Token || event is TurnEvent.Thought || event is TurnEvent.ToolCalls) said = true
+                  emit(event)
+                }
+              }
+            if (!refused) break
+            if (attempt == 0) {
+              Log.i(TAG, "Conversation was stopped earlier; starting a fresh one")
+              replaceStopped(target)
+            } else {
+              // Still refused, so the stop stuck to the engine itself: load it again.
+              Log.i(TAG, "Engine still refusing after a stop; reloading the model")
+              reload()?.let {
+                emit(TurnEvent.Failed(message = it))
+                return@withLock
+              }
+            }
+            current = if (shape == null) null else conversationFor(shape)
+            target = current?.conversation ?: conversation ?: run {
+              emit(TurnEvent.Failed("The model is not loaded."))
+              return@withLock
+            }
+          }
         }
       }
       .flowOn(Dispatchers.IO)
@@ -389,7 +450,6 @@ class OnDeviceBackend(
       val sinceStop = android.os.SystemClock.uptimeMillis() - stoppedAt
       if (sinceStop in 0 until STOP_SETTLE_MS) kotlinx.coroutines.delay(STOP_SETTLE_MS - sinceStop)
       var finished = false
-      var retriedCancel = false
       lateinit var send: () -> Unit
       val accumulated = StringBuilder()
       val requested = FreshToolCalls()
@@ -433,20 +493,6 @@ class OnDeviceBackend(
           }
 
           override fun onError(throwable: Throwable) {
-            // A stale cancel from the previous reply's stop, before anything of this one arrived:
-            // sent once more rather than shown.
-            if (!retriedCancel && accumulated.isEmpty() && isCancellation(throwable)) {
-              retriedCancel = true
-              Log.i(TAG, "Refused by a stop still settling; sending again")
-              this@callbackFlow.launch {
-                kotlinx.coroutines.delay(STOP_SETTLE_MS)
-                runCatching { send() }.onFailure {
-                  trySend(TurnEvent.Failed(message = explain(it), detail = it.message.orEmpty()))
-                  channel.close()
-                }
-              }
-              return
-            }
             finished = true
             Log.e(TAG, "Inference failed", throwable)
             trySend(
