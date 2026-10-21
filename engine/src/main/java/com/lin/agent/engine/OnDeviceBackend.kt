@@ -32,6 +32,7 @@ import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
 import com.google.ai.edge.litertlm.Message as LiteRtMessage
 import java.io.File
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -112,6 +113,13 @@ class OnDeviceBackend(
 
   /** The failure from the last load attempt, so a turn can report it rather than hang. */
   @Volatile private var loadFailure: String? = null
+
+  /**
+   * When a reply was last stopped before it finished, in uptime millis. Stopping native work is
+   * not instant, and a message sent straight after it - the retry after a reply that went round
+   * in circles - can be refused with "Task cancelled" by the stop still in progress.
+   */
+  @Volatile private var stoppedAt: Long = 0
 
   /** Held for the length of a turn, so two callers cannot generate on one engine at once. */
   private val generation = Mutex()
@@ -377,6 +385,12 @@ class OnDeviceBackend(
     closeAfter: Conversation?,
   ): Flow<TurnEvent> {
     return callbackFlow {
+      // Give a stop that is still settling a moment before sending anything new.
+      val sinceStop = android.os.SystemClock.uptimeMillis() - stoppedAt
+      if (sinceStop in 0 until STOP_SETTLE_MS) kotlinx.coroutines.delay(STOP_SETTLE_MS - sinceStop)
+      var finished = false
+      var retriedCancel = false
+      lateinit var send: () -> Unit
       val accumulated = StringBuilder()
       val requested = FreshToolCalls()
       val callback =
@@ -413,11 +427,27 @@ class OnDeviceBackend(
           }
 
           override fun onDone() {
+            finished = true
             trySend(TurnEvent.Done(accumulated.toString()))
             channel.close()
           }
 
           override fun onError(throwable: Throwable) {
+            // A stale cancel from the previous reply's stop, before anything of this one arrived:
+            // sent once more rather than shown.
+            if (!retriedCancel && accumulated.isEmpty() && isCancellation(throwable)) {
+              retriedCancel = true
+              Log.i(TAG, "Refused by a stop still settling; sending again")
+              this@callbackFlow.launch {
+                kotlinx.coroutines.delay(STOP_SETTLE_MS)
+                runCatching { send() }.onFailure {
+                  trySend(TurnEvent.Failed(message = explain(it), detail = it.message.orEmpty()))
+                  channel.close()
+                }
+              }
+              return
+            }
+            finished = true
             Log.e(TAG, "Inference failed", throwable)
             trySend(
               TurnEvent.Failed(
@@ -446,6 +476,7 @@ class OnDeviceBackend(
             Contents.of(
               pictures.map { Content.ImageBytes(it.bytes) } + Content.Text(prompt)
             )
+        send = {
         when {
           format == null && thinkingConfig == null ->
             live.sendMessageAsync(contents, callback)
@@ -461,6 +492,8 @@ class OnDeviceBackend(
               responseFormat = format,
             )
         }
+        }
+        send()
       } catch (e: Throwable) {
         trySend(TurnEvent.Failed(message = explain(e), detail = e.message.orEmpty()))
         channel.close()
@@ -470,7 +503,10 @@ class OnDeviceBackend(
         // The collector stopped - the user navigated away or asked something else. Stopping the
         // native work matters here: it holds the engine, so leaving it running would make the
         // next turn queue behind a reply nobody is waiting for.
-        runCatching { live.cancelProcess() }
+        if (!finished) {
+          stoppedAt = android.os.SystemClock.uptimeMillis()
+          runCatching { live.cancelProcess() }
+        }
         // A conversation built for this turn alone goes with it, taking what was sent to it out
         // of the engine's cache rather than leaving it there until the next one.
         closeAfter?.let { runCatching { it.close() } }
@@ -532,6 +568,13 @@ class OnDeviceBackend(
  * When the engine rewords something the match stops firing and the raw message comes through,
  * which is the behaviour this had before.
  */
+/** Whether the engine refused with its "Task cancelled". */
+internal fun isCancellation(error: Throwable): Boolean =
+  (error.message ?: "").lowercase().contains("cancel")
+
+/** How long a stop is given to settle before the next message is sent. */
+private const val STOP_SETTLE_MS = 400L
+
 internal fun explain(error: Throwable): String {
   val text = (error.message ?: error::class.java.simpleName).lowercase()
   return when {
@@ -559,6 +602,12 @@ internal fun explain(error: Throwable): String {
         "for the same thing in different words usually gets past it."
 
     text.contains("not initialized") -> "The model is still loading."
+
+    // The engine's own word for a reply that was stopped. Reaching the user means a retry was
+    // refused too, which happens after the model went round in circles and was cut off.
+    text.contains("cancel") ->
+      "The model got stuck repeating itself and was stopped. Ask again, in other words or more " +
+        "briefly - or let the server answer, which handles long requests far better."
 
     // Reaching the user means every accelerator failed, CPU included, so the GPU is no longer
     // the actionable part. Note for whoever sees this during development rather than in the
