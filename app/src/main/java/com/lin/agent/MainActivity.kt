@@ -25,6 +25,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.tappableElement
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -158,6 +165,18 @@ class MainActivity : ComponentActivity() {
           }
         BackHandler(enabled = backTo != null) { backTo?.let { screen = it } }
 
+        // The taskbar a Fold shows when it is open floats over the bottom of an edge-to-edge app,
+        // and Android reports it as a "tappable element" inset rather than as the navigation bar.
+        // Everything sits above it. Insets are consumed here, so screens that also pad for the
+        // navigation bar do not add the space twice.
+        androidx.compose.foundation.layout.Box(
+          modifier =
+            androidx.compose.ui.Modifier.fillMaxSize()
+              .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
+              .windowInsetsPadding(
+                WindowInsets.tappableElement.only(WindowInsetsSides.Bottom)
+              )
+        ) {
         when (screen) {
           SETUP -> com.lin.agent.ui.SetupScreen(onDone = { screen = CONVERSATION })
           SETTINGS ->
@@ -193,6 +212,7 @@ class MainActivity : ComponentActivity() {
               // the downloads live. One place to manage models, not two.
               onGetModel = { screen = SETTINGS },
             )
+        }
         }
         // Recorded from inside the composition rather than at the end of onCreate: onCreate
         // returning only means the work was scheduled, so a crash in the first composition would
