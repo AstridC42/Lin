@@ -120,4 +120,10 @@ class EngineErrorsTest {
   fun noDetailIsJustTheMessage() {
     assertEquals("Gone wrong.", TurnEvent.Failed("Gone wrong.").display)
   }
+
+  @Test
+  fun aStoppedReplyIsExplained() {
+    org.junit.Assert.assertTrue(isCancellation(RuntimeException("Task cancelled")))
+    org.junit.Assert.assertTrue(explain(RuntimeException("Task cancelled")).contains("stuck repeating"))
+  }
 }

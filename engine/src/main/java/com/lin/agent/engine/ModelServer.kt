@@ -116,8 +116,45 @@ class ModelServer(
       }
     }
 
+  /**
+   * Whether [model] on this server can see pictures. Ollama says so itself in /api/show
+   * ("vision" among its capabilities, or a vision projector); for the OpenAI-style servers, and
+   * when the server will not say, the model's name decides. Remembered per server and model.
+   */
+  suspend fun seesImages(typedUrl: String, authHeader: String, kind: ServerKind, model: String): Boolean {
+    val key = "$typedUrl|$model"
+    vision[key]?.let { return it }
+    val answer =
+      if (kind.speaksOpenAi) null
+      else
+        withContext(Dispatchers.IO) {
+          val url = apiUrl(typedUrl, "show") ?: return@withContext null
+          runCatching {
+              val connection =
+                (URL(url).openConnection() as HttpURLConnection).apply {
+                  requestMethod = "POST"
+                  doOutput = true
+                  connectTimeout = TIMEOUT_MS
+                  readTimeout = TIMEOUT_MS
+                  setRequestProperty("Content-Type", "application/json")
+                  headersFrom(authHeader).forEach { (name, value) -> setRequestProperty(name, value) }
+                }
+              connection.outputStream.use { it.write(org.json.JSONObject().put("model", model).toString().toByteArray()) }
+              val ok = connection.responseCode in 200..299
+              val body = if (ok) connection.inputStream.bufferedReader().use { it.readText() } else null
+              connection.disconnect()
+              body?.let(::showSaysVision)
+            }
+            .onFailure { Log.i(TAG, "Could not ask $url about $model: ${it.message}") }
+            .getOrNull()
+        }
+    return (answer ?: nameSuggestsVision(model)).also { vision[key] = it }
+  }
+
   companion object {
     private const val TAG = "LinModelServer"
+
+    private val vision = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
     private const val HTTP_OK = 200
 
     /** Interactive, unlike a model download: somebody is watching this one happen. */
@@ -351,6 +388,10 @@ internal fun describeStatus(status: Int, kind: ServerKind = ServerKind.OLLAMA): 
       "Reached that address, but there is nothing at that path (404). Either the port belongs to " +
         "something else, or this server does not list its models - in which case type the " +
         "model's name in below instead."
+    524 ->
+      "The server took more than 100 seconds to start answering, so Cloudflare stopped waiting " +
+        "(524). Usually the model was still loading: ask again and it should answer quickly. If " +
+        "it keeps happening, the model may be running on the CPU instead of the GPU."
     in 500..599 ->
       "Reached that address and it returned an error ($status). If it is behind a tunnel, the " +
         "tunnel is up but Ollama behind it may not be."
@@ -382,3 +423,22 @@ private const val OLLAMA_DEFAULT_PORT = 11434
 
 /** A trailing `/api` or `/api/<endpoint>`, which is what pasting from the docs leaves. */
 private val API_SUFFIX = Regex("/api(/[A-Za-z]+)?$")
+
+/** What Ollama's /api/show says about pictures, or null when it does not say. */
+internal fun showSaysVision(body: String): Boolean? {
+  val json = runCatching { org.json.JSONObject(body) }.getOrNull() ?: return null
+  json.optJSONArray("capabilities")?.let { caps ->
+    return (0 until caps.length()).any { caps.optString(it) == "vision" }
+  }
+  if (json.optJSONObject("projector_info")?.length()?.let { it > 0 } == true) return true
+  val families = json.optJSONObject("details")?.optJSONArray("families")
+  if (families != null && (0 until families.length()).any { families.optString(it) in setOf("clip", "mllama") }) return true
+  return null
+}
+
+/** A model whose name says it sees: Gemma 3 and 4 (but not the 1B or 270M), LLaVA, Qwen-VL and the like. */
+internal fun nameSuggestsVision(model: String): Boolean {
+  val name = model.lowercase()
+  if (Regex("gemma-?[34]").containsMatchIn(name)) return !Regex("[:\\-_](1b|270m)").containsMatchIn(name)
+  return listOf("vision", "llava", "-vl", "vl:", "pixtral", "minicpm-v", "moondream", "bakllava").any { it in name }
+}

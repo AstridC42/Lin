@@ -96,6 +96,12 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
 
   suspend fun wantsServerToAnswer(): Boolean = settings.answerOnServer.first()
 
+  /** Loads the server's model ahead of the first question, when the server answers. */
+  suspend fun warmServer() {
+    if (!wantsServerToAnswer()) return
+    (readiness() as? ChatReadiness.Ready)?.backend?.let { (it as? ServerBackend)?.warm() }
+  }
+
   suspend fun refresh() {
     lock.withLock {
       (cached as? ChatReadiness.Ready)?.let { ready ->
@@ -161,8 +167,16 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
       kind = serverKindNamed(settings.serverKind.first()),
       assumeModelExists = settings.serverModelTyped.first(),
       sampling = sampling(),
+      seesImages = seesImages(url, model),
     )
   }
+
+  private suspend fun seesImages(url: String, model: String): Boolean =
+    runCatching {
+        com.lin.agent.engine.ModelServer()
+          .seesImages(url, settings.serverAuthHeader.first(), serverKindNamed(settings.serverKind.first()), model)
+      }
+      .getOrDefault(false)
 
   private suspend fun resolve(): ChatReadiness {
     val onDevice = localBackend()
@@ -185,6 +199,7 @@ constructor(private val store: ModelStore, private val settings: SettingsReposit
         kind = serverKindNamed(settings.serverKind.first()),
         assumeModelExists = settings.serverModelTyped.first(),
         sampling = sampling(),
+        seesImages = seesImages(url, model),
       )
     // Asked once here rather than per turn. A turn against a server that has gone away still
     // fails with its own message; this is what lets the phone take over before that happens.

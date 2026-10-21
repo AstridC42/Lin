@@ -369,6 +369,8 @@ constructor(
     // types. Failures are reported on the settings screen rather than here: a server that is
     // asleep should cost its own tools and nothing else, least of all the first screen.
     viewModelScope.launch { runCatching { mcp.refresh() } }
+    // The server's model starts loading while the first question is being typed.
+    viewModelScope.launch { runCatching { backends.warmServer() } }
     // The periodic check is re-synced at launch as well as when the list changes, because
     // WorkManager's queue does not survive the app's data being cleared and a routine that
     // silently stopped running is worse than one that never existed.

@@ -65,6 +65,8 @@ class ServerBackend(
    * configuration is left alone.
    */
   private val sampling: Sampling = Sampling(),
+  /** Whether this model sees pictures; see [ModelServer.seesImages]. */
+  private val seesImages: Boolean = false,
   private val server: ModelServer = ModelServer(),
   private val openStream: (url: String, headers: Map<String, String>, body: String) -> Stream =
     ::httpStream,
@@ -87,10 +89,10 @@ class ServerBackend(
     BackendCapabilities(
       // Tools are offered because the protocol supports them and a model that does not
       // understand them simply never asks for one - which the loop handles as an ordinary reply.
-      // Images stay false: that would fail at the point of use, where it is hardest to explain,
-      // and nothing here knows which model was picked.
+      // Images only when the server says the model sees them (or its name does) - see
+      // ModelServer.seesImages. Sending a picture to a blind model fails where it is hardest to explain.
       supportsTools = true,
-      supportsImages = false,
+      supportsImages = seesImages,
       supportsAudio = false,
       // Zero means "the server's own setting", which is the default: it is configured per
       // model on the server, and inventing a number here would only be wrong. When the user
@@ -118,6 +120,22 @@ class ServerBackend(
       is ServerModelsResult.Failed -> assumeModelExists
     }
 
+  /**
+   * Asks Ollama to load the model now, so the first question does not wait for it. An empty
+   * chat request loads the model and returns; anything that goes wrong is ignored, because the
+   * real question will report it properly.
+   */
+  suspend fun warm() {
+    if (kind.speaksOpenAi) return
+    val url = serverUrl(baseUrl, kind, Endpoint.CHAT) ?: return
+    val body =
+      JSONObject().put("model", modelName).put("messages", JSONArray()).put("keep_alive", OLLAMA_KEEP_ALIVE).toString()
+    kotlinx.coroutines.withContext(Dispatchers.IO) {
+      runCatching { openStream(url, headersFrom(authHeader), body).use { it.status } }
+        .onFailure { Log.i(TAG, "Warm-up did not reach the server: ${it.message}") }
+    }
+  }
+
   override fun converse(request: TurnRequest): Flow<TurnEvent> =
     flow {
         val url = serverUrl(baseUrl, kind, Endpoint.CHAT)
@@ -143,6 +161,15 @@ class ServerBackend(
             cannotThink.add(key)
             stream.close()
             stream = openStream(url, headersFrom(authHeader), bodyFor(sendThink = false))
+          }
+          // A tunnel's gateway timing out (524 from Cloudflare, or a 502/504) usually means the
+          // model was still loading. It keeps loading on the server, so one more try is usually
+          // answered at once.
+          if (stream.status in RETRY_STATUSES) {
+            Log.i(TAG, "Server gateway said ${stream.status}; trying once more")
+            stream.close()
+            kotlinx.coroutines.delay(RETRY_PAUSE_MS)
+            stream = openStream(url, headersFrom(authHeader), bodyFor(key !in cannotThink))
           }
           stream.use { s ->
             if (s.status != HTTP_OK) {
@@ -221,6 +248,10 @@ class ServerBackend(
     const val UNKNOWN_CONTEXT = 0
 
     private const val CONNECT_TIMEOUT_MS = 10_000
+
+    /** Gateway timeouts worth one more try: Cloudflare's 524, and a proxy's 502 and 504. */
+    private val RETRY_STATUSES = setOf(502, 504, 524)
+    private const val RETRY_PAUSE_MS = 1_500L
 
     /**
      * Generous, and between bytes rather than in total.
@@ -375,6 +406,9 @@ internal fun chatRequestBody(
       .put("model", model)
       .put("messages", messages)
       .put("stream", true)
+      // Kept loaded for half an hour rather than Ollama's five minutes: loading a large model is
+      // the slow part, and over a tunnel a cold load can outlast Cloudflare's 100-second wait.
+      .put("keep_alive", OLLAMA_KEEP_ALIVE)
       .put("options", ollamaOptions(samplingFor(sampling, request, request.responseSchema != null)))
 
   if (request.tools.isNotEmpty()) {
@@ -651,3 +685,6 @@ private const val SSE_DONE = "[DONE]"
  */
 private fun base64(bytes: ByteArray): String =
   java.util.Base64.getEncoder().encodeToString(bytes)
+
+/** How long Ollama keeps the model loaded after a request. */
+internal const val OLLAMA_KEEP_ALIVE = "30m"

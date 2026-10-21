@@ -127,6 +127,45 @@ class ServerBackendTest {
     assertEquals("The answer.", (events.last() as TurnEvent.Done).fullText)
   }
 
+  /** Cloudflare's 524 while the model loads: tried once more, and the second answer is used. */
+  @Test
+  fun aGatewayTimeoutIsTriedOnceMore() = runTest {
+    var calls = 0
+    val events =
+      ServerBackend("host", "", "m", openStream = { _, _, _ -> calls++; if (calls == 1) stream(524, emptyList()) else stream(200, CHUNKS) })
+        .converse(request())
+        .toList()
+    assertEquals(2, calls)
+    assertEquals("The answer.", (events.last() as TurnEvent.Done).fullText)
+  }
+
+  @Test
+  fun aSecondGatewayTimeoutIsExplained() = runTest {
+    var calls = 0
+    val events =
+      ServerBackend("host", "", "m", openStream = { _, _, _ -> calls++; stream(524, emptyList()) }).converse(request()).toList()
+    assertEquals(2, calls)
+    assertTrue((events.last() as TurnEvent.Failed).message.contains("100 seconds"))
+  }
+
+  @Test
+  fun theModelIsKeptLoaded() {
+    assertEquals("30m", JSONObject(chatRequestBody("m", request())).getString("keep_alive"))
+  }
+
+  @Test
+  fun visionIsReadFromTheServerOrTheName() {
+    assertEquals(true, showSaysVision("""{"capabilities":["completion","vision","tools"]}"""))
+    assertEquals(false, showSaysVision("""{"capabilities":["completion","tools"]}"""))
+    assertEquals(true, showSaysVision("""{"projector_info":{"clip.has_vision_encoder":true}}"""))
+    assertNull(showSaysVision("""{"details":{"family":"llama"}}"""))
+    assertTrue(nameSuggestsVision("gemma-4-12B"))
+    assertTrue(nameSuggestsVision("gemma3:27b"))
+    assertTrue(nameSuggestsVision("qwen2.5-vl:7b"))
+    assertFalse(nameSuggestsVision("gemma3:1b"))
+    assertFalse(nameSuggestsVision("qwen3:32b"))
+  }
+
   /** A reply cut short is still a reply; discarding it would lose what the user already read. */
   @Test
   fun aStreamThatEndsWithoutTheDoneFlagKeepsWhatArrived() = runTest {
