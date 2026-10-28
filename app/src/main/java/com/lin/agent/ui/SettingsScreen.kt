@@ -1738,6 +1738,45 @@ private fun ColumnScope.WebSearch(state: SettingsState, viewModel: SettingsViewM
     }
   }
 
+  Section(R.string.settings_kitesurf_heading) {
+    Text(
+      stringResource(R.string.settings_kitesurf_detail),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedTextField(
+      value = state.cloudflareAccount,
+      onValueChange = viewModel::onCloudflareAccountChanged,
+      label = { Text(stringResource(R.string.settings_kitesurf_account)) },
+      singleLine = true,
+      isError = state.cloudflareAccount.isNotBlank() && !com.lin.agent.core.web.Kitesurf.validAccount(state.cloudflareAccount),
+      supportingText = {
+        if (state.cloudflareAccount.isNotBlank() && !com.lin.agent.core.web.Kitesurf.validAccount(state.cloudflareAccount)) {
+          Text(stringResource(R.string.settings_kitesurf_account_bad))
+        }
+      },
+      modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+      value = state.cloudflareToken,
+      onValueChange = viewModel::onCloudflareTokenChanged,
+      label = { Text(stringResource(R.string.settings_kitesurf_token)) },
+      singleLine = true,
+      visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+      modifier = Modifier.fillMaxWidth(),
+    )
+    TextButton(onClick = viewModel::tryKitesurf, enabled = !state.kitesurfTrying) {
+      Text(stringResource(if (state.kitesurfTrying) R.string.settings_search_trying else R.string.settings_kitesurf_try))
+    }
+    if (state.kitesurfTrial.isNotEmpty()) {
+      Text(
+        state.kitesurfTrial,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+  }
+
 }
 
 private fun searchProviderLabel(provider: SearchProvider) =

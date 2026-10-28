@@ -380,7 +380,7 @@ class SearchWebTool(private val settings: SettingsRepository, private val web: W
  * and which is tested, because a page that arrived as raw HTML would fill the whole context
  * window with angle brackets.
  */
-class ReadPageTool(private val web: Web) : AgentTool {
+class ReadPageTool(private val web: Web, private val browser: com.lin.agent.web.KitesurfClient) : AgentTool {
 
   override val name = "read_page"
 
@@ -417,10 +417,39 @@ class ReadPageTool(private val web: Web) : AgentTool {
     val page =
       runCatching { web.get(url) }
         .onFailure { Log.w(TAG, "Could not fetch $url", it) }
-        .getOrNull() ?: return ToolResult.Failed("$url could not be reached.")
+        .getOrNull()
 
+    // Read plainly first: it is quick, free and sends the address to nobody. Only when that
+    // cannot read the page does Cloudflare's browser take over, if it has been set up.
+    val plain = page?.let { plainReading(url, it) }
+    if (plain is Plain.Text) return ToolResult.Ok("From $url:\n\n${plain.text}")
+    if (browser.available()) {
+      when (val seen = browser.markdown(url)) {
+        is com.lin.agent.web.BrowserResult.Got ->
+          return ToolResult.Ok(
+            "From $url (read in Cloudflare's browser):\n\n${readableMarkdown(seen.value)}"
+          )
+        is com.lin.agent.web.BrowserResult.Failed ->
+          Log.i(TAG, "Cloudflare's browser could not read $url: ${seen.reason}")
+      }
+    }
+    return when (plain) {
+      is Plain.Text -> ToolResult.Ok("From $url:\n\n${plain.text}")
+      is Plain.Unreadable -> ToolResult.Failed(plain.why)
+      null -> ToolResult.Failed("$url could not be reached.")
+    }
+  }
+
+  private sealed interface Plain {
+    data class Text(val text: String) : Plain
+
+    data class Unreadable(val why: String) : Plain
+  }
+
+  /** What plain fetching made of [page]: its words, or the sentence for why there are none. */
+  private fun plainReading(url: String, page: com.lin.agent.web.Fetched): Plain {
     if (!page.ok) {
-      return ToolResult.Failed(
+      return Plain.Unreadable(
         "$url answered ${page.status}." +
           // Almost always a model that assembled a plausible-looking address rather than
           // using one from a result list. Worth saying, because the fix is to search.
@@ -429,26 +458,28 @@ class ReadPageTool(private val web: Web) : AgentTool {
           " Say the page could not be read rather than guessing what was on it."
       )
     }
-
     // A PDF or an image arrives as bytes that make no sense as text, and the model would
     // describe the mojibake as though it were the page.
     if (page.contentType.isNotEmpty() && TEXTUAL.none { page.contentType.startsWith(it) }) {
-      return ToolResult.Failed(
+      return Plain.Unreadable(
         "$url is ${page.contentType.substringBefore(';')}, which Lin cannot read as text. Say so."
       )
     }
-
     val text = readableText(page.body)
     if (text.isBlank()) {
-      return ToolResult.Failed(
+      return Plain.Unreadable(
         "$url has no readable text - it may be a page that builds itself with JavaScript, " +
           "which Lin does not run. Say so."
       )
     }
-    return ToolResult.Ok("From $url:\n\n$text")
+    return Plain.Text(text)
   }
 
+  /** Markdown from the browser, cut to the same length as any other page. */
+  private fun readableMarkdown(markdown: String): String = markdown.trim().take(MOST_MARKDOWN)
+
   private companion object {
+    const val MOST_MARKDOWN = 12_000
     const val TAG = "LinReadPage"
     val TEXTUAL = listOf("text/", "application/xhtml", "application/xml", "application/json")
   }

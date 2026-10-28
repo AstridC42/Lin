@@ -55,6 +55,9 @@ a company's cloud unless you point it there.
 
 **Knowledge**
 - Web search with fallbacks: DuckDuckGo (no setup), SearXNG, Brave, Firecrawl, Tavily, Wikipedia.
+- Optional [Cloudflare Kitesurf](https://developers.cloudflare.com/browser-run/kitesurf/) browser: reads pages that
+  need JavaScript or turn phones away, and shows a screenshot of a page. Your own Cloudflare token; page
+  addresses are sent to Cloudflare.
 - Reads the top pages, answers from their content with numbered citations, and shows pictures.
 - Long-term memory: remembers facts you tell it, and can learn from finished conversations.
 - A short "about you" quiz sets tone, length, units and more.

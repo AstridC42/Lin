@@ -91,6 +91,8 @@ Two ways past:
    answer length, units and city. Nothing is set until you answer.
 4. **Web search** works straight away through DuckDuckGo. Settings → Looking things up lets you use your
    own SearXNG, or Brave, Firecrawl or Tavily with your key.
+   Also optional: a Cloudflare account id and a "Browser Run - Edit" API token (Settings → Tools →
+   Cloudflare browser) let Lin read JavaScript-only pages and screenshot a page through Kitesurf.
 
 ## Optional extras
 
