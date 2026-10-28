@@ -78,6 +78,7 @@ constructor(
   private val privileged: Privileged,
   private val lastSaid: LastSaid,
   private val web: com.lin.agent.web.Web,
+  private val kitesurf: com.lin.agent.web.KitesurfClient,
   private val reminders: com.lin.agent.remind.ReminderBook,
   private val photoDesk: PhotoDesk,
 ) {
@@ -114,7 +115,8 @@ constructor(
       // The web. The single largest thing Lin could not do: an assistant with a calendar, a
       // torch and no way to find out anything it was not trained on is a toy.
       SearchWebTool(settings, web),
-      ReadPageTool(web),
+      ReadPageTool(web, kitesurf),
+      ScreenshotTool(context, kitesurf),
       ContactTool(context),
       NavigateTool(context, launchGuard),
       DeviceStatusTool(context),

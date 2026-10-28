@@ -71,6 +71,7 @@ fun stepsSummary(steps: List<Step>): String {
 private val VERBS: Map<String, Pair<String, String>> =
   mapOf(
     "search_web" to ("Searching the web" to "Searched the web"),
+    "screenshot_page" to ("Taking a picture of a page" to "Took a picture of a page"),
     "read_page" to ("Reading a page" to "Read a page"),
     "remind_me" to ("Setting a reminder" to "Set a reminder"),
     "list_reminders" to ("Checking reminders" to "Checked reminders"),

@@ -320,6 +320,19 @@ class SettingsRepository(private val context: Context) {
   suspend fun setQuickActionsModel(value: Boolean) = write(QUICK_ACTIONS_MODEL, value)
 
   /**
+   * Cloudflare's account id and a Browser Run API token, for reading and capturing pages in
+   * Cloudflare's Kitesurf browser. Both optional; with both set, Lin falls back to it for pages
+   * it cannot read itself. See [com.lin.agent.core.web.Kitesurf].
+   */
+  val cloudflareAccount: Flow<String> = read(CLOUDFLARE_ACCOUNT, "")
+
+  suspend fun setCloudflareAccount(value: String) = write(CLOUDFLARE_ACCOUNT, value.trim())
+
+  val cloudflareToken: Flow<String> = read(CLOUDFLARE_TOKEN, "")
+
+  suspend fun setCloudflareToken(value: String) = write(CLOUDFLARE_TOKEN, value.trim())
+
+  /**
    * A Hugging Face access token, sent with model downloads from huggingface.co. Empty by
    * default: the models in the catalog are ungated. Entered on each phone, so an APK passed to
    * somebody else carries nobody's token.
@@ -672,6 +685,8 @@ class SettingsRepository(private val context: Context) {
     val FIRECRAWL_URL = stringPreferencesKey("firecrawl_url")
     val TAVILY_KEY = stringPreferencesKey("tavily_key")
     val HF_TOKEN = stringPreferencesKey("hf_token")
+    val CLOUDFLARE_ACCOUNT = stringPreferencesKey("cloudflare_account")
+    val CLOUDFLARE_TOKEN = stringPreferencesKey("cloudflare_token")
     val WEB_IMAGES = booleanPreferencesKey("web_images")
     val BACKGROUND_VOICE = booleanPreferencesKey("background_voice")
     val OWN_VOICE = booleanPreferencesKey("own_voice")

@@ -143,6 +143,10 @@ data class SettingsState(
   val tavilyKey: String = "",
   /** Hugging Face access token for model downloads. Empty for none. */
   val hfToken: String = "",
+  val cloudflareAccount: String = "",
+  val cloudflareToken: String = "",
+  val kitesurfTrial: String = "",
+  val kitesurfTrying: Boolean = false,
   val webImages: Boolean = true,
   val quickActionsModel: Boolean = true,
   /** What a trial search actually got back, for a screen that must say facts rather than verdicts. */
@@ -215,6 +219,7 @@ constructor(
   private val privileged: com.lin.agent.privileged.Privileged,
   private val reminders: com.lin.agent.remind.ReminderBook,
   private val web: com.lin.agent.web.Web,
+  private val kitesurf: com.lin.agent.web.KitesurfClient,
   private val tools: com.lin.agent.model.Tools,
   private val work: androidx.work.WorkManager,
   private val mcp: com.lin.agent.mcp.McpConnections,
@@ -262,6 +267,8 @@ constructor(
           firecrawlUrl = settings.firecrawlUrl.first(),
           tavilyKey = settings.tavilyKey.first(),
           hfToken = settings.hfToken.first(),
+          cloudflareAccount = settings.cloudflareAccount.first(),
+          cloudflareToken = settings.cloudflareToken.first(),
           webImages = settings.webImages.first(),
           quickActionsModel = settings.quickActionsModel.first(),
           persona = personaFrom(settings.persona.first()),
@@ -706,6 +713,35 @@ constructor(
   fun setWebImages(on: Boolean) {
     _state.update { it.copy(webImages = on) }
     viewModelScope.launch { settings.setWebImages(on) }
+  }
+
+  fun onCloudflareAccountChanged(value: String) {
+    _state.update { it.copy(cloudflareAccount = value, kitesurfTrial = "") }
+    viewModelScope.launch { settings.setCloudflareAccount(value) }
+  }
+
+  fun onCloudflareTokenChanged(value: String) {
+    _state.update { it.copy(cloudflareToken = value, kitesurfTrial = "") }
+    viewModelScope.launch { settings.setCloudflareToken(value) }
+  }
+
+  /** Reads one real page through Cloudflare's browser, and says what came of it. */
+  fun tryKitesurf() {
+    if (_state.value.kitesurfTrying) return
+    _state.update { it.copy(kitesurfTrying = true, kitesurfTrial = "") }
+    viewModelScope.launch {
+      // The fields are saved as they are typed, so what is tried is what is set.
+      val said =
+        if (!com.lin.agent.core.web.Kitesurf.configured(_state.value.cloudflareAccount, _state.value.cloudflareToken)) {
+          appContext.getString(R.string.settings_kitesurf_unset)
+        } else {
+          when (val got = kitesurf.markdown("https://example.com")) {
+            is com.lin.agent.web.BrowserResult.Got -> appContext.getString(R.string.settings_kitesurf_works, got.value.length)
+            is com.lin.agent.web.BrowserResult.Failed -> got.reason
+          }
+        }
+      _state.update { it.copy(kitesurfTrying = false, kitesurfTrial = said) }
+    }
   }
 
   fun onHfTokenChanged(value: String) {

@@ -220,6 +220,7 @@ fun SetupScreen(onDone: () -> Unit, viewModel: SettingsViewModel = hiltViewModel
             }
           SetupStep.NEARBY -> Action(R.string.setup_allow) { askPermissions.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT)) }
           SetupStep.TOKEN -> TokenStep(state, viewModel, context)
+          SetupStep.BROWSER -> BrowserStep(state, viewModel, context)
           SetupStep.DONE -> Summary(done, onPick = { at = it.ordinal }, onFinish = ::finish)
         }
       }
@@ -371,6 +372,34 @@ private fun ColumnScope.TokenStep(state: SettingsState, viewModel: SettingsViewM
 }
 
 @Composable
+private fun ColumnScope.BrowserStep(state: SettingsState, viewModel: SettingsViewModel, context: Context) {
+  OutlinedTextField(
+    value = state.cloudflareAccount,
+    onValueChange = viewModel::onCloudflareAccountChanged,
+    label = { Text(stringResource(R.string.settings_kitesurf_account)) },
+    singleLine = true,
+    modifier = Modifier.fillMaxWidth(),
+  )
+  OutlinedTextField(
+    value = state.cloudflareToken,
+    onValueChange = viewModel::onCloudflareTokenChanged,
+    label = { Text(stringResource(R.string.settings_kitesurf_token)) },
+    singleLine = true,
+    visualTransformation = PasswordVisualTransformation(),
+    modifier = Modifier.fillMaxWidth(),
+  )
+  OutlinedButton(onClick = { open(context, Intent.ACTION_VIEW, Uri.parse("https://dash.cloudflare.com/profile/api-tokens")) }) {
+    Text(stringResource(R.string.setup_browser_make))
+  }
+  OutlinedButton(onClick = viewModel::tryKitesurf, enabled = !state.kitesurfTrying) {
+    Text(stringResource(R.string.settings_kitesurf_try))
+  }
+  if (state.kitesurfTrial.isNotEmpty()) {
+    Text(state.kitesurfTrial, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+  }
+}
+
+@Composable
 private fun ColumnScope.Summary(done: Set<SetupStep>, onPick: (SetupStep) -> Unit, onFinish: () -> Unit) {
   val missing = missingEssentials(done)
   for (each in checkedSteps) {
@@ -459,6 +488,7 @@ private fun doneSteps(context: Context, state: SettingsState): Set<SetupStep> = 
   }
   if (granted(context, Manifest.permission.BLUETOOTH_CONNECT)) add(SetupStep.NEARBY)
   if (state.hfToken.isNotBlank()) add(SetupStep.TOKEN)
+  if (com.lin.agent.core.web.Kitesurf.configured(state.cloudflareAccount, state.cloudflareToken)) add(SetupStep.BROWSER)
 }
 
 private fun titleOf(step: SetupStep) =
@@ -477,6 +507,7 @@ private fun titleOf(step: SetupStep) =
     SetupStep.BATTERY -> R.string.setup_battery_title
     SetupStep.NEARBY -> R.string.setup_nearby_title
     SetupStep.TOKEN -> R.string.setup_token_title
+    SetupStep.BROWSER -> R.string.setup_browser_title
     SetupStep.DONE -> R.string.setup_done_title
   }
 
@@ -496,5 +527,6 @@ private fun detailOf(step: SetupStep) =
     SetupStep.BATTERY -> R.string.setup_battery_detail
     SetupStep.NEARBY -> R.string.setup_nearby_detail
     SetupStep.TOKEN -> R.string.setup_token_detail
+    SetupStep.BROWSER -> R.string.setup_browser_detail
     SetupStep.DONE -> R.string.setup_done_detail
   }

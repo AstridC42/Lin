@@ -794,4 +794,15 @@
   <string name="setup_finish">Start using Lin</string>
   <string name="setup_again_note">You can run this again any time from Settings.</string>
   <string name="settings_run_setup">Setup</string>
+  <string name="settings_kitesurf_heading">Cloudflare browser</string>
+  <string name="settings_kitesurf_detail">Optional. When Lin cannot read a page itself, because it is built with JavaScript or turns phones away, it can read it in Cloudflare\'s Kitesurf browser instead, and it can show you what a page looks like. The address of the page is sent to Cloudflare. Make a token at dash.cloudflare.com with the \"Browser Run - Edit\" permission; the account id is on your account\'s overview page. The free plan allows one request every ten seconds.</string>
+  <string name="settings_kitesurf_account">Cloudflare account id</string>
+  <string name="settings_kitesurf_account_bad">An account id is 32 letters and digits.</string>
+  <string name="settings_kitesurf_token">Browser Run API token</string>
+  <string name="settings_kitesurf_try">Try it on a page</string>
+  <string name="settings_kitesurf_unset">Add both the account id and the token first.</string>
+  <string name="settings_kitesurf_works">It works: Cloudflare\'s browser read the page (%1$d characters).</string>
+  <string name="setup_browser_title">Cloudflare browser</string>
+  <string name="setup_browser_detail">Optional. Lets Lin read pages that need JavaScript and show you what a page looks like, using Cloudflare\'s Kitesurf browser. Page addresses are sent to Cloudflare. You need a free Cloudflare account and a token with the \"Browser Run - Edit\" permission.</string>
+  <string name="setup_browser_make">Make a token</string>
 </resources>

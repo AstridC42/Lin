@@ -35,6 +35,7 @@ enum class SetupStep(val essential: Boolean) {
   BATTERY(false),
   NEARBY(false),
   TOKEN(false),
+  BROWSER(false),
   DONE(false),
 }
 

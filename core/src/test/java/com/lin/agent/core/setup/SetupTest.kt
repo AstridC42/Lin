@@ -25,7 +25,8 @@ class SetupTest {
     assertEquals(SetupStep.BRAIN, nextStep(SetupStep.WELCOME, emptySet()))
     assertEquals(SetupStep.VOICE, nextStep(SetupStep.WELCOME, setOf(SetupStep.BRAIN, SetupStep.NOTIFICATIONS)))
     assertEquals(SetupStep.DONE, nextStep(SetupStep.WELCOME, checkedSteps.toSet()))
-    assertEquals(SetupStep.DONE, nextStep(SetupStep.TOKEN, emptySet()))
+    assertEquals(SetupStep.BROWSER, nextStep(SetupStep.TOKEN, emptySet()))
+    assertEquals(SetupStep.DONE, nextStep(SetupStep.BROWSER, emptySet()))
     assertEquals(SetupStep.DONE, nextStep(SetupStep.DONE, emptySet()))
   }
 

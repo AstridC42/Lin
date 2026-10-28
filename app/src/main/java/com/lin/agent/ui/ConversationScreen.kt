@@ -1374,7 +1374,13 @@ private fun Thumbnail(uri: String) {
   var failed by remember(uri) { mutableStateOf(false) }
   val bitmap: ImageBitmap? by
     produceState<ImageBitmap?>(initialValue = null, uri) {
-      val bytes = if (fromWeb) webImageBytes(uri) else PhotoLibrary(context).bytesFor(uri)
+      val bytes =
+        when {
+          fromWeb -> webImageBytes(uri)
+          // A page picture Lin took itself, kept in its own cache.
+          uri.startsWith("file://") -> runCatching { java.io.File(java.net.URI(uri)).readBytes() }.getOrNull()
+          else -> PhotoLibrary(context).bytesFor(uri)
+        }
       value =
         bytes?.let { shrunk(it)?.asImageBitmap() }
       if (value == null) failed = true
